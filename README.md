@@ -97,6 +97,7 @@ ls > fits_input_file.txt
 ```
 
 ---
+```
 Responding to the inquiry with (including appostraphes) either 
 
 `'fits_input_file.txt'` 
@@ -106,6 +107,7 @@ or
 `'/Users/jonathan/Research/NIRCam/CV3/StabilityTest/fitsfilesonly/reduced_orig_flags/redfits/NRCN821CLRSUB1-6012172256_1_481_SE_2016-01-12T18h00m43.red/'` 
 
 is successful
+```
 ---
 
 Request Directory with a Set of Fits Files OR a Text File with the Same List
