@@ -64,7 +64,7 @@
 #     `sys`        : python-os level functions (i.e. path)
 #     `time`       : compute and convert current timestamps from python / os
 
-# In[1]:
+# In[ ]:
 
 # Matplotlib for Plotting
 get_ipython().magic(u'matplotlib inline')
@@ -106,7 +106,7 @@ from image_registration import cross_correlation_shifts
 style.use('fivethirtyeight')
 
 
-# This is an example input for the requests below. The directory contains a collection fits files within it
+# This is an example input for the requests below. The directory contains a collection of fits files within it
 #     - only works on my laptop
 #     - soon to 'upgraded' to working on the server
 # 
@@ -133,7 +133,7 @@ style.use('fivethirtyeight')
 # Request Directory with a Set of Fits Files OR a Text File with the Same List
 # ---
 
-# In[10]:
+# In[ ]:
 
 list_of_data_file_types = ['.txt', '.dat', '.csv']
 found       = False
@@ -173,7 +173,7 @@ if not found:
 #     return startDate, endDate
 # ```
 
-# In[4]:
+# In[ ]:
 
 def get_julian_date_from_gregorian_date(*date):
     """gd2jd.py converts a UT Gregorian date to Julian date.
@@ -272,7 +272,7 @@ def get_julian_date_from_gregorian_date(*date):
     return JD
 
 
-# In[5]:
+# In[ ]:
 
 def get_julian_date_from_header(header):
     from jd import julian_date
@@ -333,7 +333,7 @@ def get_julian_date_from_header(header):
 # This routine ensures that the user can manipulate the inputs as needed. Users can either send a single fits array, a set of fits array, a single string with the location of a fits file, or a list of strings with the location of several fits files.
 # 
 
-# In[6]:
+# In[ ]:
 
 def load_fit_phot_time(fitsfile, guesscenter = None, subframesize = [10,10], aperrad = [5], 
                            nGroupsBig = 100, stddev0 = 2.0):
@@ -396,7 +396,7 @@ def load_fit_phot_time(fitsfile, guesscenter = None, subframesize = [10,10], ape
 # Test output using the first fits file name in the list from above
 # ---
 
-# In[11]:
+# In[ ]:
 
 load_fit_phot_time(fitsfilenames[0], guesscenter = None)#[160,160]
 
@@ -420,7 +420,7 @@ load_fit_phot_time(fitsfilenames[0], guesscenter = None)#[160,160]
 # Outputs:
 #     1. Master dataframe containing list of aper phot, gauss centers/widths/amplitudes, cross-corr centers, sky bg
 
-# In[7]:
+# In[ ]:
 
 def loads_fits_phots_times(fitsfiles, guesscenter = None, subframesize = [10,10], aperrad = [5], stddev0 = 2.0):
     '''
@@ -459,7 +459,7 @@ def loads_fits_phots_times(fitsfiles, guesscenter = None, subframesize = [10,10]
 # 
 # The table below is the entire data set computed from the wrapper to the crux function
 
-# In[8]:
+# In[ ]:
 
 master_output_df = loads_fits_phots_times(fitsfilenames, guesscenter = None, 
                                           subframesize = [10,10], aperrad = [3], stddev0 = 2.0)
@@ -473,7 +473,7 @@ master_output_df
 # 
 # The diagonal is a kernel density estimator (default: histogram) as a metric on the specific column distribution.
 
-# In[9]:
+# In[ ]:
 
 scatter_matrix(master_output_df.drop('filename',1), diagonal='kde', figsize=(14,12));
 
@@ -485,7 +485,7 @@ scatter_matrix(master_output_df.drop('filename',1), diagonal='kde', figsize=(14,
 # 
 # For special cases, plot the gaussian X and Y centers vs aperture photometry values
 
-# In[10]:
+# In[ ]:
 
 def renorm(arr):
     if arr.dtype == 'float64':
