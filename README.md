@@ -18,7 +18,7 @@ In order to process that data, it is important to identify the host star, accura
     2. Computer the time element
     3. subtract the background (store background level)
     4. isolate the star into a subframe
-    5. Cross-correlate a Gaussian (or JWST psf) with the image to find predicted center (store CC center)
+    5. Cross-correlate a Gaussian (or synthetic psf) with the image to find predicted center (store CC center)
     6. Gaussian fit to subframe, starting at CC center (store GS center, width, amplitude)
     7. Perform apeture photometry with each radius given at the beginning (store aperture radii as a function of radius)
 
@@ -82,29 +82,27 @@ from image_registration import cross_correlation_shifts
 style.use('fivethirtyeight')
 ```
 
-This is an example input for the requests below. The directory contains JWST-NIRCam fits files within it
-    - only works on Jonathan Fraine's Laptop
-    - soon to 'upgrade' to working on surtr
+This is an example input for the requests below. The directory contains a collection of fits files within it
+    - only works on my laptop
+    - soon to 'upgraded' to working on the server
 
-'/Users/jonathan/Research/NIRCam/CV3/StabilityTest/fitsfilesonly/reduced_orig_flags/redfits/NRCN821CLRSUB1-6012172256_1_481_SE_2016-01-12T18h00m43.red/'
+'/path/to/fits/files/'
 
 There is also a test file in the current working directory named `'fits_input_file.txt'`. It was creating using the bash 'script'
 
 ```bash
-cd /Users/jonathan/Research/NIRCam/CV3/StabilityTest/fitsfilesonly/reduced_orig_flags/redfits/NRCN821CLRSUB1-6012172256_1_481_SE_2016-01-12T18h00m43.red/
-
+cd /path/to/fits/files/
 ls > fits_input_file.txt
 ```
 
 ---
-
 Responding to the inquiry with (including appostraphes) either 
 
 `'fits_input_file.txt'` 
 
 or 
 
-`'/Users/jonathan/Research/NIRCam/CV3/StabilityTest/fitsfilesonly/reduced_orig_flags/redfits/NRCN821CLRSUB1-6012172256_1_481_SE_2016-01-12T18h00m43.red/'` 
+`'/path/to/fits/files/'` 
 
 is successful
 
@@ -114,17 +112,16 @@ Request Directory with a Set of Fits Files OR a Text File with the Same List
 ---
 ```python
 list_of_data_file_types = ['.txt', '.dat', '.csv']
-nircam_data = DataFrame()
 found       = False
 DataDir     = input()
 
 for filetype in list_of_data_file_types:
     if filetype in DataDir:
-        nircam_data['fitsfilenames'] = read_csv(DataDir)
+        fitsfilenames = list(read_csv(DataDir))
         found = True
 
 if not found:
-    nircam_data['fitsfilenames'] = glob(DataDir+'/*')
+    fitsfilenames = glob(DataDir+'/*')
 ```
 
 Compute Julian Data from Header
@@ -276,7 +273,7 @@ This function is the **crux** of the entire algorithm. The operation takes in on
     2. Computer the time element
     3. subtract the background (store background level)
     4. isolate the star into a subframe
-    5. Cross-correlate a Gaussian (or JWST psf) with the image to find predicted center (store CC center)
+    5. Cross-correlate a Gaussian (or synthetic psf) with the image to find predicted center (store CC center)
     6. Gaussian fit to subframe, starting at CC center (store GS center, width, amplitude)
     7. Perform apeture photometry with each radius given at the beginning (store aperture radii as a function of radius)
 3. Output
@@ -354,7 +351,7 @@ def load_fit_phot_time(fitsfile, guesscenter = None, subframesize = [10,10], ape
 Test output using the first fits file name in the list from above
 ---
 ```python
-load_fit_phot_time(nircam_data['fitsfilenames'][0], guesscenter = None)
+load_fit_phot_time(fitsfilenames[0], guesscenter = None)
 ```
 
 Wrapper function to cycle through each fits file name in the list of fits files from user input
@@ -397,27 +394,27 @@ def loads_fits_phots_times(fitsfiles, guesscenter = None, subframesize = [10,10]
                    'cross corr y center', 'cross corr x center', 
                    'sky background']
 
-    nircam_master_df = DataFrame(columns=columnNames)
+    master_output_df = DataFrame(columns=columnNames)
     for fitsfile in fitsfiles:
         columnInputs = load_fit_phot_time(fitsfile, guesscenter  = guesscenter, 
                                                     subframesize = subframesize, 
                                                     aperrad      = aperrad, 
                                                     stddev0      = stddev0)
         #
-        nircam_master_df.loc[len(nircam_master_df)] = columnInputs
+        master_output_df.loc[len(master_output_df)] = columnInputs
     
-    return nircam_master_df
+    return master_output_df
 ```
 
-Create JWST-NIRCam Master DataFrame and Print Out Table Thereof
+Create Master Output DataFrame and Print Out Table Thereof
 ---
 
 The table below is the entire data set computed from the wrapper to the crux function
 
 ```python
-nircam_master_df = loads_fits_phots_times(nircam_data['fitsfilenames'], guesscenter = None, 
+master_output_df = loads_fits_phots_times(fitsfilenames, guesscenter = None, 
                                           subframesize = [10,10], aperrad = [3], stddev0 = 2.0)
-nircam_master_df
+master_output_df
 ```
 
 Generate Scatter Matrix to Cross Compare All Values with Eachother
@@ -428,7 +425,7 @@ The scatter matrix is a pandas data frame function that plots every column of th
 The diagonal is a kernel density estimator (default: histogram) as a metric on the specific column distribution.
 
 ```python
-scatter_matrix(nircam_master_df.drop('filename',1), diagonal='kde', figsize=(14,12));
+scatter_matrix(master_output_df.drop('filename',1), diagonal='kde', figsize=(14,12));
 ```
 
 Plot All Values as Function of Time and Gaussian Centers
@@ -445,14 +442,14 @@ def renorm(arr):
     else:
         return arr
 
-nircam_master_df.apply(renorm, axis=0)
+master_output_df.apply(renorm, axis=0)
 
 fig = figure(figsize=(14,12))
-for k, key in enumerate(nircam_master_df.keys()):
-    ax  = fig.add_subplot(len(nircam_master_df.keys()), 1, k+1)
+for k, key in enumerate(master_output_df.keys()):
+    ax  = fig.add_subplot(len(master_output_df.keys()), 1, k+1)
     if not key in ['time', 'filename']:
-        ax.plot(nircam_master_df['time'], nircam_master_df[key])
-        if k == len(nircam_master_df.keys()) - 1:
+        ax.plot(master_output_df['time'], master_output_df[key])
+        if k == len(master_output_df.keys()) - 1:
             ax.set_xlabel('time')
         else:
             ax.set_xticklabels([])
@@ -460,14 +457,14 @@ for k, key in enumerate(nircam_master_df.keys()):
         ax.set_ylabel(key.replace('gaussian', 'gauss').replace('background', 'bg').replace(' ', '\n'))
         ax.yaxis.set_major_locator(MaxNLocator(nbins=3))
 
-ax  = fig.add_subplot(len(nircam_master_df.keys()), 1, 1)
-ax.plot(nircam_master_df['gaussian y center'], nircam_master_df['aperture phot 3.0'], 'o')
+ax  = fig.add_subplot(len(master_output_df.keys()), 1, 1)
+ax.plot(master_output_df['gaussian y center'], master_output_df['aperture phot 3.0'], 'o')
 ax.set_ylabel('aperture phot 3.0'.replace(' ', '\n'))
 ax.set_xlabel('gauss y center')
 ax.yaxis.set_major_locator(MaxNLocator(nbins=3))
 
-ax  = fig.add_subplot(len(nircam_master_df.keys()), 1, 3)
-ax.plot(nircam_master_df['gaussian x center'], nircam_master_df['aperture phot 3.0'], 'o')
+ax  = fig.add_subplot(len(master_output_df.keys()), 1, 3)
+ax.plot(master_output_df['gaussian x center'], master_output_df['aperture phot 3.0'], 'o')
 ax.set_ylabel('aperture phot 3.0'.replace(' ', '\n'))
 ax.set_xlabel('gauss x center')
 ax.yaxis.set_major_locator(MaxNLocator(nbins=3))
