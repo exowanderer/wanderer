@@ -866,7 +866,7 @@ loadfitsdir = dataDir + fitsFileDir
 
 method = 'median'
 
-print('Initialize an instance of `wanderer` as `nircamTSOmedian_ModB`\n')
+print('Initialize an instance of `wanderer` as `example_wanderer_median`\n')
 example_wanderer_median = wanderer(fitsFileDir=loadfitsdir_ModB, filetype=filetype, 
                                             yguess=yguess, xguess=xguess, method=method)
 
@@ -904,7 +904,7 @@ for bgNow in background_choices:
             print('Working on Background ' + bgNow + ' with Centering ' + ctrNow + ' and AperRad ' + str(aperRad), end=" ")
             example_wanderer_median.compute_flux_over_time(aperRad=aperRad, centering=ctrNow, background=bgNow)
             flux_key_now  = ctrNow + '_' + bgNow+'_' + 'rad' + '_' + str(aperRad)
-            print(std(example_wanderer_median.flux_TSO_df[flux_key_now] / median(nircamTSOmedian_ModB.flux_TSO_df[flux_key_now]))*ppm)
+            print(std(example_wanderer_median.flux_TSO_df[flux_key_now] / median(example_wanderer_median.flux_TSO_df[flux_key_now]))*ppm)
 
 print('Operation took: ', time()-start)
 
@@ -927,7 +927,7 @@ print('Load Data From Fits Files in ' + loadfitsdir)
 example_wanderer_mean.load_data_from_fits_files()
 
 print('Skipping Load Data From Save Files in ' + loadfitsdir)
-# nircamTSOmean_ModB.load_data_from_save_files()
+# example_wanderer_mean.load_data_from_save_files()
 
 print('Find, flag, and NaN the "Bad Pixels" Outliers')
 example_wanderer_mean.find_bad_pixels()
