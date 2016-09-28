@@ -1,10 +1,3 @@
-
-# coding: utf-8
-
-# In[ ]:
-
-get_ipython().magic('matplotlib inline')
-
 from astroML.plotting          import hist
 from astropy.io                import fits
 from astropy.modeling          import models, fitting
