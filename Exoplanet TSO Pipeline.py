@@ -2,11 +2,11 @@ from astroML.plotting          import hist
 from astropy.io                import fits
 from astropy.modeling          import models, fitting
 from datetime                  import datetime
-from image_registration        import cross_correlation_shifts
+# from image_registration        import cross_correlation_shifts
 from glob                      import glob
 from matplotlib.ticker         import MaxNLocator
-from matplotlib                import style
-from os                        import listdir
+from matplotlib                import style, colors
+from os                        import listdir, path, mkdir, chdir
 from pandas                    import DataFrame, read_csv, read_pickle, scatter_matrix
 from photutils                 import CircularAperture, CircularAnnulus, aperture_photometry, findstars
 from least_asymmetry           import actr, moments, fitgaussian
@@ -22,7 +22,8 @@ from socket                    import gethostname
 from statsmodels.robust        import scale
 from statsmodels.nonparametric import kde
 from sys                       import exit
-from time                      import time, localtime
+from time                      import time, localtime, sleep
+from tqdm                      import tnrange, tqdm_notebook
 
 from numpy                     import zeros, nanmedian as median, nanmean as mean, nan
 from sys                       import exit
