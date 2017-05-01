@@ -943,16 +943,41 @@ background_choices = example_wanderer_mean.background_df.columns
 centering_choices  = ['Gaussian_Fit', 'Gaussian_Mom', 'FluxWeighted', 'LeastAsymmetry']
 aperRads           = np.arange(1, 100.5,0.5)
 
-start = time()
-for bgNow in background_choices:
-    for ctrNow in centering_choices:
-        for aperRad in aperRads:
-            print('Working on Background ' + bgNow + ' with Centering ' + ctrNow + ' and AperRad ' + str(aperRad), end=" ")
-            example_wanderer_mean.compute_flux_over_time(aperRad=aperRad, centering=ctrNow, background=bgNow)
-            flux_key_now  = ctrNow + '_' + bgNow+'_' + 'rad' + '_' + str(aperRad)
-            print(std(example_wanderer_mean.flux_TSO_df[flux_key_now] / median(example_wanderer_mean.flux_TSO_df[flux_key_now]))*ppm)
+useTheForce = False # True :: recompute flux for a given aperature radius, centering method, and background technique
 
-print('Operation took: ', time()-start)
+# print('Working on Background ' + str(kBG) + ' ' + bgNow + ' with Centering ' + str(kCTR) \
+#       + ' ' + ctrNow + ' and staticRad ' + str(staticRad) + ' with varRad ' + str(varRad), end=" ")
+
+start = time()
+example_wanderer_mean.SDNR_df = DataFrame()
+for kBG, bgNow in tqdm_notebook(enumerate(background_choices), desc='Background', \
+                                leave = True, total=len(background_choices)):
+    for kCTR, ctrNow in tqdm_notebook(enumerate(centering_choices), desc='Centering', \
+                                      leave = True, total=len(centering_choices)):
+        for staticRad in tqdm_notebook(staticRads, desc='StaticRad', leave = True, total=len(staticRads)):
+            for varRad in tqdm_notebook(varRads, desc='VarRad', leave = True, total=len(varRads)):
+                if varRad is not None:
+                    flux_key_now  = ctrNow + '_' + bgNow+'_' + 'rad' + '_' + str(staticRad) + '_' + str(varRad)
+                else:
+                    flux_key_now  = ctrNow + '_' + bgNow+'_' + 'rad' + '_' + str(staticRad) + '_None'
+                
+                example_wanderer_mean.compute_flux_over_time(staticRad=staticRad, varRad=varRad, \
+                                                         centering=ctrNow, background=bgNow,useTheForce=useTheForce)
+                
+                fluxNow     = example_wanderer_mean.flux_TSO_df[flux_key_now]
+                medFluxNow  = median(example_wanderer_mean.flux_TSO_df[flux_key_now])
+                
+                # average SDNR per `staticRad`
+                fluxNow    /= len(varRads)
+                medFluxNow /= len(varRads)
+
+                # Standard Deviation of the Normalized Residuals
+                SDNR        = std(fluxNow / medFluxNow)*ppm
+                example_wanderer_mean.SDNR_df[flux_key_now]  = [SDNR]
+                
+                print('Finished with Background ' + str(kBG) + ' ' + bgNow + ' with Centering ' + str(kCTR) \
+                          + ' ' + ctrNow + ' and staticRad ' + str(staticRad) + ' and varRad ' + str(varRad), \
+                      int(np.round(SDNR)), 'ppm')
 
 print('Saving `example_wanderer_mean` to a set of pickles for various Image Cubes and the Storage Dictionary')
 example_wanderer_mean.save_data_to_save_files(savefiledir='./SaveFiles/', saveFileNameHeader='Example_Wanderer_Mean_', saveFileType='.pickle.save')
