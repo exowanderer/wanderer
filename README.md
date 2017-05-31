@@ -54,30 +54,38 @@ Load All Necessary Libraries and Functions
 ```python
 # Matplotlib for Plotting
 %matplotlib inline
-from pylab              import gcf, sort, linspace, indices, std, empty, concatenate, pi, sqrt, ones, diag, inf
-from pylab              import rcParams, array, get_current_fig_manager, twinx, figure, subplots_adjust
+from astroML.plotting          import hist
+from astropy.io                import fits
+from astropy.modeling          import models, fitting
+from datetime                  import datetime
+from image_registration        import cross_correlation_shifts
+from glob                      import glob
+from matplotlib.ticker         import MaxNLocator
+from matplotlib                import style
+from os                        import listdir
+from pandas                    import DataFrame, read_csv, read_pickle, scatter_matrix
+from photutils                 import CircularAperture, CircularAnnulus, aperture_photometry, findstars
+from least_asymmetry           import actr, moments, fitgaussian
+from pylab                     import ion, gcf, sort, linspace, indices, median, mean, std, empty, figure, transpose, ceil
+from pylab                     import concatenate, pi, sqrt, ones, diag, inf, rcParams, isnan, isfinite, array, nanmax
+from numpy                     import min as npmin, max as npmax, zeros, arange, sum, float, isnan, hstack
+from numpy                     import int32 as npint, round as npround, nansum as sum, nanstd as std
+from seaborn                   import *
+from scipy.special             import erf
+from scipy                     import stats
+from sklearn.externals         import joblib
+from socket                    import gethostname
+from statsmodels.robust        import scale
+from statsmodels.nonparametric import kde
+from sys                       import exit
+from time                      import time, localtime
 
-from matplotlib.ticker  import MaxNLocator
-from matplotlib         import style
-from matplotlib         import pyplot as plt
+from numpy                     import zeros, nanmedian as median, nanmean as mean, nan
+from sys                       import exit
+from sklearn.externals         import joblib
+from least_asymmetry           import actr
 
-# Numpy & Pandas for Array and DataFrame Manipulation
-from numpy              import min, max, median, mean, zeros, empty
-from numpy              import ones, where, arange, indices
-from pandas             import DataFrame, read_csv, scatter_matrix
-
-# Astropy for Aperture Photometry and Fits read/write
-from photutils          import CircularAperture, aperture_photometry
-# from astroML.plotting   import hist
-from astropy.modeling   import models, fitting
-from astropy.io         import fits
-
-# Built in Libraries for directory
-from glob               import glob
-
-# Adam Ginsburg
-# https://github.com/keflavich/image_registration
-from image_registration import cross_correlation_shifts
+import numpy as np
 
 style.use('fivethirtyeight')
 ```
