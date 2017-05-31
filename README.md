@@ -373,39 +373,70 @@ Operation:
 Outputs:
     1. Master dataframe containing list of aper phot, gauss centers/widths/amplitudes, cross-corr centers, sky bg
 
+**Initiate Instance Framework**
 ```python
-def loads_fits_phots_times(fitsfiles, guesscenter = None, subframesize = [10,10], aperrad = [5], stddev0 = 2.0):
-    '''
-    'sky background'
-    'cross correlation center'
-    'gaussian center'
-    'gaussian width'
-    'gaussian ampitude'
-    'aperture photometry dictionary' or 'aperture photometry dataframe'
-    the keys to the aperture photometry dictionary or data frame will be the float values of the aperture radii
-    'time' (in days?)
-    '''
-    
-    print 'Need to add multiple aperture raddii usage'
-    columnNames = ['filename'           , 'aperture phot %.1f' %aperrad[0], 
-                   'time'               , 'gaussian amplitude' , 
-                   'gaussian y center'  , 'gaussian x center'  , 
-                   'gaussian y width'   , 'gaussian x width'   , 
-                   'cross corr y center', 'cross corr x center', 
-                   'sky background']
+dataDir     = '/path/to/fits/files/main/directory/'
+fitsFileDir = 'path/to/fits/subdirectories/'
 
-    master_output_df = DataFrame(columns=columnNames)
-    for fitsfile in fitsfiles:
-        columnInputs = load_fit_phot_time(fitsfile, guesscenter  = guesscenter, 
-                                                    subframesize = subframesize, 
-                                                    aperrad      = aperrad, 
-                                                    stddev0      = stddev0)
-        #
-        master_output_df.loc[len(master_output_df)] = columnInputs
-    
-    return master_output_df
+loadfitsdir = dataDir + fitsFileDir
+
+method = 'median'
+example_wanderer_median = wanderer(fitsFileDir=loadfitsdir_ModA, filetype=filetype, 
+                                            yguess=yguess, xguess=xguess, method=method)
+
+example_wanderer_median.load_data_from_save_files(savefiledir='./SaveFiles/', saveFileNameHeader='Example_Wanderer_Median_', saveFileType='.pickle.save')
 ```
 
+**Operate on Instance**
+```python
+method = 'median'
+
+print('Initialize an instance of `wanderer` as `example_wanderer_median`\n')
+example_wanderer_median = wanderer(fitsFileDir=loadfitsdir_ModB, filetype=filetype, 
+                                            yguess=yguess, xguess=xguess, method=method)
+
+print('Load Data From Fits Files in ' + fitsFileDir_ModB + '\n')
+example_wanderer_median.load_data_from_fits_files()
+
+print('Skipping Load Data From Save Files in ' + fitsFileDir_ModB + '\n')
+# example_wanderer_median.load_data_from_save_files()
+
+print('Find, flag, and NaN the "Bad Pixels" Outliers' + '\n')
+example_wanderer_median.find_bad_pixels()
+
+print('Fit for All Centers: Flux Weighted, Gaussian Fitting, Gaussian Moments, Least Asymmetry' + '\n')
+# example_wanderer_median.fit_gaussian_fitting_centering()
+# example_wanderer_median.fit_flux_weighted_centering()
+# example_wanderer_median.fit_least_asymmetry_centering()
+example_wanderer_median.fit_all_centering()
+
+print('Measure Background Estimates with All Methods: Circle Masked, Annular Masked, KDE Mode, Median Masked' + '\n')
+# example_wanderer_median.measure_background_circle_masked()
+# example_wanderer_median.measure_background_annular_mask()
+# example_wanderer_median.measure_background_KDE_Mode()
+# example_wanderer_median.measure_background_median_masked()
+example_wanderer_median.measure_all_background()
+
+print('Iterating over Background Techniques, Centering Techniques, Aperture Radii' + '\n')
+background_choices = example_wanderer_median.background_df.columns
+centering_choices  = ['Gaussian_Fit', 'Gaussian_Mom', 'FluxWeighted', 'LeastAsymmetry']
+aperRads           = np.arange(1, 100.5,0.5)
+
+start = time()
+for bgNow in background_choices:
+    for ctrNow in centering_choices:
+        for aperRad in aperRads:
+            print('Working on Background ' + bgNow + ' with Centering ' + ctrNow + ' and AperRad ' + str(aperRad), end=" ")
+            example_wanderer_median.compute_flux_over_time(aperRad=aperRad, centering=ctrNow, background=bgNow)
+            flux_key_now  = ctrNow + '_' + bgNow+'_' + 'rad' + '_' + str(aperRad)
+            print(std(example_wanderer_median.flux_TSO_df[flux_key_now] / median(example_wanderer_median.flux_TSO_df[flux_key_now]))*ppm)
+
+print('Operation took: ', time()-start)
+
+print('Saving `example_wanderer_median` to a set of pickles for various Image Cubes and the Storage Dictionary')
+example_wanderer_median.save_data_to_save_files(savefiledir='./SaveFiles/', saveFileNameHeader='Example_Wanderer_Median_', saveFileType='.pickle.save')
+
+```
 Create Master Output DataFrame and Print Out Table Thereof
 ---
 
