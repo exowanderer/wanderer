@@ -106,6 +106,7 @@ loadfitsdir = dataDir + fitsFileDir
 example_wanderer_median = wanderer(fitsFileDir=loadfitsdir, filetype=filetype, 
                                             yguess=yguess, xguess=xguess, method=method)
 
+print('Loading a saved instance of `wanderer` as `example_wanderer_median`\n')
 example_wanderer_median.load_data_from_save_files(savefiledir='./SaveFiles/', saveFileNameHeader='Example_Wanderer_Median_', saveFileType='.pickle.save')
 ```
 
@@ -121,14 +122,14 @@ fitsFileDir = 'path/to/fits/subdirectories/'
 
 loadfitsdir = dataDir + fitsFileDir
 
-print('Initialize an instance of `wanderer` as `example_wanderer_median`\n')
+print('Initializing an instance of `wanderer` as `example_wanderer_median`\n')
 example_wanderer_median = wanderer(fitsFileDir=loadfitsdir, filetype=filetype, 
                                             yguess=yguess, xguess=xguess, method=method)
 
-print('Load Data From Fits Files in ' + fitsFileDir_ModB + '\n')
+print('Load Data From Fits Files in ' + loadfitsdir + '\n')
 example_wanderer_median.load_data_from_fits_files()
 
-print('Skipping Load Data From Save Files in ' + fitsFileDir_ModB + '\n')
+print('Skipping Load Data From Save Files in ' + loadfitsdir + '\n')
 # example_wanderer_median.load_data_from_save_files()
 
 print('Find, flag, and NaN the "Bad Pixels" Outliers' + '\n')
