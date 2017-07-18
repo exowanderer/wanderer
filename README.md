@@ -93,13 +93,17 @@ It's utility is in taking in the time stamps from the headers and converting the
 
 **Load Saved Data from the Wanderer Class**
 ```python
+method    = 'median'
+midFrame  = frameSize//2 # We need to know frameSize ahead of time
+yguess    = midFrame     # We assume that the stellar PSF is in the center of the frame
+xguess    = midFrame     # We assume that the stellar PSF is in the center of the frame
+
 dataDir     = '/path/to/fits/files/main/directory/'
 fitsFileDir = 'path/to/fits/subdirectories/'
 
 loadfitsdir = dataDir + fitsFileDir
 
-method = 'median'
-example_wanderer_median = wanderer(fitsFileDir=loadfitsdir_ModA, filetype=filetype, 
+example_wanderer_median = wanderer(fitsFileDir=loadfitsdir, filetype=filetype, 
                                             yguess=yguess, xguess=xguess, method=method)
 
 example_wanderer_median.load_data_from_save_files(savefiledir='./SaveFiles/', saveFileNameHeader='Example_Wanderer_Median_', saveFileType='.pickle.save')
@@ -107,10 +111,18 @@ example_wanderer_median.load_data_from_save_files(savefiledir='./SaveFiles/', sa
 
 **Start from Scratch with the Wanderer Class**
 ```python
-method = 'median'
+method    = 'median'
+midFrame  = frameSize//2 # We need to know frameSize ahead of time
+yguess    = midFrame     # We assume that the stellar PSF is in the center of the frame
+xguess    = midFrame     # We assume that the stellar PSF is in the center of the frame
+
+dataDir     = '/path/to/fits/files/main/directory/'
+fitsFileDir = 'path/to/fits/subdirectories/'
+
+loadfitsdir = dataDir + fitsFileDir
 
 print('Initialize an instance of `wanderer` as `example_wanderer_median`\n')
-example_wanderer_median = wanderer(fitsFileDir=loadfitsdir_ModB, filetype=filetype, 
+example_wanderer_median = wanderer(fitsFileDir=loadfitsdir, filetype=filetype, 
                                             yguess=yguess, xguess=xguess, method=method)
 
 print('Load Data From Fits Files in ' + fitsFileDir_ModB + '\n')
