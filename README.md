@@ -88,12 +88,6 @@ This is an example input for the requests below. The directory contains a collec
 
 ---
 
-Request Directory with a Set of Fits Files
----
-```python
-fitsfilenames = glob(DataDir+'/*')
-```
-
 This function is a wrapper for `julian_date` in the `jd.py` package (soon to be converted to `julian_date.py` package.
 It's utility is in taking in the time stamps from the headers and converting them to the julian date; to be saved in the 'master' data frame below.
 
