@@ -91,7 +91,7 @@ This is an example input for the requests below. The directory contains a collec
 This function is a wrapper for `julian_date` in the `jd.py` package (soon to be converted to `julian_date.py` package.
 It's utility is in taking in the time stamps from the headers and converting them to the julian date; to be saved in the 'master' data frame below.
 
-**Using the Wanderer Class**
+**Load Saved Data from the Wanderer Class**
 ```python
 dataDir     = '/path/to/fits/files/main/directory/'
 fitsFileDir = 'path/to/fits/subdirectories/'
@@ -105,7 +105,7 @@ example_wanderer_median = wanderer(fitsFileDir=loadfitsdir_ModA, filetype=filety
 example_wanderer_median.load_data_from_save_files(savefiledir='./SaveFiles/', saveFileNameHeader='Example_Wanderer_Median_', saveFileType='.pickle.save')
 ```
 
-**Operate on Instance**
+**Start from Scratch with the Wanderer Class**
 ```python
 method = 'median'
 
