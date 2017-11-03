@@ -2,10 +2,12 @@ from astroML.plotting          import hist
 from astropy.io                import fits
 from astropy.modeling          import models, fitting
 from datetime                  import datetime
+from functools                 import partial
 # from image_registration        import cross_correlation_shifts
 from glob                      import glob
 from matplotlib.ticker         import MaxNLocator
 from matplotlib                import style, colors
+from multiprocessing           import cpu_count, Pool
 from os                        import listdir, path, mkdir, chdir
 from pandas                    import DataFrame, read_csv, read_pickle, scatter_matrix
 from photutils                 import CircularAperture, CircularAnnulus, aperture_photometry, findstars
@@ -31,6 +33,7 @@ from sklearn.externals         import joblib
 from least_asymmetry           import actr
 
 import numpy as np
+        
 
 
 # In[ ]:
@@ -188,6 +191,7 @@ def flux_weighted_centroid(image, ypos, xpos, bSize = 7):
         xpos and ypos are the rounded pixel positions of the star
     '''
     
+    ypos, xpos, bsize = np.int32([ypos, xpos, bSize])
     ## extract a box around the star:
     #im = a[ypos-bSize:ypos+bSize, xpos-bSize:xpos+bSize].copy()
     subImage = image[ypos-bSize:ypos+bSize, xpos-bSize:xpos+bSize].transpose().copy()
@@ -243,13 +247,10 @@ def fit_gauss(subFrameNow, xinds, yinds, initParams, print_compare=False):
 # In[ ]:
 
 class wanderer(object):
-    
-    print('\n\n** Not all who wander are lost **\n\n')
-    
     def __init__(self, fitsFileDir = './', filetype = 'slp.fits', telescope = None,
-                 yguess=None, xguess=None, npix=5, method='mean'):
+                 yguess=None, xguess=None, npix=5, method='mean', nCores = None):
         
-        print('\nNot all who wander are lost \n')
+        print('\n\n** Not all who wander are lost **\n\n')
         
         self.method   = method
         
@@ -273,7 +274,7 @@ class wanderer(object):
         self.telescope    = telescope
         
         if self.telescope == 'Spitzer':
-            self.permBadPixels = fits.open(loadfitsdir + '../cal/nov14_ch1_bcd_pmask_subarray.fits')
+            self.permBadPixels = fits.open(self.fitsFileDir + '../cal/nov14_ch1_bcd_pmask_subarray.fits')
         
         if self.nSlopeFiles == 0:
             print('Pipeline found no Files in ' + self.fitsFileDir + ' of type /*' + filetype)
@@ -294,7 +295,14 @@ class wanderer(object):
             self.xguess = xguess
         
         self.npix = npix
-    
+        
+        self.nCores cpu_count()//2 if nCores is None else int(nCores)
+        
+        tm_year, tm_mon, tm_mday, tm_hour, tm_min, tm_sec, tm_wday, tm_yday, tm_isdst = localtime()
+        print('Completed Class Definition at ' +
+              str(tm_year) + '-' + str(tm_mon) + '-' + str(tm_mday) + ' ' + \
+              str(tm_hour) + 'h' + str(tm_min) + 'm' + str(tm_sec) + 's')
+        
     def jwst_load_fits_file(self):
         testfits            = fits.open(self.fitsFilenames[0])[0]
         
@@ -476,33 +484,106 @@ class wanderer(object):
     def initiate_save_dict(self):
         
         self.save_dict  = {} # DataFrame() -- test if this works later
+        # for key,val in self.__dict__.items():
+        #     self.save_dict[key]  = val
         
-        self.save_dict['fitsFileDir']               = self.fitsFileDir
-        self.save_dict['fitsFilenames']              = self.fitsFilenames
-        
-        self.save_dict['background_Annulus']        = self.background_Annulus
-        self.save_dict['background_CircleMask']     = self.background_CircleMask
-        self.save_dict['background_GaussMoment']    = self.background_GaussMoment
-        self.save_dict['background_GaussianFit']    = self.background_GaussianFit
-        self.save_dict['background_KDEUniv']        = self.background_KDEUniv
-        self.save_dict['background_MedianMask']     = self.background_MedianMask
-        self.save_dict['centering_FluxWeight']      = self.centering_FluxWeight
-        self.save_dict['centering_GaussianFit']     = self.centering_GaussianFit
-        self.save_dict['centering_GaussianMoment']  = self.centering_GaussianMoment
-        self.save_dict['centering_LeastAsym']       = self.centering_LeastAsym
-        self.save_dict['effective_widths']          = self.effective_widths
-        self.save_dict['fitsFileDir']               = self.fitsFileDir
-        self.save_dict['fitsFilenames']             = self.fitsFilenames
-        self.save_dict['heights_GaussianFit']       = self.heights_GaussianFit
-        self.save_dict['heights_GaussianMoment']    = self.heights_GaussianMoment
-        self.save_dict['method']                    = self.method
-        self.save_dict['npix']                      = self.npix
-        self.save_dict['Quadrature']                      = self.npix
-        self.save_dict['yguess']                    = self.yguess
-        self.save_dict['xguess']                    = self.xguess
-        self.save_dict['widths_GaussianFit']        = self.widths_GaussianFit
-        self.save_dict['widths_GaussianMoment']     = self.widths_GaussianMoment
-        
+        try:
+            self.save_dict['fitsFileDir']                = self.fitsFileDir
+        except:
+            pass
+        try:
+            self.save_dict['fitsFilenames']              = self.fitsFilenames
+        except:
+            pass
+        try:
+            self.save_dict['background_Annulus']        = self.background_Annulus
+        except:
+            pass
+        try:
+            self.save_dict['background_CircleMask']     = self.background_CircleMask
+        except:
+            pass
+        try:
+            self.save_dict['background_GaussMoment']    = self.background_GaussMoment
+        except:
+            pass
+        try:
+            self.save_dict['background_GaussianFit']    = self.background_GaussianFit
+        except:
+            pass
+        try:
+            self.save_dict['background_KDEUniv']        = self.background_KDEUniv
+        except:
+            pass
+        try:
+            self.save_dict['background_MedianMask']     = self.background_MedianMask
+        except:
+            pass
+        try:
+            self.save_dict['centering_FluxWeight']      = self.centering_FluxWeight
+        except:
+            pass
+        try:
+            self.save_dict['centering_GaussianFit']     = self.centering_GaussianFit
+        except:
+            pass
+        try:
+            self.save_dict['centering_GaussianMoment']  = self.centering_GaussianMoment
+        except:
+            pass
+        try:
+            self.save_dict['centering_LeastAsym']       = self.centering_LeastAsym
+        except:
+            pass
+        try:
+            self.save_dict['effective_widths']          = self.effective_widths
+        except:
+            pass
+        try:
+            self.save_dict['fitsFileDir']               = self.fitsFileDir
+        except:
+            pass
+        try:
+            self.save_dict['fitsFilenames']             = self.fitsFilenames
+        except:
+            pass
+        try:
+            self.save_dict['heights_GaussianFit']       = self.heights_GaussianFit
+        except:
+            pass
+        try:
+            self.save_dict['heights_GaussianMoment']    = self.heights_GaussianMoment
+        except:
+            pass
+        try:
+            self.save_dict['method']                    = self.method
+        except:
+            pass
+        try:
+            self.save_dict['npix']                      = self.npix
+        except:
+            pass
+        try:
+            self.save_dict['Quadrature']                      = self.npix
+        except:
+            pass
+        try:
+            self.save_dict['yguess']                    = self.yguess
+        except:
+            pass
+        try:
+            self.save_dict['xguess']                    = self.xguess
+        except:
+            pass
+        try:
+            self.save_dict['widths_GaussianFit']        = self.widths_GaussianFit
+        except:
+            pass
+        try:
+            self.save_dict['widths_GaussianMoment']     = self.widths_GaussianMoment
+        except:
+            pass
+    
     def copy_instance(self):
         
         temp = wanderer()
@@ -715,8 +796,10 @@ class wanderer(object):
             fitFailed = False # "Benefit of the Doubt"
             
             # Option 1: We run `actr` with default settings that were developed for Spitzer exoplanet lightcurves
+            kframe, yguess, xguess = np.int32([kframe, self.yguess, self.xguess])
+            
             try:
-                center_asym = actr(self.imageCube[kframe], [self.yguess, self.xguess], \
+                center_asym = actr(self.imageCube[kframe], [yguess, xguess], \
                                    asym_rad=8, asym_size=5, maxcounts=2, method='gaus', \
                                    half_pix=False, resize=False, weights=False)[0]
             except:
@@ -727,7 +810,7 @@ class wanderer(object):
             if fitFailed:
                 try: 
                     center_asym = actr(np.sign(self.imageCube[kframe])*self.imageCube[kframe]**2, \
-                                       [self.yguess, self.xguess], \
+                                       [yguess, xguess], \
                                        asym_rad=8, asym_size=5, maxcounts=2, method='gaus', \
                                        half_pix=False, resize=False, weights=False)[0]
                     fitFailed = False
@@ -737,7 +820,7 @@ class wanderer(object):
             # Option 3: We assume that there is a cosmic ray hit nearby the PSF and shrink the asym_rad by half
             if fitFailed:
                 try: 
-                    center_asym = actr(self.imageCube[kframe], [self.yguess, self.xguess], \
+                    center_asym = actr(self.imageCube[kframe], [yguess, xguess], \
                                        asym_rad=4, asym_size=5, maxcounts=2, method='gaus', \
                                        half_pix=False, resize=False, weights=False)[0]
                     fitFailed = False
@@ -749,7 +832,7 @@ class wanderer(object):
             if fitFailed:
                 try:
                     center_asym = actr(np.sign(self.imageCube[kframe])*self.imageCube[kframe]**2, \
-                                       [self.yguess, self.xguess], \
+                                       [yguess, xguess], \
                                        asym_rad=4, asym_size=5, maxcounts=2, method='gaus', \
                                        half_pix=False, resize=False, weights=False)[0]
                     fitFailed = False
@@ -762,7 +845,7 @@ class wanderer(object):
             if fitFailed:
                 try:
                     center_asym = actr(np.sign(self.imageCube[kframe])*self.imageCube[kframe]**2, \
-                                       [self.yguess, self.xguess], \
+                                       [yguess, xguess], \
                                        asym_rad=4, asym_size=3, maxcounts=2, method='gaus', \
                                        half_pix=False, resize=False, weights=False)[0]
                     fitFailed = False
@@ -783,7 +866,7 @@ class wanderer(object):
             if fitFailed:
                 print('Least Asymmetry FAILED: Setting self.centering_LeastAsym[%s] to Initial Guess: [%s,%s]' \
                       % (kframe, self.yguess, self.xguess))
-                self.centering_LeastAsym[kframe]  = np.array([self.yguess, self.xguess])
+                self.centering_LeastAsym[kframe]  = np.array([yguess, xguess])
         
         self.centering_df['LeastAsymmetry_Y_Centers'] = self.centering_LeastAsym.T[self.y]
         self.centering_df['LeastAsymmetry_X_Centers'] = self.centering_LeastAsym.T[self.x]
@@ -938,7 +1021,24 @@ class wanderer(object):
         print('Measuring Background Using KDE Mode')
         self.measure_background_KDE_Mode()
     
-    def compute_flux_over_time(self, staticRad=None, varRad=None, centering='LeastAsymmetry', background='AnnularMask', useTheForce=False):
+    def compute_flux_one_image(self, image, noise, yx_centers, background, aperRad):
+        
+        y,x = 0,1
+        
+        frameNow                     = np.copy(image) - background
+        frameNow[np.isnan(frameNow)] = median(frameNow)
+        
+        noiseNow  = np.copy(noise)**2.
+        noiseNow[np.isnan(noiseNow)] = median(noiseNow)
+        
+        aperture  = CircularAperture([yx_center[x], yx_center[y]], r=aperRad)
+        
+        fluxNow   = aperture_photometry(frameNow, aperture)['aperture_sum']
+        noiseNow  = sqrt(aperture_photometry(noiseNow, aperture)['aperture_sum'])
+        
+        return fluxNow, noiseNow
+    
+    def compute_flux_over_time(self, aperRad=None, centering='GaussianFit', background='AnnularMask', useTheForce=False):
         y,x = 0,1
         
         if background not in self.background_df.columns:
@@ -947,44 +1047,44 @@ class wanderer(object):
         if centering not in ['Gaussian_Fit', 'Gaussian_Mom', 'FluxWeighted', 'LeastAsymmetry']:
             raise Exception("`centering` must be either 'Gaussian_Fit', 'Gaussian_Mom', 'FluxWeighted', or 'LeastAsymmetry'")
         
-        if staticRad is None:
+        if aperRad is None:
             if 'wlp' in self.fitsFilenames[0].lower():
                 staticRad = 70
             else:
                 staticRad = 3
         
-        if varRad is not None and 'Effective_Widths' not in self.centering_df.columns:
-            self.measure_effective_width()
+        # if varRad is not None and 'Effective_Widths' not in self.centering_df.columns:
+        #     self.measure_effective_width()
         
         centering_Use = np.transpose([self.centering_df[centering + '_Y_Centers'], 
                                       self.centering_df[centering + '_X_Centers']])
         
         background_Use= self.background_df[background]
         
-        if varRad is not None:
-            flux_key_now  = centering + '_' + background+'_' + 'rad' + '_' + str(staticRad) + '_' + str(varRad)
-        else:
-            flux_key_now  = centering + '_' + background+'_' + 'rad' + '_' + str(staticRad) + '_None'
+        flux_key_now  = centering + '_' + background+'_' + 'rad' + '_' + str(aperRad)
+        # if varRad is not None:
+        #     flux_key_now  = centering + '_' + background+'_' + 'rad' + '_' + str(aperRad)# + '_' + str(varRad)
+        # else:
+        #     flux_key_now  = centering + '_' + background+'_' + 'rad' + '_' + str(aperRad)# + '_None'
         
-        # print(flux_key_now)
         if flux_key_now not in self.flux_TSO_df.keys() or useTheForce:
             flux_TSO_now  = np.zeros(self.nFrames)
             noise_TSO_now = np.zeros(self.nFrames)
-
+            
             for kframe in tqdm_notebook(range(self.nFrames), desc='Flux', leave = False, total=self.nFrames):
                 frameNow  = np.copy(self.imageCube[kframe]) - background_Use[kframe]
                 frameNow[np.isnan(frameNow)] = median(frameNow)
 
                 noiseNow  = np.copy(self.noiseCube[kframe])**2.
                 noiseNow[np.isnan(noiseNow)] = median(noiseNow)
-
-                if varRad is not None:
-                    aperRad = staticRad + varRad * self.centering_df['Quadrature_Widths'][kframe]
-                else:
-                    aperRad = staticRad
-
+                
+                # if varRad is not None:
+                #     aperRad = staticRad + varRad * self.centering_df['Quadrature_Widths'][kframe]
+                # else:
+                #     aperRad = staticRad
+                
                 aperture  = CircularAperture([centering_Use[kframe][self.x], centering_Use[kframe][self.y]], r=aperRad)
-
+                
                 flux_TSO_now[kframe]  = aperture_photometry(frameNow, aperture)['aperture_sum']
                 noise_TSO_now[kframe] = sqrt(aperture_photometry(noiseNow, aperture)['aperture_sum'])
 
@@ -992,210 +1092,271 @@ class wanderer(object):
             self.noise_TSO_df[flux_key_now] = noise_TSO_now
         else:
             print(flux_key_now + ' exists: if you want to overwrite, then you `useTheForce=True`')
+    
+    def compute_flux_over_time_over_aperRad(self, aperRads=[], centering_choices=[], background_choices=[], \
+                                            useTheForce=False, verbose=False):
+        
+        ppm   = 1e6
+        start = time()
+        for bgNow in background_choices:
+            for ctrNow in centering_choices:
+                for aperRad in aperRads:
+                    if verbose: 
+                        print('Working on Background {} with Centering {} and AperRad {}'.format(bgNow, ctrNow, aperRad), end=" ")
+                    
+                    self.compute_flux_over_time(aperRad    = aperRad  , \
+                                                centering  = ctrNow     , \
+                                                background = bgNow      , \
+                                                useTheForce= useTheForce, \
+                                                verbose    = verbose    )
+                    
+                    flux_key_now  = "{}_{}_rad_{}".format(ctrNow, bgNow, aperRad)
+                    
+                    if verbose:
+                        flux_now = self.flux_TSO_df[flux_key_now]
+                        print( std( flux_now/ median(flux_now)) * ppm)
+        
+        print('Operation took: ', time()-start)
+    
+    def mp_compute_flux_over_time_per_aperRad(self, aperRad=3.0, centering='GaussianFit', \
+                                                background='AnnularMask', useTheForce=False,\
+                                                nCores = None):
+        '''
+            aperRad=3.0 assumes the PSF is nyquist samples, such that aperRad == 1.5*PSF_FWHM
+        '''
+        
+        if background not in self.background_df.columns:
+            raise Exception("`background` must be in", self.background_df.columns)
+        
+        if centering not in ['Gaussian_Fit', 'Gaussian_Mom', 'FluxWeighted', 'LeastAsymmetry']:
+            raise Exception("`centering` must be either 'Gaussian_Fit', 'Gaussian_Mom', 'FluxWeighted', or 'LeastAsymmetry'")
+        
+        if aperRad is None:
+            if 'wlp' in self.fitsFilenames[0].lower():
+                staticRad = 70
+            else:
+                staticRad = 3
+        
+        # if varRad is not None and 'Effective_Widths' not in self.centering_df.columns:
+        #     self.measure_effective_width()
+        
+        centering_Use = np.transpose([self.centering_df[centering + '_Y_Centers'], 
+                                      self.centering_df[centering + '_X_Centers']])
+        
+        background_Use= self.background_df[background]
+        
+        # Modeled after: compute_flux_one_image(self, image, noise, yx_centers, background, aperRad)
+        
+        pool = Pool(self.nCores) # This starts the multiprocessing call to arms
+        
+        func = partial(compute_flux_one_image, aperRad=aperRad)  # In case you need more kwargs to satisfy your aperture_photometry routine
+        
+        photometry = pool.starmap(func, zip(self.imageCube, self.noiseCube, centering_Use, background_Use)) # the order is very important
+        
+        pool.close()
+        pool.join()
+        
+        flux_key_now                   = centering + '_' + background+'_' + 'rad' + '_' + str(aperRad)
+        self.flux_TSO_df[flux_key_now] = np.array(photometry)
 
-tm_year, tm_mon, tm_mday, tm_hour, tm_min, tm_sec, tm_wday, tm_yday, tm_isdst = localtime()
-print('Completed Class Definition at ' +
-      str(tm_year) + '-' + str(tm_mon) + '-' + str(tm_mday) + ' ' + \
-      str(tm_hour) + 'h' + str(tm_min) + 'm' + str(tm_sec) + 's')
-
-
-# Necessary Constants for Both Module A and Module B
-# ---
-
-# In[ ]:
-
-ppm             = 1e6
-y,x             = 0,1
-
-yguess, xguess  = 160., 167. # Specific to JWST WLP Test Data
-filetype        = 'slp.fits' # Specific to JWST WLP Test Data
-
-
-# Load Stored Instance from Save Files
-# ---
-
-# In[ ]:
-
-dataDir     = '/path/to/fits/files/main/directory/'
-fitsFileDir = 'path/to/fits/subdirectories/'
-
-loadfitsdir = dataDir + fitsFileDir
-
-
-# In[ ]:
-
-method = 'mean'
-example_wanderer_mean = wanderer(fitsFileDir=loadfitsdir, filetype=filetype, 
-                                            yguess=yguess, xguess=xguess, method=method)
-
-example_wanderer_mean.load_data_from_save_files(savefiledir='./SaveFiles/', 
-                                                     saveFileNameHeader='Example_Wanderer_Mean_', saveFileType='.pickle.save')
-
-
-# In[ ]:
-
-method = 'median'
-example_wanderer_median = wanderer(fitsFileDir=loadfitsdir_ModA, filetype=filetype, 
-                                            yguess=yguess, xguess=xguess, method=method)
-
-example_wanderer_median.load_data_from_save_files(savefiledir='./SaveFiles/', saveFileNameHeader='Example_Wanderer_Median_', saveFileType='.pickle.save')
-
-
-# Start a New Instance with Median for the Metric
-# ---
-
-# In[ ]:
-
-dataDir     = '/path/to/fits/files/main/directory/'
-fitsFileDir = 'path/to/fits/subdirectories/'
-
-loadfitsdir = dataDir + fitsFileDir
-
-
-# In[ ]:
-
-method = 'median'
-
-print('Initialize an instance of `wanderer` as `example_wanderer_median`\n')
-example_wanderer_median = wanderer(fitsFileDir=loadfitsdir_ModB, filetype=filetype, 
-                                            yguess=yguess, xguess=xguess, method=method)
-
-print('Load Data From Fits Files in ' + fitsFileDir_ModB + '\n')
-example_wanderer_median.load_data_from_fits_files()
-
-print('Skipping Load Data From Save Files in ' + fitsFileDir_ModB + '\n')
-# example_wanderer_median.load_data_from_save_files()
-
-print('Find, flag, and NaN the "Bad Pixels" Outliers' + '\n')
-example_wanderer_median.find_bad_pixels()
-
-print('Fit for All Centers: Flux Weighted, Gaussian Fitting, Gaussian Moments, Least Asymmetry' + '\n')
-# example_wanderer_median.fit_gaussian_fitting_centering()
-# example_wanderer_median.fit_flux_weighted_centering()
-# example_wanderer_median.fit_least_asymmetry_centering()
-example_wanderer_median.fit_all_centering()
-
-print('Measure Background Estimates with All Methods: Circle Masked, Annular Masked, KDE Mode, Median Masked' + '\n')
-# example_wanderer_median.measure_background_circle_masked()
-# example_wanderer_median.measure_background_annular_mask()
-# example_wanderer_median.measure_background_KDE_Mode()
-# example_wanderer_median.measure_background_median_masked()
-example_wanderer_median.measure_all_background()
-
-print('Iterating over Background Techniques, Centering Techniques, Aperture Radii' + '\n')
-background_choices = example_wanderer_median.background_df.columns
-centering_choices  = ['Gaussian_Fit', 'Gaussian_Mom', 'FluxWeighted', 'LeastAsymmetry']
-aperRads           = np.arange(1, 100.5,0.5)
-
-start = time()
-example_wanderer_median.SDNR_df = DataFrame()
-for kBG, bgNow in tqdm_notebook(enumerate(background_choices), desc='Background', \
-                                leave = True, total=len(background_choices)):
-    for kCTR, ctrNow in tqdm_notebook(enumerate(centering_choices), desc='Centering', \
-                                      leave = True, total=len(centering_choices)):
-        for staticRad in tqdm_notebook(staticRads, desc='StaticRad', leave = True, total=len(staticRads)):
-            for varRad in tqdm_notebook(varRads, desc='VarRad', leave = True, total=len(varRads)):
-                if varRad is not None:
-                    flux_key_now  = ctrNow + '_' + bgNow+'_' + 'rad' + '_' + str(staticRad) + '_' + str(varRad)
-                else:
-                    flux_key_now  = ctrNow + '_' + bgNow+'_' + 'rad' + '_' + str(staticRad) + '_None'
-                
-                example_wanderer_median.compute_flux_over_time(staticRad=staticRad, varRad=varRad, \
-                                                         centering=ctrNow, background=bgNow,useTheForce=useTheForce)
-                
-                fluxNow     = example_wanderer_median.flux_TSO_df[flux_key_now]
-                medFluxNow  = median(example_wanderer_median.flux_TSO_df[flux_key_now])
-                
-                # average SDNR per `staticRad`
-                fluxNow    /= len(varRads)
-                medFluxNow /= len(varRads)
-
-                # Standard Deviation of the Normalized Residuals
-                SDNR        = std(fluxNow / medFluxNow)*ppm
-                example_wanderer_median.SDNR_df[flux_key_now]  = [SDNR]
-                
-                print('Finished with Background ' + str(kBG) + ' ' + bgNow + ' with Centering ' + str(kCTR) \
-                          + ' ' + ctrNow + ' and staticRad ' + str(staticRad) + ' and varRad ' + str(varRad), \
-                      int(np.round(SDNR)), 'ppm')
-
-print('Saving `example_wanderer_median` to a set of pickles for various Image Cubes and the Storage Dictionary')
-example_wanderer_median.save_data_to_save_files(savefiledir='./SaveFiles/', saveFileNameHeader='Example_Wanderer_Median_', saveFileType='.pickle.save')
-
-
-# Start a New Instance with Mean for the Metric
-# ---
-
-# In[ ]:
-
-method = 'mean'
-
-print('Initialize an instance of `wanderer` as `example_wanderer_mean`')
-example_wanderer_mean = wanderer(fitsFileDir=loadfitsdir_ModB, filetype = filetype, 
-                                yguess=yguess, xguess=xguess, method=method)
-
-print('Load Data From Fits Files in ' + loadfitsdir)
-example_wanderer_mean.load_data_from_fits_files()
-
-print('Skipping Load Data From Save Files in ' + loadfitsdir)
-# example_wanderer_mean.load_data_from_save_files()
-
-print('Find, flag, and NaN the "Bad Pixels" Outliers')
-example_wanderer_mean.find_bad_pixels()
-
-print('Fit for All Centers: Flux Weighted, Gaussian Fitting, Gaussian Moments, Least Asymmetry')
-# example_wanderer_mean.fit_gaussian_fitting_centering()
-# example_wanderer_mean.fit_flux_weighted_centering()
-# example_wanderer_mean.fit_least_asymmetry_centering()
-example_wanderer_mean.fit_all_centering()
-
-print('Measure Background Estimates with All Methods: Circle Masked, Annular Masked, KDE Mode, Median Masked')
-# example_wanderer_mean.measure_background_circle_masked()
-# example_wanderer_mean.measure_background_annular_mask()
-# example_wanderer_mean.measure_background_KDE_Mode()
-# example_wanderer_mean.measure_background_median_masked()
-example_wanderer_mean.measure_all_background()
-
-print('Iterating over Background Techniques, Centering Techniques, Aperture Radii')
-background_choices = example_wanderer_mean.background_df.columns
-centering_choices  = ['Gaussian_Fit', 'Gaussian_Mom', 'FluxWeighted', 'LeastAsymmetry']
-aperRads           = np.arange(1, 100.5,0.5)
-
-useTheForce = False # True :: recompute flux for a given aperature radius, centering method, and background technique
-
-# print('Working on Background ' + str(kBG) + ' ' + bgNow + ' with Centering ' + str(kCTR) \
-#       + ' ' + ctrNow + ' and staticRad ' + str(staticRad) + ' with varRad ' + str(varRad), end=" ")
-
-start = time()
-example_wanderer_mean.SDNR_df = DataFrame()
-for kBG, bgNow in tqdm_notebook(enumerate(background_choices), desc='Background', \
-                                leave = True, total=len(background_choices)):
-    for kCTR, ctrNow in tqdm_notebook(enumerate(centering_choices), desc='Centering', \
-                                      leave = True, total=len(centering_choices)):
-        for staticRad in tqdm_notebook(staticRads, desc='StaticRad', leave = True, total=len(staticRads)):
-            for varRad in tqdm_notebook(varRads, desc='VarRad', leave = True, total=len(varRads)):
-                if varRad is not None:
-                    flux_key_now  = ctrNow + '_' + bgNow+'_' + 'rad' + '_' + str(staticRad) + '_' + str(varRad)
-                else:
-                    flux_key_now  = ctrNow + '_' + bgNow+'_' + 'rad' + '_' + str(staticRad) + '_None'
-                
-                example_wanderer_mean.compute_flux_over_time(staticRad=staticRad, varRad=varRad, \
-                                                         centering=ctrNow, background=bgNow,useTheForce=useTheForce)
-                
-                fluxNow     = example_wanderer_mean.flux_TSO_df[flux_key_now]
-                medFluxNow  = median(example_wanderer_mean.flux_TSO_df[flux_key_now])
-                
-                # average SDNR per `staticRad`
-                fluxNow    /= len(varRads)
-                medFluxNow /= len(varRads)
-
-                # Standard Deviation of the Normalized Residuals
-                SDNR        = std(fluxNow / medFluxNow)*ppm
-                example_wanderer_mean.SDNR_df[flux_key_now]  = [SDNR]
-                
-                print('Finished with Background ' + str(kBG) + ' ' + bgNow + ' with Centering ' + str(kCTR) \
-                          + ' ' + ctrNow + ' and staticRad ' + str(staticRad) + ' and varRad ' + str(varRad), \
-                      int(np.round(SDNR)), 'ppm')
-
-print('Saving `example_wanderer_mean` to a set of pickles for various Image Cubes and the Storage Dictionary')
-example_wanderer_mean.save_data_to_save_files(savefiledir='./SaveFiles/', saveFileNameHeader='Example_Wanderer_Mean_', saveFileType='.pickle.save')
-
+#
+# # Necessary Constants for Both Module A and Module B
+# # ---
+#
+# # In[ ]:
+#
+# ppm             = 1e6
+# y,x             = 0,1
+#
+# yguess, xguess  = 160., 167. # Specific to JWST WLP Test Data
+# filetype        = 'slp.fits' # Specific to JWST WLP Test Data
+#
+#
+# # Load Stored Instance from Save Files
+# # ---
+#
+# # In[ ]:
+#
+# dataDir     = '/path/to/fits/files/main/directory/'
+# fitsFileDir = 'path/to/fits/subdirectories/'
+#
+# self.fitsFileDir = dataDir + fitsFileDir
+#
+#
+# # In[ ]:
+#
+# method = 'mean'
+# example_wanderer_mean = wanderer(fitsFileDir=self.fitsFileDir, filetype=filetype,
+#                                             yguess=yguess, xguess=xguess, method=method)
+#
+# example_wanderer_mean.load_data_from_save_files(savefiledir='./SaveFiles/',
+#                                                      saveFileNameHeader='Example_Wanderer_Mean_', saveFileType='.pickle.save')
+#
+#
+# # In[ ]:
+#
+# method = 'median'
+# self = wanderer(fitsFileDir=self.fitsFileDir_ModA, filetype=filetype,
+#                                             yguess=yguess, xguess=xguess, method=method)
+#
+# self.load_data_from_save_files(savefiledir='./SaveFiles/', saveFileNameHeader='self_', saveFileType='.pickle.save')
+#
+#
+# # Start a New Instance with Median for the Metric
+# # ---
+#
+# # In[ ]:
+#
+# dataDir     = '/path/to/fits/files/main/directory/'
+# fitsFileDir = 'path/to/fits/subdirectories/'
+#
+# self.fitsFileDir = dataDir + fitsFileDir
+#
+#
+# # In[ ]:
+#
+# method = 'median'
+#
+# print('Initialize an instance of `wanderer` as `self`\n')
+# self = wanderer(fitsFileDir=self.fitsFileDir_ModB, filetype=filetype,
+#                                             yguess=yguess, xguess=xguess, method=method)
+#
+# print('Load Data From Fits Files in ' + fitsFileDir_ModB + '\n')
+# self.load_data_from_fits_files()
+#
+# print('Skipping Load Data From Save Files in ' + fitsFileDir_ModB + '\n')
+# # self.load_data_from_save_files()
+#
+# print('Find, flag, and NaN the "Bad Pixels" Outliers' + '\n')
+# self.find_bad_pixels()
+#
+# print('Fit for All Centers: Flux Weighted, Gaussian Fitting, Gaussian Moments, Least Asymmetry' + '\n')
+# # self.fit_gaussian_fitting_centering()
+# # self.fit_flux_weighted_centering()
+# # self.fit_least_asymmetry_centering()
+# self.fit_all_centering()
+#
+# print('Measure Background Estimates with All Methods: Circle Masked, Annular Masked, KDE Mode, Median Masked' + '\n')
+# # self.measure_background_circle_masked()
+# # self.measure_background_annular_mask()
+# # self.measure_background_KDE_Mode()
+# # self.measure_background_median_masked()
+# self.measure_all_background()
+#
+# print('Iterating over Background Techniques, Centering Techniques, Aperture Radii' + '\n')
+# background_choices = self.background_df.columns
+# centering_choices  = ['Gaussian_Fit', 'Gaussian_Mom', 'FluxWeighted', 'LeastAsymmetry']
+# aperRads           = np.arange(1, 100.5,0.5)
+#
+# start = time()
+# self.SDNR_df = DataFrame()
+# for kBG, bgNow in tqdm_notebook(enumerate(background_choices), desc='Background', \
+#                                 leave = True, total=len(background_choices)):
+#     for kCTR, ctrNow in tqdm_notebook(enumerate(centering_choices), desc='Centering', \
+#                                       leave = True, total=len(centering_choices)):
+#         for staticRad in tqdm_notebook(staticRads, desc='StaticRad', leave = True, total=len(staticRads)):
+#             for varRad in tqdm_notebook(varRads, desc='VarRad', leave = True, total=len(varRads)):
+#                 if varRad is not None:
+#                     flux_key_now  = ctrNow + '_' + bgNow+'_' + 'rad' + '_' + str(staticRad) + '_' + str(varRad)
+#                 else:
+#                     flux_key_now  = ctrNow + '_' + bgNow+'_' + 'rad' + '_' + str(staticRad) + '_None'
+#
+#                 self.compute_flux_over_time(staticRad=staticRad, varRad=varRad, \
+#                                                          centering=ctrNow, background=bgNow,useTheForce=useTheForce)
+#
+#                 fluxNow     = self.flux_TSO_df[flux_key_now]
+#                 medFluxNow  = median(self.flux_TSO_df[flux_key_now])
+#
+#                 # average SDNR per `staticRad`
+#                 fluxNow    /= len(varRads)
+#                 medFluxNow /= len(varRads)
+#
+#                 # Standard Deviation of the Normalized Residuals
+#                 SDNR        = std(fluxNow / medFluxNow)*ppm
+#                 self.SDNR_df[flux_key_now]  = [SDNR]
+#
+#                 print('Finished with Background ' + str(kBG) + ' ' + bgNow + ' with Centering ' + str(kCTR) \
+#                           + ' ' + ctrNow + ' and staticRad ' + str(staticRad) + ' and varRad ' + str(varRad), \
+#                       int(np.round(SDNR)), 'ppm')
+#
+# print('Saving `self` to a set of pickles for various Image Cubes and the Storage Dictionary')
+# self.save_data_to_save_files(savefiledir='./SaveFiles/', saveFileNameHeader='self_', saveFileType='.pickle.save')
+#
+#
+# # Start a New Instance with Mean for the Metric
+# # ---
+#
+# # In[ ]:
+#
+# method = 'mean'
+#
+# print('Initialize an instance of `wanderer` as `example_wanderer_mean`')
+# example_wanderer_mean = wanderer(fitsFileDir=self.fitsFileDir_ModB, filetype = filetype,
+#                                 yguess=yguess, xguess=xguess, method=method)
+#
+# print('Load Data From Fits Files in ' + self.fitsFileDir)
+# example_wanderer_mean.load_data_from_fits_files()
+#
+# print('Skipping Load Data From Save Files in ' + self.fitsFileDir)
+# # example_wanderer_mean.load_data_from_save_files()
+#
+# print('Find, flag, and NaN the "Bad Pixels" Outliers')
+# example_wanderer_mean.find_bad_pixels()
+#
+# print('Fit for All Centers: Flux Weighted, Gaussian Fitting, Gaussian Moments, Least Asymmetry')
+# # example_wanderer_mean.fit_gaussian_fitting_centering()
+# # example_wanderer_mean.fit_flux_weighted_centering()
+# # example_wanderer_mean.fit_least_asymmetry_centering()
+# example_wanderer_mean.fit_all_centering()
+#
+# print('Measure Background Estimates with All Methods: Circle Masked, Annular Masked, KDE Mode, Median Masked')
+# # example_wanderer_mean.measure_background_circle_masked()
+# # example_wanderer_mean.measure_background_annular_mask()
+# # example_wanderer_mean.measure_background_KDE_Mode()
+# # example_wanderer_mean.measure_background_median_masked()
+# example_wanderer_mean.measure_all_background()
+#
+# print('Iterating over Background Techniques, Centering Techniques, Aperture Radii')
+# background_choices = example_wanderer_mean.background_df.columns
+# centering_choices  = ['Gaussian_Fit', 'Gaussian_Mom', 'FluxWeighted', 'LeastAsymmetry']
+# aperRads           = np.arange(1, 100.5,0.5)
+#
+# useTheForce = False # True :: recompute flux for a given aperature radius, centering method, and background technique
+#
+# # print('Working on Background ' + str(kBG) + ' ' + bgNow + ' with Centering ' + str(kCTR) \
+# #       + ' ' + ctrNow + ' and staticRad ' + str(staticRad) + ' with varRad ' + str(varRad), end=" ")
+#
+# start = time()
+# example_wanderer_mean.SDNR_df = DataFrame()
+# for kBG, bgNow in tqdm_notebook(enumerate(background_choices), desc='Background', \
+#                                 leave = True, total=len(background_choices)):
+#     for kCTR, ctrNow in tqdm_notebook(enumerate(centering_choices), desc='Centering', \
+#                                       leave = True, total=len(centering_choices)):
+#         for staticRad in tqdm_notebook(staticRads, desc='StaticRad', leave = True, total=len(staticRads)):
+#             for varRad in tqdm_notebook(varRads, desc='VarRad', leave = True, total=len(varRads)):
+#                 if varRad is not None:
+#                     flux_key_now  = ctrNow + '_' + bgNow+'_' + 'rad' + '_' + str(staticRad) + '_' + str(varRad)
+#                 else:
+#                     flux_key_now  = ctrNow + '_' + bgNow+'_' + 'rad' + '_' + str(staticRad) + '_None'
+#
+#                 example_wanderer_mean.compute_flux_over_time(staticRad=staticRad, varRad=varRad, \
+#                                                          centering=ctrNow, background=bgNow,useTheForce=useTheForce)
+#
+#                 fluxNow     = example_wanderer_mean.flux_TSO_df[flux_key_now]
+#                 medFluxNow  = median(example_wanderer_mean.flux_TSO_df[flux_key_now])
+#
+#                 # average SDNR per `staticRad`
+#                 fluxNow    /= len(varRads)
+#                 medFluxNow /= len(varRads)
+#
+#                 # Standard Deviation of the Normalized Residuals
+#                 SDNR        = std(fluxNow / medFluxNow)*ppm
+#                 example_wanderer_mean.SDNR_df[flux_key_now]  = [SDNR]
+#
+#                 print('Finished with Background ' + str(kBG) + ' ' + bgNow + ' with Centering ' + str(kCTR) \
+#                           + ' ' + ctrNow + ' and staticRad ' + str(staticRad) + ' and varRad ' + str(varRad), \
+#                       int(np.round(SDNR)), 'ppm')
+#
+# print('Saving `example_wanderer_mean` to a set of pickles for various Image Cubes and the Storage Dictionary')
+# example_wanderer_mean.save_data_to_save_files(savefiledir='./SaveFiles/', saveFileNameHeader='Example_Wanderer_Mean_', saveFileType='.pickle.save')
+#
