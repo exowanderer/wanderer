@@ -263,6 +263,16 @@ def compute_flux_one_frame(image, center, background, aperRad=3.0):
 def meausre_bg_func(funcNow):
     funcNow()
 
+def measure_one_circle_bg(image, center, aperRad, metric, apMethod='exact'):
+    aperture  = CircularAperture(center, aperRad)
+    aper_mask = aperture.to_mask(method=apMethod)[0]    # list of ApertureMask objects (one for each position)
+    
+    # backgroundMask = abs(aperture.get_fractions(np.ones(self.imageCube[0].shape))-1)
+    backgroundMask = aper_mask.to_image(image.shape).astype(bool)
+    backgroundMask = ~backgroundMask#[backgroundMask == 0] = False
+    
+    return metric(image[backgroundMask])
+
 def measure_one_background(image, center, aperRad, metric, apMethod='exact', bgMethod='circle'):
     
     if np.ndim(aperRad) == 0:
@@ -1203,7 +1213,7 @@ class wanderer(object):
         """
         pool = Pool(self.nCores) # This starts the multiprocessing call to arms
         
-        func = partial(measure_one_background, aperRad=aperRad, metric=self.metric, apMethod='exact', bgMethod='circle')
+        func = partial(measure_one_circle_bg, aperRad=aperRad, metric=self.metric, apMethod='exact')
         
         self.background_CircleMask = pool.starmap(func, zip(self.imageCube, self.centering_FluxWeight)) # the order is very important
         
