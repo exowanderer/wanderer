@@ -299,23 +299,6 @@ def measure_one_background(image, center, aperRad, metric, apMethod='exact', bgM
     
     return metric(image[aperture])
 
-def compute_flux_one_image(image, noise, yx_centers, background, aperRad):
-
-    y,x = 0,1
-
-    frameNow                     = np.copy(image) - background
-    frameNow[np.isnan(frameNow)] = median(frameNow)
-
-    noiseNow  = np.copy(noise)**2.
-    noiseNow[np.isnan(noiseNow)] = median(noiseNow)
-    
-    aperture  = CircularAperture([yx_centers[x], yx_centers[y]], r=aperRad)
-
-    fluxNow   = aperture_photometry(frameNow, aperture)['aperture_sum']
-    noiseNow  = sqrt(aperture_photometry(noiseNow, aperture)['aperture_sum'])
-
-    return fluxNow, noiseNow
-
 class wanderer(object):
     def __init__(self, fitsFileDir = './', filetype = 'slp.fits', telescope = None,
                  yguess=None, xguess=None, npix=5, method='mean', nCores = None):
@@ -334,9 +317,9 @@ class wanderer(object):
         else:
             raise Exception("`method` must be from the list ['mean', 'median']")
         
-        self.fitsFileDir  = fitsFileDir
-        self.fitsFilenames = glob(self.fitsFileDir + '/*' + filetype)
-        self.nSlopeFiles  = len(self.fitsFilenames)
+        self.fitsFileDir    = fitsFileDir
+        self.fitsFilenames  = glob(self.fitsFileDir + '/*' + filetype)
+        self.nSlopeFiles    = len(self.fitsFilenames)
         
         if telescope is None:
             raise Exception("Please specify `telescope` as either 'JWST' or 'Spitzer' or 'HST'")
@@ -406,33 +389,88 @@ class wanderer(object):
             fitsNow.close()
             del fitsNow
     
-    def spitzer_load_fits_file(self):
+    def spitzer_load_fits_file(self, outputUnits='electrons'):
+        # BMJD_2_BJD     = -0.5
+    
+        sec2day        = 1/(24*3600)
+        nFramesPerFile = 64
         
-        nFramesPerFile      = 64
-        testfits            = fits.open(self.fitsFilenames[0])[0]
-        
+        testfits       = fits.open(self.fitsFilenames[0])[0]
+        testheader     = testfits.header
+    
+        bcd_shape      = testfits.data[0].shape
+    
         self.nFrames        = self.nSlopeFiles * nFramesPerFile
-        self.imageCube      = np.zeros((self.nFrames, testfits.data[0].shape[0], testfits.data[0].shape[1]))
-        self.noiseCube      = np.zeros((self.nFrames, testfits.data[0].shape[0], testfits.data[0].shape[1]))
-        self.timeCube       = np.zeros((self.nFrames))
+        self.imageCube      = zeros((self.nFrames, bcd_shape[0], bcd_shape[1]))
+        self.noiseCube      = zeros((self.nFrames, bcd_shape[0], bcd_shape[1]))
+        self.timeCube       = zeros(self.nFrames)
         
         del testfits
-        
-        for kfile, fname in tqdm_notebook(enumerate(self.fitsFilenames), desc='Spitzer Load File', leave = False, total=self.nSlopeFiles):
-            fitsNow = fits.open(fname)
+    
+        # Converts DN/s to microJy per pixel
+        #   1) expTime * gain / fluxConv converts MJ/sr to electrons
+        #   2) as2sr * MJ2mJ * testheader['PXSCAL1'] * testheader['PXSCAL2'] converts MJ/sr to muJ/pixel
+        if outputUnits == 'electrons':
+            fluxConv  = testheader['FLUXCONV']
+            expTime   = testheader['EXPTIME']
+            gain      = testheader['GAIN']
+            fluxConversion = expTime*gain / fluxConv
+        elif outputUnits == 'muJ_per_Pixel':
+            as2sr = arcsec**2.0 # steradians per square arcsecond
+            MJ2mJ = 1e12        # mircro-Janskeys per Mega-Jansky
+            fluxConversion = abs(as2sr * MJ2mJ * testheader['PXSCAL1'] * testheader['PXSCAL2']) # converts MJ/
+        else:
+            raise Exception("`outputUnits` must be either 'electrons' or 'muJ_per_Pixel'")
+    
+        print('Loading Spitzer Data')
+        for kfile, fname in tqdm_notebook(enumerate(self.fitsFilenames),
+                                          desc='Spitzer Load File', leave = False, total=self.nSlopeFiles):
+            bcdNow  = fits.open(fname)
+            # buncNow = fits.open(fname[:-len(filetype)] + 'bunc.fits')
+            buncNow = fits.open(fname.replace('bcd.fits', 'bunc.fits'))
             
             for iframe in range(nFramesPerFile):
-                self.timeCube[kfile * nFramesPerFile + iframe]  = fitsNow[0].header['BMJD_OBS'] \
-                                + iframe * float(fitsNow[0].header['FRAMTIME'])
-                
-                self.imageCube[kfile * nFramesPerFile + iframe] = fitsNow[0].data[iframe]
-
-                # Initial Guess of Photon Limited Noise
-                self.noiseCube[kfile * nFramesPerFile + iframe] = sqrt(fitsNow[0].data[iframe])
+                self.timeCube[kfile * nFramesPerFile + iframe]  = bcdNow[0].header['BMJD_OBS'] \
+                                                            + iframe * float(bcdNow[0].header['FRAMTIME']) * sec2day
             
-            del fitsNow[0].data
-            fitsNow.close()
-            del fitsNow
+                self.imageCube[kfile * nFramesPerFile + iframe] = bcdNow[0].data[iframe]  * fluxConversion
+                self.noiseCube[kfile * nFramesPerFile + iframe] = buncNow[0].data[iframe] * fluxConversion
+            
+            del bcdNow[0].data
+            bcdNow.close()
+            del bcdNow
+            
+            del buncNow[0].data
+            buncNow.close()
+            del buncNow
+    
+    # def spitzer_load_fits_file(self):
+    #
+    #     sec2day             = 1/86400.
+    #     nFramesPerFile      = 64
+    #     testfits            = fits.open(self.fitsFilenames[0])[0]
+    #
+    #     self.nFrames        = self.nSlopeFiles * nFramesPerFile
+    #     self.imageCube      = np.zeros((self.nFrames, testfits.data[0].shape[0], testfits.data[0].shape[1]))
+    #     self.noiseCube      = np.zeros((self.nFrames, testfits.data[0].shape[0], testfits.data[0].shape[1]))
+    #     self.timeCube       = np.zeros((self.nFrames))
+    #
+    #     del testfits
+    #
+    #     for kfile, fname in tqdm_notebook(enumerate(self.fitsFilenames), desc='Spitzer Load File', leave = False, total=self.nSlopeFiles):
+    #         fitsNow = fits.open(fname)
+    #
+    #         for iframe in range(nFramesPerFile):
+    #             self.timeCube[kfile * nFramesPerFile + iframe]  = fitsNow[0].header['BMJD_OBS'] + iframe * float(fitsNow[0].header['FRAMTIME']) * sec2day
+    #
+    #             self.imageCube[kfile * nFramesPerFile + iframe] = fitsNow[0].data[iframe]
+    #
+    #             # Initial Guess of Photon Limited Noise
+    #             self.noiseCube[kfile * nFramesPerFile + iframe] = sqrt(fitsNow[0].data[iframe])
+    #
+    #         del fitsNow[0].data
+    #         fitsNow.close()
+    #         del fitsNow
     
     def hst_load_fits_file(fitsNow):
         raise Exception('NEED TO CODE THIS')
