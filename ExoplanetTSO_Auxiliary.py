@@ -30,6 +30,7 @@ from tqdm                      import tnrange, tqdm_notebook
 from numpy                     import zeros, nanmedian as median, nanmean as mean, nan
 from sys                       import exit
 from sklearn.externals         import joblib
+from skimage.filters           import gaussian as gaussianFilter
 
 import numpy as np
 
@@ -240,11 +241,13 @@ def fit_gauss(subFrameNow, xinds, yinds, initParams, print_compare=False):
     
     return model1.parameters
 
-def fit_one_center(image, ylower, yupper, xlower, xupper, method='gauss', bSize = 7):
+def fit_one_center(image, ylower, yupper, xlower, xupper, nSig=False, method='gauss', bSize = 7):
     
     subFrameNow = image[ylower:yupper, xlower:xupper]
     subFrameNow[isnan(subFrameNow)] = median(~isnan(subFrameNow))
-
+    
+    subFrameNow = gaussianFilter(subFrameNow, nSig) if not isinstance(nSig, bool) else subFrameNow
+    
     if method == 'cmom':
         return np.array(moments(subFrameNow))  # H, Xc, Yc, Xs, Ys, O
     if method == 'gauss':
@@ -272,6 +275,47 @@ def measure_one_circle_bg(image, center, aperRad, metric, apMethod='exact'):
     backgroundMask = ~backgroundMask#[backgroundMask == 0] = False
     
     return metric(image[backgroundMask])
+
+def measure_one_annular_bg(image, center, innerRad, outerRad, metric, apMethod='exact'):
+    innerAperture   = CircularAperture(center, innerRad)
+    outerAperture   = CircularAperture(center, outerRad)
+    
+    inner_aper_mask = innerAperture.to_mask(method=apMethod)[0]
+    inner_aper_mask = inner_aper_mask.to_image(image.shape).astype(bool)
+    
+    outer_aper_mask = outerAperture.to_mask(method=apMethod)[0]
+    outer_aper_mask = outer_aper_mask.to_image(image.shape).astype(bool)
+    
+    backgroundMask = (~inner_aper_mask)*outer_aper_mask
+    
+    return metric(image[backgroundMask])
+
+from numpy import nanmedian, nanstd
+def measure_one_median_bg(image, center, aperRad, metric, nSig, apMethod='exact'):
+    aperture       = CircularAperture(center, aperRad)
+    aperture       = aperture.to_mask(method=apMethod)[0]
+    aperture       = aperture.to_image(image.shape).astype(bool)
+    backgroundMask = ~aperture
+    
+    medFrame  = nanmedian(image[backgroundMask])
+    madFrame  = nanstd(image[backgroundMask])
+    
+    medianMask= abs(image - medFrame) < nSig*madFrame
+    
+    maskComb  = medianMask*backgroundMask
+    
+    return nanmedian(image[maskComb])
+
+def measure_one_KDE_bg(image, center, aperRad, metric, apMethod='exact'):
+    aperture       = CircularAperture(center, aperRad)
+    aperture       = aperture.to_mask(method=apMethod)[0]
+    aperture       = aperture.to_image(image.shape).astype(bool)
+    backgroundMask = ~aperture
+    
+    kdeFrame = kde.KDEUnivariate(image[backgroundMask])
+    kdeFrame.fit()
+    
+    return kdeFrame.support[kdeFrame.density.argmax()]
 
 def measure_one_background(image, center, aperRad, metric, apMethod='exact', bgMethod='circle'):
     
@@ -401,22 +445,23 @@ class wanderer(object):
     
     def spitzer_load_fits_file(self, outputUnits='electrons'):
         # BMJD_2_BJD     = -0.5
-    
+        from scipy.constants import arcsec # pi / arcsec = 648000
+        
         sec2day        = 1/(24*3600)
         nFramesPerFile = 64
         
         testfits       = fits.open(self.fitsFilenames[0])[0]
         testheader     = testfits.header
-    
+        
         bcd_shape      = testfits.data[0].shape
-    
+        
         self.nFrames        = self.nSlopeFiles * nFramesPerFile
         self.imageCube      = zeros((self.nFrames, bcd_shape[0], bcd_shape[1]))
         self.noiseCube      = zeros((self.nFrames, bcd_shape[0], bcd_shape[1]))
         self.timeCube       = zeros(self.nFrames)
         
         del testfits
-    
+        
         # Converts DN/s to microJy per pixel
         #   1) expTime * gain / fluxConv converts MJ/sr to electrons
         #   2) as2sr * MJ2mJ * testheader['PXSCAL1'] * testheader['PXSCAL2'] converts MJ/sr to muJ/pixel
@@ -431,7 +476,7 @@ class wanderer(object):
             fluxConversion = abs(as2sr * MJ2mJ * testheader['PXSCAL1'] * testheader['PXSCAL2']) # converts MJ/
         else:
             raise Exception("`outputUnits` must be either 'electrons' or 'muJ_per_Pixel'")
-    
+        
         print('Loading Spitzer Data')
         for kfile, fname in tqdm_notebook(enumerate(self.fitsFilenames),
                                           desc='Spitzer Load File', leave = False, total=self.nSlopeFiles):
@@ -441,8 +486,9 @@ class wanderer(object):
             
             for iframe in range(nFramesPerFile):
                 self.timeCube[kfile * nFramesPerFile + iframe]  = bcdNow[0].header['BMJD_OBS'] \
-                                                            + iframe * float(bcdNow[0].header['FRAMTIME']) * sec2day
-            
+                                                                + (bcdNow[0].header['ET_OBS'] - bcdNow[0].header['UTCS_OBS'])/86400 \
+                                                                + iframe * float(bcdNow[0].header['FRAMTIME']) * sec2day
+                
                 self.imageCube[kfile * nFramesPerFile + iframe] = bcdNow[0].data[iframe]  * fluxConversion
                 self.noiseCube[kfile * nFramesPerFile + iframe] = buncNow[0].data[iframe] * fluxConversion
             
@@ -481,7 +527,6 @@ class wanderer(object):
     #         del fitsNow[0].data
     #         fitsNow.close()
     #         del fitsNow
-    
     def hst_load_fits_file(fitsNow):
         raise Exception('NEED TO CODE THIS')
     
@@ -522,32 +567,11 @@ class wanderer(object):
         
         self.save_dict        = joblib.load(savefiledir + saveFileNameHeader + '_save_dict' + saveFileType)
         
+        print('nFrames', 'nFrame' in self.save_dict.keys())
         print('Assigning Parts of `self.save_dict` to individual data structures')
         for key in self.save_dict.keys():
             exec("self." + key + " = self.save_dict['" + key + "']")
         
-        # self.fitsFileDir              = self.save_dict['fitsFileDir']
-        # self.fitsFilenames             = self.save_dict['fitsFilenames']
-        
-        # self.background_Annulus       = self.save_dict['background_Annulus']
-        # self.background_CircleMask    = self.save_dict['background_CircleMask']
-        # self.background_GaussMoment   = self.save_dict['background_GaussMoment']
-        # self.background_GaussianFit   = self.save_dict['background_GaussianFit']
-        # self.background_KDEUniv       = self.save_dict['background_KDEUniv']
-        # self.background_MedianMask    = self.save_dict['background_MedianMask']
-        # self.centering_FluxWeight     = self.save_dict['centering_FluxWeight']
-        # self.centering_GaussianFit    = self.save_dict['centering_GaussianFit']
-        # self.centering_GaussianMoment = self.save_dict['centering_GaussianMoment']
-        # self.centering_LeastAsym      = self.save_dict['centering_LeastAsym']
-        # self.fitsFileDir              = self.save_dict['fitsFileDir']
-        # self.heights_GaussianFit      = self.save_dict['heights_GaussianFit']
-        # self.heights_GaussianMoment   = self.save_dict['heights_GaussianMoment']
-        # # self.imageCubeMAD             = self.save_dict['imageCubeMAD']
-        # # self.imageCubeMedian          = self.save_dict['imageCubeMedian']
-        # self.fitsFilenames             = self.save_dict['fitsFilenames']
-        # self.widths_GaussianFit       = self.save_dict['widths_GaussianFit']
-        # self.widths_GaussianMoment    = self.save_dict['widths_GaussianMoment']
-    
     def save_data_to_save_files(self, savefiledir=None, saveFileNameHeader=None, saveFileType='.pickle.save'):
         
         if saveFileNameHeader is None:
@@ -614,11 +638,11 @@ class wanderer(object):
         #     self.save_dict[key]  = val
         
         try:
-            self.save_dict['fitsFileDir']                = self.fitsFileDir
+            self.save_dict['fitsFileDir']               = self.fitsFileDir
         except:
             pass
         try:
-            self.save_dict['fitsFilenames']              = self.fitsFilenames
+            self.save_dict['fitsFilenames']             = self.fitsFilenames
         except:
             pass
         try:
@@ -690,7 +714,11 @@ class wanderer(object):
         except:
             pass
         try:
-            self.save_dict['Quadrature']                      = self.npix
+            self.save_dict['nFrames']                   = self.nFrames
+        except:
+            pass
+        try:
+            self.save_dict['quadrature_widths']         = self.quadrature_widths
         except:
             pass
         try:
@@ -853,7 +881,7 @@ class wanderer(object):
         
         # self.centering_df['Gaussian_Fit_Rotation']    = self.rotation_GaussianFit
     
-    def mp_fit_gaussian_centering(self, method='la', initc='fw', subArray=False, print_compare=False):
+    def mp_fit_gaussian_centering(self, nSig=False, method='la', initc='fw', subArray=False, print_compare=False):
         
         y,x = 0,1
         
@@ -883,7 +911,7 @@ class wanderer(object):
         # Gaussian fit centering
         pool = Pool(self.nCores) # This starts the multiprocessing call to arms
         
-        func = partial(fit_one_center, method='gauss', ylower=ylower, yupper=yupper, xlower=xlower, xupper=xupper)
+        func = partial(fit_one_center, nSig=nSig, method='gauss', ylower=ylower, yupper=yupper, xlower=xlower, xupper=xupper)
         
         gaussian_centers = pool.starmap(func, zip(self.imageCube)) # the order is very important
         
@@ -893,7 +921,7 @@ class wanderer(object):
         ## Moment based centering
         pool = Pool(self.nCores) # This starts the multiprocessing call to arms
         
-        func = partial(fit_one_center, method='cmom', ylower=ylower, yupper=yupper, xlower=xlower, xupper=xupper)
+        func = partial(fit_one_center, nSig=nSig, method='cmom', ylower=ylower, yupper=yupper, xlower=xlower, xupper=xupper)
         
         cmom_centers = pool.starmap(func, zip(self.imageCube)) # the order is very important
         
@@ -969,7 +997,7 @@ class wanderer(object):
         self.centering_df['FluxWeighted_Y_Centers'] = self.centering_FluxWeight.T[self.y]
         self.centering_df['FluxWeighted_X_Centers'] = self.centering_FluxWeight.T[self.x]
     
-    def mp_fit_flux_weighted_centering(self):
+    def mp_fit_flux_weighted_centering(self, nSig=False):
         yinds0, xinds0 = indices(self.imageCube[0].shape)
         
         ylower = self.yguess - self.npix
@@ -987,7 +1015,7 @@ class wanderer(object):
         
         pool = Pool(self.nCores) # This starts the multiprocessing call to arms
         
-        func = partial(fit_one_center, method='fwc', ylower=ylower, yupper=yupper, xlower=xlower, xupper=xupper, bSize = 7)
+        func = partial(fit_one_center, nSig=nSig, method='fwc', ylower=ylower, yupper=yupper, xlower=xlower, xupper=xupper, bSize = 7)
         
         fwc_centers = pool.starmap(func, zip(self.imageCube)) # the order is very important
         
@@ -1178,19 +1206,11 @@ class wanderer(object):
         self.quadrature_widths                  = sqrt(x_widths**2 + y_widths**2)
         self.centering_df['Quadrature_Widths']  = self.quadrature_widths
     
-    def measure_background_circle_masked(self, aperRad=None, centering='FluxWeight'):
+    def measure_background_circle_masked(self, aperRad=10, centering='FluxWeight'):
         """
             Assigning all zeros in the mask to NaNs because the `mean` and `median` 
                 functions are set to `nanmean` functions, which will skip all NaNs
         """
-        
-        if aperRad is None:
-            if 'wlp' in self.fitsFilenames[0].lower():
-                aperRad = 100
-            else:
-                aperRad = 10
-        
-        # medianCenter   = median(self.centering_FluxWeight, axis=0)
         
         self.background_CircleMask = np.zeros(self.nFrames)
         for kframe in tqdm_notebook(range(self.nFrames), desc='CircleBG', leave = False, total=self.nFrames):
@@ -1206,16 +1226,22 @@ class wanderer(object):
         
         self.background_df['CircleMask'] = self.background_CircleMask.copy()
     
-    def mp_measure_background_circle_masked(self, aperRad=10, centering='FluxWeight'):
+    def mp_measure_background_circle_masked(self, aperRad=10, centering='Gauss'):
         """
             Assigning all zeros in the mask to NaNs because the `mean` and `median` 
                 functions are set to `nanmean` functions, which will skip all NaNs
         """
+        
+        if centering=='Gauss':
+            centers = self.centering_GaussianFit
+        if centering=='FluxWeight':
+            centers = self.centering_FluxWeight
+        
         pool = Pool(self.nCores) # This starts the multiprocessing call to arms
         
         func = partial(measure_one_circle_bg, aperRad=aperRad, metric=self.metric, apMethod='exact')
         
-        self.background_CircleMask = pool.starmap(func, zip(self.imageCube, self.centering_FluxWeight)) # the order is very important
+        self.background_CircleMask = pool.starmap(func, zip(self.imageCube, centers))
         
         pool.close()
         pool.join()
@@ -1223,19 +1249,7 @@ class wanderer(object):
         self.background_CircleMask       = np.array(self.background_CircleMask)
         self.background_df['CircleMask'] = self.background_CircleMask.copy()
     
-    def measure_background_annular_mask(self, innerRad=None, outerRad=None):
-        
-        if innerRad is None:
-            if 'wlp' in self.fitsFilenames[0].lower():
-                innerRad = 100
-            else:
-                innerRad = 8
-        
-        if outerRad is None:
-            if 'wlp' in self.fitsFilenames[0].lower():
-                outerRad = 150
-            else:
-                outerRad = 13
+    def measure_background_annular_mask(self, innerRad=8, outerRad=13):
         
         self.background_Annulus = np.zeros(self.nFrames)
         
@@ -1255,13 +1269,18 @@ class wanderer(object):
         
         self.background_df['AnnularMask'] = self.background_Annulus.copy()
     
-    def mp_measure_background_annular_mask(self, innerRad=8, outerRad=13, method='exact'):
+    def mp_measure_background_annular_mask(self, innerRad=8, outerRad=13, method='exact', centering='Gauss'):
+        
+        if centering=='Gauss':
+            centers = self.centering_GaussianFit
+        if centering=='FluxWeight':
+            centers = self.centering_FluxWeight
         
         pool = Pool(self.nCores) # This starts the multiprocessing call to arms
         
-        func = partial(measure_one_background, aperRad=[innerRad, outerRad], apMethod='exact', metric=self.metric, bgMethod='annular')
+        func = partial(measure_one_annular_bg, innerRad=innerRad, outerRad=outerRad, metric=self.metric, apMethod='exact')
         
-        self.background_Annulus = pool.starmap(func, zip(self.imageCube, self.centering_FluxWeight)) # the order is very important
+        self.background_Annulus = pool.starmap(func, zip(self.imageCube, centers)) # the order is very important
         
         pool.close()
         pool.join()
@@ -1269,13 +1288,7 @@ class wanderer(object):
         self.background_Annulus           = np.array(self.background_Annulus)
         self.background_df['AnnularMask'] = self.background_Annulus.copy()
     
-    def measure_background_median_masked(self, aperRad=None, nSig=5):
-        
-        if aperRad is None:
-            if 'wlp' in self.fitsFilenames[0].lower():
-                aperRad = 100
-            else:
-                aperRad = 10
+    def measure_background_median_masked(self, aperRad=10, nSig=5):
         
         self.background_MedianMask  = np.zeros(self.nFrames)
         
@@ -1285,39 +1298,38 @@ class wanderer(object):
             aperture       = aperture.to_image(self.imageCube[0].shape).astype(bool)
             backgroundMask = ~aperture
             
-            medFrame  = median(self.imageCube[kframe][backgroundMask])
-            madFrame  = scale.mad(self.imageCube[kframe][backgroundMask])
+            medFrame  = nanmedian(self.imageCube[kframe][backgroundMask])
+            madFrame  = nanstd(self.imageCube[kframe][backgroundMask]) # scale.mad(self.imageCube[kframe][backgroundMask])
             
             medianMask= abs(self.imageCube[kframe] - medFrame) < nSig*madFrame
             
             maskComb  = medianMask*backgroundMask
             # maskComb[maskComb == 0] = False
             
-            self.background_MedianMask[kframe] = self.metric(self.imageCube[kframe][maskComb])
+            self.background_MedianMask[kframe] = nanmedian(self.imageCube[kframe][maskComb])
         
         self.background_df['MedianMask'] = self.background_MedianMask
     
-    def mp_measure_background_median_masked(self, aperRad=10, nSig=5):
+    def mp_measure_background_median_masked(self, aperRad=10, nSig=5, centering='Gauss'):
+        
+        if centering=='Gauss':
+            centers = self.centering_GaussianFit
+        if centering=='FluxWeight':
+            centers = self.centering_FluxWeight
         
         pool = Pool(self.nCores) # This starts the multiprocessing call to arms
         
-        func = partial(measure_one_background, aperRad=aperRad, apMethod='exact', metric=self.metric, bgMethod='median')
+        func = partial(measure_one_median_bg, aperRad=aperRad, apMethod='exact', metric=self.metric, nSig=nSig)
         
-        self.background_Annulus = pool.starmap(func, zip(self.imageCube, self.centering_FluxWeight)) # the order is very important
+        self.background_MedianMask = pool.starmap(func, zip(self.imageCube, centers))
         
         pool.close()
         pool.join()
         
-        self.background_MedianMask       = np.array(self.background_Annulus)
+        self.background_MedianMask       = np.array(self.background_MedianMask)
         self.background_df['MedianMask'] = self.background_MedianMask
     
-    def measure_background_KDE_Mode(self, aperRad=None):
-        
-        if aperRad is None:
-            if 'wlp' in self.fitsFilenames[0].lower():
-                aperRad = 100
-            else:
-                aperRad = 10
+    def measure_background_KDE_Mode(self, aperRad=10):
         
         self.background_KDEUniv = np.zeros(self.nFrames)
         
@@ -1327,47 +1339,45 @@ class wanderer(object):
             aperture       = aperture.to_image(self.imageCube[0].shape).astype(bool)
             backgroundMask = ~aperture
             
-            kdeFrame = kde.KDEUnivariate(self.imageCube[kframe][backgroundMask])
+            kdeFrame = kde.KDEUnivariate(self.imageCube[kframe][backgroundMask].ravel())
             kdeFrame.fit()
             
             self.background_KDEUniv[kframe] = kdeFrame.support[kdeFrame.density.argmax()]
         
         self.background_df['KDEUnivMask'] = self.background_KDEUniv
     
-    def mp_measure_background_KDE_Mode(self, aperRad=10):
+    def mp_measure_background_KDE_Mode(self, aperRad=10, centering='Gauss'):
+        
+        if centering=='Gauss':
+            centers = self.centering_GaussianFit
+        if centering=='FluxWeight':
+            centers = self.centering_FluxWeight
         
         self.background_KDEUniv = np.zeros(self.nFrames)
         
         pool = Pool(self.nCores) # This starts the multiprocessing call to arms
         
-        func = partial(measure_one_background, aperRad=aperRad, apMethod='exact', metric=self.metric, bgMethod='kde')
+        func = partial(measure_one_KDE_bg, aperRad=aperRad, apMethod='exact', metric=self.metric)
         
-        self.background_KDEUniv = pool.starmap(func, zip(self.imageCube, self.centering_FluxWeight)) # the order is very important
+        self.background_KDEUniv = pool.starmap(func, zip(self.imageCube, centers)) # the order is very important
         
         pool.close()
         pool.join()
         
-        self.background_KDEUniv           = np.array(self.background_KDEUniv)
-        self.background_df['KDEUnivMask'] = self.background_KDEUniv
+        self.background_KDEUniv              = np.array(self.background_KDEUniv)
+        self.background_df['KDEUnivMask_mp'] = self.background_KDEUniv
     
-    def measure_all_background(self, nSig=5):
-        # list_of_bg_funcs = [self.measure_background_circle_masked, self.measure_background_annular_mask, self.measure_background_median_masked, self.measure_background_KDE_Mode()]
-        #
-        # pool = Pool(self.nCores)
-        #
-        # pool.starmap(meausre_bg_func, zip(list_of_bg_funcs))
-        #
-        # pool.close()
-        # pool.join()
-        
-        print('Measuring Background Using Circle Mask')
-        self.measure_background_circle_masked()
-        print('Measuring Background Using Annular Mask')
-        self.measure_background_annular_mask()
-        print('Measuring Background Using Median Mask')
-        self.measure_background_median_masked(nSig=nSig)
-        print('Measuring Background Using KDE Mode')
-        self.measure_background_KDE_Mode()
+    def measure_all_background(self, aperRad=10, nSig=5):
+        pInner  = 0.2 # Percent Inner = -20%
+        pOuter  = 0.3 # Percent Outer = +30%
+        print('Measuring Background Using Circle Mask with Multiprocessing')
+        self.mp_measure_background_circle_masked(aperRad=aperRad)
+        print('Measuring Background Using Annular Mask with Multiprocessing')
+        self.mp_measure_background_annular_mask(innerRad=(1-pInner)*aperRad, outerRad=(1+pOuter)*aperRad)
+        print('Measuring Background Using Median Mask with Multiprocessing')
+        self.mp_measure_background_median_masked(aperRad=aperRad, nSig=nSig)
+        print('Measuring Background Using KDE Mode with Multiprocessing')
+        self.mp_measure_background_KDE_Mode(aperRad=aperRad)
     
     def compute_flux_over_time(self, aperRad=None, centering='GaussianFit', background='AnnularMask', useTheForce=False):
         y,x = 0,1
