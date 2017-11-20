@@ -38,20 +38,7 @@ rcParams['image.interpolation'] = 'None'
 rcParams['image.cmap']          = 'Blues_r'
 rcParams['axes.grid']           = False
 
-
 y,x = 0,1
-
-# dataDir = '/path/to/fits/files/main/directory/'
-# fitsFileDir = 'path/to/fits/subdirectories/'
-#
-# fitsFilenames = glob(dataDir + fitsFileDir + '*slp.fits')
-# fitsFilenames
-
-
-# Load All of the Data
-# ===
-
-# In[ ]:
 
 def get_julian_date_from_gregorian_date(*date):
     """gd2jd.py converts a UT Gregorian date to Julian date.
@@ -219,7 +206,120 @@ def flux_weighted_centroid(image, ypos, xpos, bSize = 7):
     return (ypeak, xpeak)
 
 
-# In[ ]:
+def gaussian(height, center_y, center_x, width_y, width_x, offset, yy, xx):
+    """Returns a gaussian function with the given parameters"""
+    width_x = float(width_x)
+    width_y = float(width_y)
+    
+    chiY    = (center_y - yy) / width_y
+    chiX    = (center_x - xx) / width_x
+    
+    return height * exp(-0.5*(chiY**2 + chiX**2)) + offset
+
+def moments(data):
+    """Returns (height, x, y, width_x, width_y,offset)
+    the gaussian parameters of a 2D distribution by calculating its
+    moments """
+    total = data.sum()
+    X, Y = indices(data.shape)
+    x = (X*data).sum()/total
+    y = (Y*data).sum()/total
+    height = data.max()
+    firstq = nanmedian(data[data < nanmedian(data)])
+    thirdq = nanmedian(data[data > nanmedian(data)])
+    offset = nanmedian(data[where(bitwise_and(data > firstq,
+                                                    data < thirdq))])
+    places = where((data-offset) > 4*nanstd(data[where(bitwise_and(
+                                      data > firstq, data < thirdq))]))
+    width_y = nanstd(places[0])
+    width_x = nanstd(places[1])
+    # These if statements take into account there might only be one significant
+    # point above the background when that is the case it is assumend the width
+    # of the gaussian must be smaller than one pixel
+    if width_y == 0.0:
+        width_y = 0.5
+    if width_x == 0.0:
+        width_x = 0.5
+
+    height -= offset
+    return height, y, x, width_y, width_x, offset
+
+def lame_lmfit_gaussian_centering(imageCube, yguess=15, xguess=15, subArraySize=10, init_params=None, nSig=False, useMoments=False, method='leastsq'):
+    imageSize  = imageCube.shape[1]
+    
+    nparams    = 6
+    if init_params is None:
+        useMoments = True
+        init_params = moments(imageCube[0])
+    
+    ihg, iyc, ixc, iyw, ixw, ibg  = arange(nparams)
+    lmfit_init_params = Parameters()
+    lmfit_init_params.add_many(
+        ('height'  , init_params[ihg], True  , 0.0 , inf   ),
+        ('center_y', init_params[iyc], True  , 0.0 , imageSize),
+        ('center_x', init_params[ixc], True  , 0.0 , imageSize),
+        ('width_y' , init_params[iyw], True  , 0.0 , imageSize),
+        ('width_x' , init_params[ixw], True  , 0.0 , imageSize),
+        ('offset'  , init_params[ibg], True))
+    
+    gfit_model = Model(gaussian, independent_vars=['yy', 'xx'])
+    
+    yy0, xx0 = indices(imageCube[0].shape)
+    
+    npix   = subArraySize//2
+    ylower = yguess - npix
+    yupper = yguess + npix
+    xlower = xguess - npix
+    xupper = xguess + npix
+    
+    ylower, xlower, yupper, xupper = int32([ylower, xlower, yupper, xupper])
+    
+    yy = yy0[ylower:yupper, xlower:xupper]
+    xx = xx0[ylower:yupper, xlower:xupper]
+    
+    heights, ycenters, xcenters, ywidths, xwidths, offsets = zeros((nparams, nFrames))
+    
+    for k, image in enumerate(imageCube):
+        subFrameNow = image[ylower:yupper, xlower:xupper]
+        subFrameNow[isnan(subFrameNow)] = nanmedian(subFrameNow)
+        
+        subFrameNow = gaussianFilter(subFrameNow, nSig) if not isinstance(nSig, bool) else subFrameNow
+        
+        init_params = moments(subFrameNow) if useMoments else init_params
+        
+        gfit_res    = gfit_model.fit(subFrameNow, params=lmfit_init_params, xx=xx, yy=yy, method=method)
+        
+        heights[k]  = gfit_res.best_values['height']
+        ycenters[k] = gfit_res.best_values['center_y']
+        xcenters[k] = gfit_res.best_values['center_x']
+        ywidths[k]  = gfit_res.best_values['width_y']
+        xwidths[k]  = gfit_res.best_values['width_x']
+        offsets[k]  = gfit_res.best_values['offset']
+    
+    return heights, ycenters, xcenters, ywidths, xwidths, offsets
+
+def lmfit_one_center(image, yy, xx, gfit_model, lmfit_init_params, yupper, ylower, xupper, xlower, useMoments=True, nSig=False, method='leastsq'):
+    
+    subFrameNow = image[ylower:yupper, xlower:xupper]
+    subFrameNow[isnan(subFrameNow)] = nanmedian(subFrameNow)
+    
+    subFrameNow = gaussianFilter(subFrameNow, nSig) if not isinstance(nSig, bool) else subFrameNow
+    
+    init_params = moments(subFrameNow) if useMoments else list(lmfit_init_params.valuesdict().values())
+    
+    nparams     = 6
+    ihg, iyc, ixc, iyw, ixw, ibg  = arange(nparams)
+    
+    lmfit_init_params.height   = init_params[ihg]
+    lmfit_init_params.center_y = init_params[iyc]
+    lmfit_init_params.center_x = init_params[ixc]
+    lmfit_init_params.widths_y = init_params[iyw]
+    lmfit_init_params.widths_x = init_params[ixw]
+    lmfit_init_params.offset   = init_params[ibg]
+    
+    gfit_res    = gfit_model.fit(subFrameNow, params=lmfit_init_params, xx=xx, yy=yy, method=method)
+    
+    return gfit_res.best_values, init_params
 
 def fit_gauss(subFrameNow, xinds, yinds, initParams, print_compare=False):
     # initParams = (height, x, y, width_x, width_y, offset)
@@ -654,10 +754,6 @@ class wanderer(object):
         except:
             pass
         try:
-            self.save_dict['background_GaussMoment']    = self.background_GaussMoment
-        except:
-            pass
-        try:
             self.save_dict['background_GaussianFit']    = self.background_GaussianFit
         except:
             pass
@@ -678,10 +774,6 @@ class wanderer(object):
         except:
             pass
         try:
-            self.save_dict['centering_GaussianMoment']  = self.centering_GaussianMoment
-        except:
-            pass
-        try:
             self.save_dict['centering_LeastAsym']       = self.centering_LeastAsym
         except:
             pass
@@ -699,10 +791,6 @@ class wanderer(object):
             pass
         try:
             self.save_dict['heights_GaussianFit']       = self.heights_GaussianFit
-        except:
-            pass
-        try:
-            self.save_dict['heights_GaussianMoment']    = self.heights_GaussianMoment
         except:
             pass
         try:
@@ -733,10 +821,6 @@ class wanderer(object):
             self.save_dict['widths_GaussianFit']        = self.widths_GaussianFit
         except:
             pass
-        try:
-            self.save_dict['widths_GaussianMoment']     = self.widths_GaussianMoment
-        except:
-            pass
     
     def copy_instance(self):
         
@@ -765,22 +849,18 @@ class wanderer(object):
         
         # temp.background_Annulus       = temp.save_dict['background_Annulus']
         # temp.background_CircleMask    = temp.save_dict['background_CircleMask']
-        # temp.background_GaussMoment   = temp.save_dict['background_GaussMoment']
         # temp.background_GaussianFit   = temp.save_dict['background_GaussianFit']
         # temp.background_KDEUniv       = temp.save_dict['background_KDEUniv']
         # temp.background_MedianMask    = temp.save_dict['background_MedianMask']
         # temp.centering_FluxWeight     = temp.save_dict['centering_FluxWeight']
         # temp.centering_GaussianFit    = temp.save_dict['centering_GaussianFit']
-        # temp.centering_GaussianMoment = temp.save_dict['centering_GaussianMoment']
         # temp.centering_LeastAsym      = temp.save_dict['centering_LeastAsym']
         # temp.fitsFileDir              = temp.save_dict['fitsFileDir']
         # temp.heights_GaussianFit      = temp.save_dict['heights_GaussianFit']
-        # temp.heights_GaussianMoment   = temp.save_dict['heights_GaussianMoment']
         # # temp.imageCubeMAD             = temp.save_dict['imageCubeMAD']
         # # temp.imageCubeMedian          = temp.save_dict['imageCubeMedian']
         # temp.fitsFilenames             = temp.save_dict['fitsFilenames']
         # temp.widths_GaussianFit       = temp.save_dict['widths_GaussianFit']
-        # temp.widths_GaussianMoment    = temp.save_dict['widths_GaussianMoment']
     
     def find_bad_pixels(self, nSig=5):
         # we chose 5 arbitrarily, but from experience
@@ -809,14 +889,10 @@ class wanderer(object):
         xinds = xinds0[ylower:yupper, xlower:xupper]
         
         self.centering_GaussianFit    = zeros((self.imageCube.shape[0], 2))
-        self.centering_GaussianMoment = zeros((self.imageCube.shape[0], 2))
         self.widths_GaussianFit       = zeros((self.imageCube.shape[0], 2))
-        self.widths_GaussianMoment    = zeros((self.imageCube.shape[0], 2))
         
         self.heights_GaussianFit      = zeros(self.imageCube.shape[0])
-        self.heights_GaussianMoment   = zeros(self.imageCube.shape[0])
         # self.rotation_GaussianFit     = zeros(self.imageCube.shape[0])
-        self.background_GaussMoment   = zeros(self.imageCube.shape[0])
         self.background_GaussianFit   = zeros(self.imageCube.shape[0])
         
         for kframe in tqdm_notebook(range(self.nFrames), desc='GaussFit', leave = False, total=self.nFrames):
@@ -841,24 +917,12 @@ class wanderer(object):
             
             self.centering_GaussianFit[kframe][self.x]     = gaussP[1] + xlower
             self.centering_GaussianFit[kframe][self.y]     = gaussP[2] + ylower
-            self.centering_GaussianMoment[kframe][self.x]  = cmom[1]   + xlower
-            self.centering_GaussianMoment[kframe][self.y]  = cmom[2]   + ylower
             
             self.widths_GaussianFit[kframe][self.x]        = gaussP[3]
             self.widths_GaussianFit[kframe][self.y]        = gaussP[4]
-            self.widths_GaussianMoment[kframe][self.x]     = cmom[3]
-            self.widths_GaussianMoment[kframe][self.y]     = cmom[4]
             
             self.heights_GaussianFit[kframe]          = gaussP[0]
-            self.heights_GaussianMoment[kframe]       = cmom[0]
-            
             self.background_GaussianFit[kframe]       = gaussP[5]
-            self.background_GaussMoment[kframe]       = cmom[5]
-            
-            if print_compare:
-                print('Finished Frame ' + str(kframe) + ' with Yc = ' + \
-                      str(self.centering_GaussianFit[kframe][self.y] - self.centering_GaussianMoment[kframe][self.y]) + '; Xc = ' + \
-                      str(self.centering_GaussianFit[kframe][self.x] - self.centering_GaussianMoment[kframe][self.x]))
             
             del gaussP, cmom
         
@@ -870,17 +934,81 @@ class wanderer(object):
         
         self.centering_df['Gaussian_Fit_Y_Widths']  = self.widths_GaussianFit.T[self.y]
         self.centering_df['Gaussian_Fit_X_Widths']  = self.widths_GaussianFit.T[self.x]
-        self.centering_df['Gaussian_Mom_Y_Widths']  = self.widths_GaussianMoment.T[self.y]
-        self.centering_df['Gaussian_Mom_X_Widths']  = self.widths_GaussianMoment.T[self.x]
         
         self.centering_df['Gaussian_Fit_Heights']   = self.heights_GaussianFit
-        self.centering_df['Gaussian_Mom_Heights']   = self.heights_GaussianMoment
-        
         self.centering_df['Gaussian_Fit_Offset']    = self.background_GaussianFit
-        self.centering_df['Gaussian_Mom_Offset']    = self.background_GaussMoment
-        
-        # self.centering_df['Gaussian_Fit_Rotation']    = self.rotation_GaussianFit
     
+    def mp_lmfit_gaussian_centering(self, subArraySize=10, init_params=None, useMoments=False, nCores=cpu_count(), nSig=False, method='leastsq'):
+        
+        imageSize  = self.imageCube.shape[1]
+        
+        nparams    = 6
+        if init_params is None:
+            useMoments = True
+            init_params = moments(self.imageCube[0])
+        
+        ihg, iyc, ixc, iyw, ixw, ibg  = arange(nparams)
+        
+        lmfit_init_params = Parameters()
+        lmfit_init_params.add_many(
+            ('height'  , init_params[ihg], True  , 0.0 , inf   ),
+            ('center_y', init_params[iyc], True  , 0.0 , imageSize),
+            ('center_x', init_params[ixc], True  , 0.0 , imageSize),
+            ('width_y' , init_params[iyw], True  , 0.0 , imageSize),
+            ('width_x' , init_params[ixw], True  , 0.0 , imageSize),
+            ('offset'  , init_params[ibg], True))
+        
+        gfit_model = Model(gaussian, independent_vars=['yy', 'xx'])
+        
+        yy0, xx0 = indices(self.imageCube[0].shape)
+        
+        npix   = subArraySize//2
+        ylower = self.yguess - self.npix
+        yupper = self.yguess + self.npix
+        xlower = self.xguess - self.npix
+        xupper = self.xguess + self.npix
+        
+        ylower, xlower, yupper, xupper = int32([ylower, xlower, yupper, xupper])
+        
+        yy = yy0[ylower:yupper, xlower:xupper]
+        xx = xx0[ylower:yupper, xlower:xupper]
+        
+        pool = Pool(nCores)
+        
+        func = partial(lmfit_one_center, yy=yy, xx=xx, gfit_model=gfit_model, lmfit_init_params=lmfit_init_params, 
+                                            yupper=yupper, ylower=ylower, xupper=xupper, xlower=xlower, method=method)
+        
+        gauss_centers = pool.starmap(func, zip(self.imageCube))
+        
+        pool.close()
+        pool.join()
+        
+        pool = Pool(nCores)
+        
+        gaussP, cmom  = gauss_centers
+        
+        print('Finished with Fitting Centers. Now assigning to instance values.')
+        for kframe, (gaussP, cmom) in enumerate(zip(gaussian_centers, cmom_centers)):
+            self.centering_GaussianFit[kframe][self.x]     = gaussP[ixc] + xlower
+            self.centering_GaussianFit[kframe][self.y]     = gaussP[iyc] + ylower
+            
+            self.widths_GaussianFit[kframe][self.x]        = gaussP[ixw]
+            self.widths_GaussianFit[kframe][self.y]        = gaussP[iyw]
+            
+            self.heights_GaussianFit[kframe]               = gaussP[ihg]
+            
+            self.background_GaussianFit[kframe]            = gaussP[ibg]
+        
+        self.centering_df = DataFrame()
+        self.centering_df['Gaussian_Fit_Y_Centers'] = self.centering_GaussianFit.T[self.y]
+        self.centering_df['Gaussian_Fit_X_Centers'] = self.centering_GaussianFit.T[self.x]
+        
+        self.centering_df['Gaussian_Fit_Y_Widths']  = self.widths_GaussianFit.T[self.y]
+        self.centering_df['Gaussian_Fit_X_Widths']  = self.widths_GaussianFit.T[self.x]
+        
+        self.centering_df['Gaussian_Fit_Heights']   = self.heights_GaussianFit
+        self.centering_df['Gaussian_Fit_Offset']    = self.background_GaussianFit
+        
     def mp_fit_gaussian_centering(self, nSig=False, method='la', initc='fw', subArray=False, print_compare=False):
         
         y,x = 0,1
@@ -898,14 +1026,10 @@ class wanderer(object):
         xinds = xinds0[ylower:yupper, xlower:xupper]
         
         self.centering_GaussianFit    = zeros((self.imageCube.shape[0], 2))
-        self.centering_GaussianMoment = zeros((self.imageCube.shape[0], 2))
         self.widths_GaussianFit       = zeros((self.imageCube.shape[0], 2))
-        self.widths_GaussianMoment    = zeros((self.imageCube.shape[0], 2))
         
         self.heights_GaussianFit      = zeros(self.imageCube.shape[0])
-        self.heights_GaussianMoment   = zeros(self.imageCube.shape[0])
         # self.rotation_GaussianFit     = zeros(self.imageCube.shape[0])
-        self.background_GaussMoment   = zeros(self.imageCube.shape[0])
         self.background_GaussianFit   = zeros(self.imageCube.shape[0])
         
         # Gaussian fit centering
@@ -918,33 +1042,16 @@ class wanderer(object):
         pool.close()
         pool.join()
         
-        ## Moment based centering
-        pool = Pool(self.nCores) # This starts the multiprocessing call to arms
-        
-        func = partial(fit_one_center, nSig=nSig, method='cmom', ylower=ylower, yupper=yupper, xlower=xlower, xupper=xupper)
-        
-        cmom_centers = pool.starmap(func, zip(self.imageCube)) # the order is very important
-        
-        pool.close()
-        pool.join()
-        
         print('Finished with Fitting Centers. Now assigning to instance values.')
         for kframe, (gaussP, cmom) in enumerate(zip(gaussian_centers, cmom_centers)):
             self.centering_GaussianFit[kframe][self.x]     = gaussP[1] + xlower
             self.centering_GaussianFit[kframe][self.y]     = gaussP[2] + ylower
-            self.centering_GaussianMoment[kframe][self.x]  = cmom[1]   + xlower
-            self.centering_GaussianMoment[kframe][self.y]  = cmom[2]   + ylower
             
             self.widths_GaussianFit[kframe][self.x]        = gaussP[3]
             self.widths_GaussianFit[kframe][self.y]        = gaussP[4]
-            self.widths_GaussianMoment[kframe][self.x]     = cmom[3]
-            self.widths_GaussianMoment[kframe][self.y]     = cmom[4]
             
-            self.heights_GaussianFit[kframe]               = gaussP[0]
-            self.heights_GaussianMoment[kframe]            = cmom[0]
-            
+            self.heights_GaussianFit[kframe]               = gaussP[0]            
             self.background_GaussianFit[kframe]            = gaussP[5]
-            self.background_GaussMoment[kframe]            = cmom[5]
         
         self.centering_df = DataFrame()
         self.centering_df['Gaussian_Fit_Y_Centers'] = self.centering_GaussianFit.T[self.y]
@@ -954,14 +1061,9 @@ class wanderer(object):
         
         self.centering_df['Gaussian_Fit_Y_Widths']  = self.widths_GaussianFit.T[self.y]
         self.centering_df['Gaussian_Fit_X_Widths']  = self.widths_GaussianFit.T[self.x]
-        self.centering_df['Gaussian_Mom_Y_Widths']  = self.widths_GaussianMoment.T[self.y]
-        self.centering_df['Gaussian_Mom_X_Widths']  = self.widths_GaussianMoment.T[self.x]
         
         self.centering_df['Gaussian_Fit_Heights']   = self.heights_GaussianFit
-        self.centering_df['Gaussian_Mom_Heights']   = self.heights_GaussianMoment
-        
         self.centering_df['Gaussian_Fit_Offset']    = self.background_GaussianFit
-        self.centering_df['Gaussian_Mom_Offset']    = self.background_GaussMoment
         
         # self.centering_df['Gaussian_Fit_Rotation']    = self.rotation_GaussianFit
     
@@ -1178,8 +1280,8 @@ class wanderer(object):
         self.centering_df['LeastAsymmetry_X_Centers'] = self.centering_LeastAsym.T[self.x]
     
     def fit_all_centering(self):
-        print('Fit for Gaussian Fitting & Gaussian Moment Centers\n')
-        self.fit_gaussian_centering()
+        print('Fit for Gaussian Fitting Centers\n')
+        self.mp_lmfit_gaussian_centering()
         
         print('Fit for Flux Weighted Centers\n')
         self.fit_flux_weighted_centering()

@@ -492,6 +492,6 @@ if __name__ == '__main__':
         plot((input_xcenters- gauss_xcenters) / input_xcenters, (input_ycenters- gauss_ycenters)/input_ycenters,'.')
         plot((input_xcenters- fwc_xcenters) / input_xcenters, (input_ycenters- fwc_ycenters)/input_ycenters,'.')
         plot((gauss_xcenters- fwc_xcenters) / gauss_xcenters, (gauss_ycenters- fwc_ycenters)/gauss_ycenters,'.')
-        
+    
     if plotRaw or plotRel:
         show()
