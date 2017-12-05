@@ -136,10 +136,10 @@ print('Find, flag, and NaN the "Bad Pixels" Outliers' + '\n')
 example_wanderer_median.find_bad_pixels()
 
 print('Fit for All Centers: Flux Weighted, Gaussian Fitting, Gaussian Moments, Least Asymmetry' + '\n')
-# example_wanderer_median.fit_gaussian_fitting_centering()
-# example_wanderer_median.fit_flux_weighted_centering()
+example_wanderer_median.mp_lmfit_gaussian_fitting_centering()
+example_wanderer_median.fit_flux_weighted_centering()
 # example_wanderer_median.fit_least_asymmetry_centering()
-example_wanderer_median.fit_all_centering()
+# example_wanderer_median.fit_all_centering()
 
 print('Measure Background Estimates with All Methods: Circle Masked, Annular Masked, KDE Mode, Median Masked' + '\n')
 # example_wanderer_median.measure_background_circle_masked()
