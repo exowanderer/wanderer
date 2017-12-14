@@ -519,6 +519,29 @@ def measure_one_background(image, center, aperRad, metric, apMethod='exact', bgM
     
     return metric(image[aperture])
 
+def std_per_point(vec, kernel_size=50):
+
+    #dcc.badpix_medfilt(vec, nSig = 4.0, kernel_size = 7)
+    #dcc.badpix_medfilt(vec, nSig = 4.0, kernel_size = 7)
+
+    sVec    = vec.size
+    indices = np.arange(sVec)
+    stds    = np.zeros(sVec)
+
+    sWing = (kernel_size - 1)/2 # Number of Pixel left and right of center: 'wing'
+
+    for k in range(sVec):
+        if k - sWing < 0:
+            inds      = np.concatenate([indices[sVec + k-sWing:],indices[:k+sWing+1]])
+        elif k+sWing+1 > sVec:
+            inds      = np.concatenate([indices[k-sWing:],indices[:k+sWing-sVec+1]])
+        else:
+            inds      = indices[k-sWing:k+sWing+1]
+
+        stds[k]   = np.std(vec[inds])
+
+    return stds
+
 class wanderer(object):
     def __init__(self, fitsFileDir = './', filetype = 'slp.fits', telescope = None,
                  yguess=None, xguess=None, npix=5, method='mean', nCores = None):
