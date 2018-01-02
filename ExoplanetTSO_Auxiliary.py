@@ -20,7 +20,9 @@ from numpy                     import int32 as npint, round as npround, nansum a
 from seaborn                   import *
 from scipy.special             import erf
 from scipy                     import stats
+from sklearn.cluster           import DBSCAN
 from sklearn.externals         import joblib
+from sklearn.preprocessing     import StandardScaler
 from skimage.filters           import gaussian as gaussianFilter
 from socket                    import gethostname
 from statsmodels.robust        import scale
@@ -43,15 +45,45 @@ y,x = 0,1
 
 '''Start: From least_asymmetry.asym by N.Lust (github.com/natelust/least_asymmetry) and modified (reversed XY -> YX)'''
 def gaussian(height, center_y, center_x, width_y, width_x, offset, yy, xx):
+    """Class methods are similar to regular functions.
+
+    Note:
+        Do not include the `self` parameter in the ``Args`` section.
+
+    Args:
+        param1: The first parameter.
+        param2: The second parameter.
+
+    Returns:
+        True if successful, False otherwise.
+
+    """
+    
     """Returns a gaussian function with the given parameters"""
+    
     width_y = float(width_y)
     width_x = float(width_x)
     return height*np.exp(-0.5*(((center_y-yy)/width_y)**2+((center_x-xx)/width_x)**2))+offset
 
 def moments(data, kernel_size=2):
+    """Class methods are similar to regular functions.
+
+    Note:
+        Do not include the `self` parameter in the ``Args`` section.
+
+    Args:
+        param1: The first parameter.
+        param2: The second parameter.
+
+    Returns:
+        True if successful, False otherwise.
+
+    """
+    
     """Returns (height, x, y, width_x, width_y,offset)
     the gaussian parameters of a 2D distribution by calculating its
     moments """
+    
     total = data.sum()
     Y, X = indices(data.shape)
     y = (Y*data).sum()/total
@@ -75,6 +107,20 @@ def moments(data, kernel_size=2):
     return height, y, x, width_y, width_x, offset
 
 def fitgaussian(data, weights=False):
+    """Class methods are similar to regular functions.
+
+    Note:
+        Do not include the `self` parameter in the ``Args`` section.
+
+    Args:
+        param1: The first parameter.
+        param2: The second parameter.
+
+    Returns:
+        True if successful, False otherwise.
+
+    """
+    
     """Returns (height, y, x, width_y, width_x)
     the gaussian parameters of a 2D distribution found by a fit
     Weights must be the same size as the data, but every point
@@ -95,6 +141,20 @@ def fitgaussian(data, weights=False):
     return params
 
 def center_of_light(data, weights=False):
+    """Class methods are similar to regular functions.
+
+    Note:
+        Do not include the `self` parameter in the ``Args`` section.
+
+    Args:
+        param1: The first parameter.
+        param2: The second parameter.
+
+    Returns:
+        True if successful, False otherwise.
+
+    """
+    
     if isinstance(weights, type(False)):
         weights = np.ones(data.shape, dtype=float)
     elif weights.dtype != np.dtype('float'):
@@ -105,6 +165,20 @@ def center_of_light(data, weights=False):
     return [sum(weights*ny*data)/sum(weights*data), sum(weights*nx*data)/sum(weights*data)]
 
 def get_julian_date_from_gregorian_date(*date):
+    """Class methods are similar to regular functions.
+
+    Note:
+        Do not include the `self` parameter in the ``Args`` section.
+
+    Args:
+        param1: The first parameter.
+        param2: The second parameter.
+
+    Returns:
+        True if successful, False otherwise.
+
+    """
+    
     """gd2jd.py converts a UT Gregorian date to Julian date.
     
     Functions for JD <-> GD conversion, 
@@ -199,6 +273,20 @@ def get_julian_date_from_gregorian_date(*date):
 # In[ ]:
 
 def get_julian_date_from_header(header):
+    """Class methods are similar to regular functions.
+
+    Note:
+        Do not include the `self` parameter in the ``Args`` section.
+
+    Args:
+        param1: The first parameter.
+        param2: The second parameter.
+
+    Returns:
+        True if successful, False otherwise.
+
+    """
+    
     # These are specific to STScI standards -- may vary on the ground
     fitsDate    = header['DATE-OBS']
     startTimeStr= header['TIME-OBS']
@@ -227,6 +315,20 @@ def get_julian_date_from_header(header):
     return startDate, endDate
 
 def clipOutlier(oneDarray, nSig=8):
+    """Class methods are similar to regular functions.
+
+    Note:
+        Do not include the `self` parameter in the ``Args`` section.
+
+    Args:
+        param1: The first parameter.
+        param2: The second parameter.
+
+    Returns:
+        True if successful, False otherwise.
+
+    """
+    
     medarray = np.median(oneDarray)
     stdarray = np.std(oneDarray)
     outliers = abs(oneDarray - medarray) > nSig*stdarray
@@ -235,6 +337,20 @@ def clipOutlier(oneDarray, nSig=8):
     return oneDarray
 
 def flux_weighted_centroid(image, ypos, xpos, bSize = 7):
+    """Class methods are similar to regular functions.
+
+    Note:
+        Do not include the `self` parameter in the ``Args`` section.
+
+    Args:
+        param1: The first parameter.
+        param2: The second parameter.
+
+    Returns:
+        True if successful, False otherwise.
+
+    """
+    
     '''
         Flux-weighted centroiding (Knutson et al. 2008)
         xpos and ypos are the rounded pixel positions of the star
@@ -271,6 +387,20 @@ def flux_weighted_centroid(image, ypos, xpos, bSize = 7):
 
 
 def gaussian(height, center_y, center_x, width_y, width_x, offset, yy, xx):
+    """Class methods are similar to regular functions.
+
+    Note:
+        Do not include the `self` parameter in the ``Args`` section.
+
+    Args:
+        param1: The first parameter.
+        param2: The second parameter.
+
+    Returns:
+        True if successful, False otherwise.
+
+    """
+    
     """Returns a gaussian function with the given parameters"""
     width_x = float(width_x)
     width_y = float(width_y)
@@ -281,6 +411,20 @@ def gaussian(height, center_y, center_x, width_y, width_x, offset, yy, xx):
     return height * exp(-0.5*(chiY**2 + chiX**2)) + offset
 
 def moments(data):
+    """Class methods are similar to regular functions.
+
+    Note:
+        Do not include the `self` parameter in the ``Args`` section.
+
+    Args:
+        param1: The first parameter.
+        param2: The second parameter.
+
+    Returns:
+        True if successful, False otherwise.
+
+    """
+    
     """Returns (height, x, y, width_x, width_y,offset)
     the gaussian parameters of a 2D distribution by calculating its
     moments """
@@ -309,6 +453,20 @@ def moments(data):
     return height, y, x, width_y, width_x, offset
 
 def lame_lmfit_gaussian_centering(imageCube, yguess=15, xguess=15, subArraySize=10, init_params=None, nSig=False, useMoments=False, method='leastsq'):
+    """Class methods are similar to regular functions.
+
+    Note:
+        Do not include the `self` parameter in the ``Args`` section.
+
+    Args:
+        param1: The first parameter.
+        param2: The second parameter.
+
+    Returns:
+        True if successful, False otherwise.
+
+    """
+    
     imageSize  = imageCube.shape[1]
     
     nparams    = 6
@@ -363,6 +521,19 @@ def lame_lmfit_gaussian_centering(imageCube, yguess=15, xguess=15, subArraySize=
     return heights, ycenters, xcenters, ywidths, xwidths, offsets
 
 def lmfit_one_center(image, yy, xx, gfit_model, lmfit_init_params, yupper, ylower, xupper, xlower, useMoments=True, nSig=False, method='leastsq'):
+    """Class methods are similar to regular functions.
+
+    Note:
+        Do not include the `self` parameter in the ``Args`` section.
+
+    Args:
+        param1: The first parameter.
+        param2: The second parameter.
+
+    Returns:
+        True if successful, False otherwise.
+
+    """
     
     subFrameNow = image[ylower:yupper, xlower:xupper]
     subFrameNow[isnan(subFrameNow)] = median(subFrameNow)
@@ -388,6 +559,20 @@ def lmfit_one_center(image, yy, xx, gfit_model, lmfit_init_params, yupper, ylowe
     return gfit_res.best_values
 
 def fit_gauss(subFrameNow, xinds, yinds, initParams, print_compare=False):
+    """Class methods are similar to regular functions.
+
+    Note:
+        Do not include the `self` parameter in the ``Args`` section.
+
+    Args:
+        param1: The first parameter.
+        param2: The second parameter.
+
+    Returns:
+        True if successful, False otherwise.
+
+    """
+    
     # initParams = (height, x, y, width_x, width_y, offset)
     fit_lvmq = fitting.LevMarLSQFitter()
     model0  = models.Gaussian2D(amplitude=initParams[0], x_mean=initParams[1], y_mean=initParams[2], 
@@ -408,6 +593,19 @@ def fit_gauss(subFrameNow, xinds, yinds, initParams, print_compare=False):
     return model1.parameters
 
 def fit_one_center(image, ylower, yupper, xlower, xupper, nSig=False, method='gauss', bSize = 7):
+    """Class methods are similar to regular functions.
+
+    Note:
+        Do not include the `self` parameter in the ``Args`` section.
+
+    Args:
+        param1: The first parameter.
+        param2: The second parameter.
+
+    Returns:
+        True if successful, False otherwise.
+
+    """
     
     subFrameNow = image[ylower:yupper, xlower:xupper]
     subFrameNow[isnan(subFrameNow)] = median(~isnan(subFrameNow))
@@ -422,17 +620,42 @@ def fit_one_center(image, ylower, yupper, xlower, xupper, nSig=False, method='ga
         return flux_weighted_centroid(image, image.shape[y]//2, image.shape[x]//2, bSize = bSize)[::-1]
 
 def compute_flux_one_frame(image, center, background, aperRad=3.0):
+    """Class methods are similar to regular functions.
+
+    Note:
+        Do not include the `self` parameter in the ``Args`` section.
+
+    Args:
+        param1: The first parameter.
+        param2: The second parameter.
+
+    Returns:
+        True if successful, False otherwise.
+
+    """
+    
     frameNow  = image - background
     frameNow[np.isnan(frameNow)] = median(frameNow)
     
-    aperture  = CircularAperture([center[x], center[y]], r=aperRad)
+    aperture  = CircularAperture([center[x], center[y]], r=abs(aperRad))
     
     return aperture_photometry(frameNow, aperture)['aperture_sum'].data[0]
 
-def meausre_bg_func(funcNow):
-    funcNow()
-
 def measure_one_circle_bg(image, center, aperRad, metric, apMethod='exact'):
+    """Class methods are similar to regular functions.
+
+    Note:
+        Do not include the `self` parameter in the ``Args`` section.
+
+    Args:
+        param1: The first parameter.
+        param2: The second parameter.
+
+    Returns:
+        True if successful, False otherwise.
+
+    """
+    
     aperture  = CircularAperture(center, aperRad)
     aper_mask = aperture.to_mask(method=apMethod)[0]    # list of ApertureMask objects (one for each position)
     
@@ -443,6 +666,20 @@ def measure_one_circle_bg(image, center, aperRad, metric, apMethod='exact'):
     return metric(image[backgroundMask])
 
 def measure_one_annular_bg(image, center, innerRad, outerRad, metric, apMethod='exact'):
+    """Class methods are similar to regular functions.
+
+    Note:
+        Do not include the `self` parameter in the ``Args`` section.
+
+    Args:
+        param1: The first parameter.
+        param2: The second parameter.
+
+    Returns:
+        True if successful, False otherwise.
+
+    """
+    
     innerAperture   = CircularAperture(center, innerRad)
     outerAperture   = CircularAperture(center, outerRad)
     
@@ -458,6 +695,20 @@ def measure_one_annular_bg(image, center, innerRad, outerRad, metric, apMethod='
 
 from numpy import median, std
 def measure_one_median_bg(image, center, aperRad, metric, nSig, apMethod='exact'):
+    """Class methods are similar to regular functions.
+
+    Note:
+        Do not include the `self` parameter in the ``Args`` section.
+
+    Args:
+        param1: The first parameter.
+        param2: The second parameter.
+
+    Returns:
+        True if successful, False otherwise.
+
+    """
+    
     aperture       = CircularAperture(center, aperRad)
     aperture       = aperture.to_mask(method=apMethod)[0]
     aperture       = aperture.to_image(image.shape).astype(bool)
@@ -473,6 +724,20 @@ def measure_one_median_bg(image, center, aperRad, metric, nSig, apMethod='exact'
     return median(image[maskComb])
 
 def measure_one_KDE_bg(image, center, aperRad, metric, apMethod='exact'):
+    """Class methods are similar to regular functions.
+
+    Note:
+        Do not include the `self` parameter in the ``Args`` section.
+
+    Args:
+        param1: The first parameter.
+        param2: The second parameter.
+
+    Returns:
+        True if successful, False otherwise.
+
+    """
+    
     aperture       = CircularAperture(center, aperRad)
     aperture       = aperture.to_mask(method=apMethod)[0]
     aperture       = aperture.to_image(image.shape).astype(bool)
@@ -484,6 +749,19 @@ def measure_one_KDE_bg(image, center, aperRad, metric, apMethod='exact'):
     return kdeFrame.support[kdeFrame.density.argmax()]
 
 def measure_one_background(image, center, aperRad, metric, apMethod='exact', bgMethod='circle'):
+    """Class methods are similar to regular functions.
+
+    Note:
+        Do not include the `self` parameter in the ``Args`` section.
+
+    Args:
+        param1: The first parameter.
+        param2: The second parameter.
+
+    Returns:
+        True if successful, False otherwise.
+
+    """
     
     if np.ndim(aperRad) == 0:
         aperture  = CircularAperture(center, aperRad)
@@ -519,13 +797,98 @@ def measure_one_background(image, center, aperRad, metric, apMethod='exact', bgM
     
     return metric(image[aperture])
 
+def DBScan_Flux(phots, ycenters, xcenters, dbsClean=0, useTheForce=False):
+    """Class methods are similar to regular functions.
+
+    Note:
+        Do not include the `self` parameter in the ``Args`` section.
+
+    Args:
+        param1: The first parameter.
+        param2: The second parameter.
+
+    Returns:
+        True if successful, False otherwise.
+
+    """
+    
+    dbsPhots    = DBSCAN()#n_jobs=-1)
+    stdScaler   = StandardScaler()
+    
+    phots       = np.copy(phots.ravel())
+    phots[~np.isfinite(phots)] = np.median(phots[np.isfinite(phots)])
+    
+    featuresNow = np.transpose([stdScaler.fit_transform(ycenters[:,None]).ravel(), \
+                                stdScaler.fit_transform(xcenters[:,None]).ravel(), \
+                                stdScaler.fit_transform(phots[:,None]).ravel()   ] )
+    
+    dbsPhotsPred= dbsPhots.fit_predict(featuresNow)
+    
+    return dbsPhotsPred == dbsClean
+
+def DBScan_PLD(PLDNow, dbsClean=0, useTheForce=False):
+    """Class methods are similar to regular functions.
+    
+    Note:
+        Do not include the `self` parameter in the ``Args`` section.
+    
+    Args:
+        param1: The first parameter.
+        param2: The second parameter.
+    
+    Returns:
+        True if successful, False otherwise.
+    
+    """
+    
+    dbsPLD      = DBSCAN()#n_jobs=-1)
+    stdScaler   = StandardScaler()
+    
+    dbsPLDPred= dbsPLD.fit_predict(stdScaler.fit_transform(PLDNow[:,None]))
+    
+    return dbsPLDPred == dbsClean
+
 class wanderer(object):
+    """The summary line for a class docstring should fit on one line.
+
+        If the class has public attributes, they may be documented here
+        in an ``Attributes`` section and follow the same formatting as a
+        function's ``Args`` section. Alternatively, attributes may be documented
+        inline with the attribute's declaration (see __init__ method below).
+
+        Properties created with the ``@property`` decorator should be documented
+        in the property's getter method.
+
+        Attributes:
+            attr1 (str): Description of `attr1`.
+            attr2 (:obj:`int`, optional): Description of `attr2`.
+
+    """
+    
     def __init__(self, fitsFileDir = './', filetype = 'slp.fits', telescope = None,
                  yguess=None, xguess=None, npix=5, method='mean', nCores = None):
-        
+        """Example of docstring on the __init__ method.
+
+                The __init__ method may be documented in either the class level
+                docstring, or as a docstring on the __init__ method itself.
+
+                Either form is acceptable, but the two should not be mixed. Choose one
+                convention to document the __init__ method and be consistent with it.
+
+                Note:
+                    Do not include the `self` parameter in the ``Args`` section.
+
+                Args:
+                    param1 (str): Description of `param1`.
+                    param2 (:obj:`int`, optional): Description of `param2`. Multiple
+                        lines are supported.
+                    param3 (:obj:`list` of :obj:`str`): Description of `param3`.
+
+        """
         print('\n\n** Not all who wander are lost **\n\n')
         
         self.method   = method
+        self.filetype = filetype
         
         self.y,self.x = 0,1
         
@@ -538,7 +901,7 @@ class wanderer(object):
             raise Exception("`method` must be from the list ['mean', 'median']")
         
         self.fitsFileDir    = fitsFileDir
-        self.fitsFilenames  = glob(self.fitsFileDir + '/*' + filetype)
+        self.fitsFilenames  = glob(self.fitsFileDir + '/*' + self.filetype)
         self.nSlopeFiles    = len(self.fitsFilenames)
         
         if telescope is None:
@@ -551,11 +914,11 @@ class wanderer(object):
             for _ in range(4):
                 fitsdir_split.pop()
             
-            self.calDir        = ''
-            for thing in fitsdir_split:
-                self.calDir = self.calDir + thing + '/' 
-                        
-            self.permBadPixels = fits.open(self.calDir + 'nov14_ch1_bcd_pmask_subarray.fits')
+            # self.calDir        = ''
+            # for thing in fitsdir_split:
+            #     self.calDir = self.calDir + thing + '/' 
+            # 
+            # self.permBadPixels = fits.open(self.calDir + 'nov14_ch1_bcd_pmask_subarray.fits')
         
         if self.nSlopeFiles == 0:
             print('Pipeline found no Files in ' + self.fitsFileDir + ' of type /*' + filetype)
@@ -585,6 +948,19 @@ class wanderer(object):
               str(tm_hour) + 'h' + str(tm_min) + 'm' + str(tm_sec) + 's')
         
     def jwst_load_fits_file(self):
+        """Class methods are similar to regular functions.
+
+        Note:
+            Do not include the `self` parameter in the ``Args`` section.
+
+        Args:
+            param1: The first parameter.
+            param2: The second parameter.
+
+        Returns:
+            True if successful, False otherwise.
+
+        """
         testfits            = fits.open(self.fitsFilenames[0])[0]
         
         self.nFrames        = self.nSlopeFiles
@@ -610,6 +986,19 @@ class wanderer(object):
             del fitsNow
     
     def spitzer_load_fits_file(self, outputUnits='electrons', remove_nans=True):
+        """Class methods are similar to regular functions.
+
+        Note:
+            Do not include the `self` parameter in the ``Args`` section.
+
+        Args:
+            param1: The first parameter.
+            param2: The second parameter.
+
+        Returns:
+            True if successful, False otherwise.
+
+        """
         # BMJD_2_BJD     = -0.5
         from scipy.constants import arcsec # pi / arcsec = 648000
         
@@ -670,9 +1059,23 @@ class wanderer(object):
             self.imageCube[where(isnan(self.imageCube))] = median(self.imageCube)
     
     def hst_load_fits_file(fitsNow):
+        """Not Yet Implemented"""
         raise Exception('NEED TO CODE THIS')
     
     def load_data_from_fits_files(self, remove_nans=True):
+        """Class methods are similar to regular functions.
+
+        Note:
+            Do not include the `self` parameter in the ``Args`` section.
+
+        Args:
+            param1: The first parameter.
+            param2: The second parameter.
+
+        Returns:
+            True if successful, False otherwise.
+
+        """
         
         if self.telescope == 'JWST':
             self.jwst_load_fits_file()
@@ -684,6 +1087,19 @@ class wanderer(object):
             self.hst_load_fits_file()
         
     def load_data_from_save_files(self, savefiledir=None, saveFileNameHeader=None, saveFileType='.pickle.save'):
+        """Class methods are similar to regular functions.
+
+        Note:
+            Do not include the `self` parameter in the ``Args`` section.
+
+        Args:
+            param1: The first parameter.
+            param2: The second parameter.
+
+        Returns:
+            True if successful, False otherwise.
+
+        """
         
         if saveFileNameHeader is None:
             raise Exception('`saveFileNameHeader` should be the beginning of each save file name')
@@ -715,6 +1131,19 @@ class wanderer(object):
             exec("self." + key + " = self.save_dict['" + key + "']")
         
     def save_data_to_save_files(self, savefiledir=None, saveFileNameHeader=None, saveFileType='.pickle.save'):
+        """Class methods are similar to regular functions.
+
+        Note:
+            Do not include the `self` parameter in the ``Args`` section.
+
+        Args:
+            param1: The first parameter.
+            param2: The second parameter.
+
+        Returns:
+            True if successful, False otherwise.
+
+        """
         
         if saveFileNameHeader is None:
             raise Exception('`saveFileNameHeader` should be the beginning of each save file name')
@@ -747,7 +1176,7 @@ class wanderer(object):
         
         #self.save_dict = self.__dict__
         
-        print('Saving to Master File -- Overwriting Previous Master')
+        print('\nSaving to Master File -- Overwriting Previous Master')
         self.centering_df.to_pickle(savefiledir  + saveFileNameHeader + '_centering_dataframe'  + saveFileType)
         self.background_df.to_pickle(savefiledir + saveFileNameHeader + '_background_dataframe' + saveFileType)
         self.flux_TSO_df.to_pickle(savefiledir   + saveFileNameHeader + '_flux_TSO_dataframe'   + saveFileType)
@@ -773,138 +1202,173 @@ class wanderer(object):
         
         joblib.dump(self.save_dict, savefiledir + 'TimeStamped/' + saveFileNameHeader + '_save_dict' + saveFileTypeBak)
     
-    def initiate_save_dict(self):
+    def initiate_save_dict(self, dummy=None):
+        """Class methods are similar to regular functions.
+
+        Note:
+            Do not include the `self` parameter in the ``Args`` section.
+
+        Args:
+            param1: The first parameter.
+            param2: The second parameter.
+
+        Returns:
+            True if successful, False otherwise.
+
+        """
         
-        self.save_dict  = {} # DataFrame() -- test if this works later
-        # for key,val in self.__dict__.items():
-        #     self.save_dict[key]  = val
+        _stored_variables = ['background_Annulus', 'background_CircleMask', 'background_GaussianFit', 'background_KDEUniv',
+                             'background_MedianMask','centering_FluxWeight', 'centering_GaussianFit', 'centering_LeastAsym',
+                             'effective_widths', 'fitsFileDir', 'fitsFilenames', 'heights_GaussianFit', 'inliers_Phots',
+                             'inliers_PLD', 'inliers_Master', 'method', 'npix', 'nFrames', 'PLD_components', 'PLD_norm',
+                             'quadrature_widths', 'yguess', 'xguess', 'widths_GaussianFit']
         
-        try:
-            self.save_dict['fitsFileDir']               = self.fitsFileDir
-        except:
-            pass
-        try:
-            self.save_dict['fitsFilenames']             = self.fitsFilenames
-        except:
-            pass
-        try:
-            self.save_dict['background_Annulus']        = self.background_Annulus
-        except:
-            pass
-        try:
-            self.save_dict['background_CircleMask']     = self.background_CircleMask
-        except:
-            pass
-        try:
-            self.save_dict['background_GaussianFit']    = self.background_GaussianFit
-        except:
-            pass
-        try:
-            self.save_dict['background_KDEUniv']        = self.background_KDEUniv
-        except:
-            pass
-        try:
-            self.save_dict['background_MedianMask']     = self.background_MedianMask
-        except:
-            pass
-        try:
-            self.save_dict['centering_FluxWeight']      = self.centering_FluxWeight
-        except:
-            pass
-        try:
-            self.save_dict['centering_GaussianFit']     = self.centering_GaussianFit
-        except:
-            pass
-        try:
-            self.save_dict['centering_LeastAsym']       = self.centering_LeastAsym
-        except:
-            pass
-        try:
-            self.save_dict['effective_widths']          = self.effective_widths
-        except:
-            pass
-        try:
-            self.save_dict['fitsFileDir']               = self.fitsFileDir
-        except:
-            pass
-        try:
-            self.save_dict['fitsFilenames']             = self.fitsFilenames
-        except:
-            pass
-        try:
-            self.save_dict['heights_GaussianFit']       = self.heights_GaussianFit
-        except:
-            pass
-        try:
-            self.save_dict['method']                    = self.method
-        except:
-            pass
-        try:
-            self.save_dict['npix']                      = self.npix
-        except:
-            pass
-        try:
-            self.save_dict['nFrames']                   = self.nFrames
-        except:
-            pass
-        try:
-            self.save_dict['quadrature_widths']         = self.quadrature_widths
-        except:
-            pass
-        try:
-            self.save_dict['yguess']                    = self.yguess
-        except:
-            pass
-        try:
-            self.save_dict['xguess']                    = self.xguess
-        except:
-            pass
-        try:
-            self.save_dict['widths_GaussianFit']        = self.widths_GaussianFit
-        except:
-            pass
+        _max_str_len = 0
+        for thing in _stored_variables:
+            if len(thing) > _max_str_len:
+                _max_str_len = len(thing)
+        
+        print('Storing in `self.save_dict`: ')
+        self.save_dict = {} # DataFrame does not work because each all `columns` must be 1D and have the same length
+        for key, val in self.__dict__.items():
+            self.save_dict[key] = val
+            print('\tself.' + key)# + ' into save_dict')#+ ' '*(len(key) - _max_str_len)
+        
+        print('\n')
+        
+        notYet = True
+        for thing in _stored_variables:
+            if thing not in self.save_dict.keys():
+                if notYet:
+                    print('The following do not yet exist:')
+                    notYet = False
+                
+                print("\tself."+thing)#+" does not yet exist")
+        
+        # for thing in _stored_variables:
+        #     exec("try: self.save_dict['"+thing+"'] = self."+thing+"\nexcept: print('self."+thing+" does not yet exist')")
+        #
+        # try:self.save_dict['background_Annulus']      = self.background_Annulus
+        # except: pass
+        #
+        # try:self.save_dict['background_CircleMask']   = self.background_CircleMask
+        # except: pass
+        #
+        # try:self.save_dict['background_GaussianFit']  = self.background_GaussianFit
+        # except: pass
+        #
+        # try:self.save_dict['background_KDEUniv']      = self.background_KDEUniv
+        # except: pass
+        #
+        # try:self.save_dict['background_MedianMask']   = self.background_MedianMask
+        # except: pass
+        #
+        # try:self.save_dict['centering_FluxWeight']    = self.centering_FluxWeight
+        # except: pass
+        #
+        # try:self.save_dict['centering_GaussianFit']   = self.centering_GaussianFit
+        # except: pass
+        #
+        # try:self.save_dict['centering_LeastAsym']     = self.centering_LeastAsym
+        # except: pass
+        #
+        # try:self.save_dict['effective_widths']        = self.effective_widths
+        # except: pass
+        #
+        # try:self.save_dict['fitsFileDir']             = self.fitsFileDir
+        # except: pass
+        #
+        # try:self.save_dict['fitsFilenames']           = self.fitsFilenames
+        # except: pass
+        #
+        # try:self.save_dict['heights_GaussianFit']     = self.heights_GaussianFit
+        # except: pass
+        #
+        # try:self.save_dict['inliers_Phots']           = self.inliers_Phots
+        # except: pass
+        #
+        # try:self.save_dict['inliersPLD']              = self.inliers_PLD
+        # except: pass
+        #
+        # try:self.save_dict['method']                  = self.method
+        # except: pass
+        #
+        # try:self.save_dict['npix']                    = self.npix
+        # except: pass
+        #
+        # try:self.save_dict['nFrames']                 = self.nFrames
+        # except: pass
+        #
+        # try:self.save_dict['PLD_components']          = self.PLD_components
+        # except: pass
+        #
+        # try:self.save_dict['PLD_norm']                = self.PLD_norm
+        # except: pass
+        #
+        # try:self.save_dict['quadrature_widths']       = self.quadrature_widths
+        # except: pass
+        #
+        # try:self.save_dict['yguess']                  = self.yguess
+        # except: pass
+        #
+        # try:self.save_dict['xguess']                  = self.xguess
+        # except: pass
+        #
+        # try:self.save_dict['widths_GaussianFit']      = self.widths_GaussianFit
+        # except: pass
     
     def copy_instance(self):
+        """Class methods are similar to regular functions.
+
+        Note:
+            Do not include the `self` parameter in the ``Args`` section.
+
+        Args:
+            param1: The first parameter.
+            param2: The second parameter.
+
+        Returns:
+            True if successful, False otherwise.
+
+        """
+               
+        temp = wanderer(fitsFileDir = self.fitsFileDir, filetype = self.filetype, 
+                        telescope = self.telescope, yguess=self.yguess, xguess=self.xguess, 
+                        npix=self.npix, method=self.method, nCores = self.nCores)
         
-        temp = wanderer()
-        temp.saveFileNameHeader = self.saveFileNameHeader
-        temp.savefiledir = self.savefiledir
+        temp.centering_df       = self.centering_df
+        temp.background_df      = self.background_df
+        temp.flux_TSO_df        = self.flux_TSO_df
+        temp.noise_TSO_df       = self.noise_TSO_df
         
-        temp.centering_df = self.centering_df
-        temp.background_df = self.background_df
-        temp.flux_TSO_df = self.flux_TSO_df
-        temp.noise_TSO_df = self.noise_TSO_df
+        temp.imageCube          = self.imageCube
+        temp.noiseCube          = self.noiseCube
+        temp.timeCube           = self.timeCube
         
-        temp.imageCube = self.imageCube
-        temp.noiseCube = self.noiseCube
-        temp.timeCube = self.timeCube
-        
-        temp.imageBadPixMasks = self.imageBadPixMasks = joblib.load(savefiledir  + saveFileNameHeader + '_image_bad_pix_cube_array' + saveFileType)
+        temp.imageBadPixMasks   = self.imageBadPixMasks
         
         print('Assigning Parts of `temp.save_dict` to from `self.save_dict`')
         temp.save_dict = self.save_dict
-        for key in self.save_dict.keys():
-            exec("temp." + key + " = temp.save_dict['" + key + "']")
+        for thing in self.save_dict.keys():
+            exec("temp." + thing + " = self.save_dict['" + thing + "']")
         
-        # temp.fitsFileDir              = temp.save_dict['fitsFileDir']
-        # temp.fitsFilenames             = temp.save_dict['fitsFilenames']
-        
-        # temp.background_Annulus       = temp.save_dict['background_Annulus']
-        # temp.background_CircleMask    = temp.save_dict['background_CircleMask']
-        # temp.background_GaussianFit   = temp.save_dict['background_GaussianFit']
-        # temp.background_KDEUniv       = temp.save_dict['background_KDEUniv']
-        # temp.background_MedianMask    = temp.save_dict['background_MedianMask']
-        # temp.centering_FluxWeight     = temp.save_dict['centering_FluxWeight']
-        # temp.centering_GaussianFit    = temp.save_dict['centering_GaussianFit']
-        # temp.centering_LeastAsym      = temp.save_dict['centering_LeastAsym']
-        # temp.fitsFileDir              = temp.save_dict['fitsFileDir']
-        # temp.heights_GaussianFit      = temp.save_dict['heights_GaussianFit']
-        # # temp.imageCubeMAD             = temp.save_dict['imageCubeMAD']
-        # # temp.imageCubeMedian          = temp.save_dict['imageCubeMedian']
-        # temp.fitsFilenames             = temp.save_dict['fitsFilenames']
-        # temp.widths_GaussianFit       = temp.save_dict['widths_GaussianFit']
+        return temp
     
     def find_bad_pixels(self, nSig=5):
+        """Class methods are similar to regular functions.
+
+        Note:
+            Do not include the `self` parameter in the ``Args`` section.
+
+        Args:
+            param1: The first parameter.
+            param2: The second parameter.
+
+        Returns:
+            True if successful, False otherwise.
+
+        """
+        
         # we chose 5 arbitrarily, but from experience
         self.imageCubeMedian  = median(self.imageCube,axis=0)
         self.imageCubeMAD     = scale.mad(self.imageCube,axis=0)
@@ -916,6 +1380,20 @@ class wanderer(object):
         # self.imageCube[self.imageBadPixMasks] = nan
     
     def fit_gaussian_centering(self, method='la', initc='fw', subArray=False, print_compare=False):
+        """Class methods are similar to regular functions.
+
+        Note:
+            Do not include the `self` parameter in the ``Args`` section.
+
+        Args:
+            param1: The first parameter.
+            param2: The second parameter.
+
+        Returns:
+            True if successful, False otherwise.
+
+        """
+        
         y,x = 0,1
         
         yinds0, xinds0 = indices(self.imageCube[0].shape)
@@ -984,6 +1462,20 @@ class wanderer(object):
                                     init_params=None, useMoments=False, nCores=cpu_count(), 
                                     center_range=None, width_range=None, nSig=False, 
                                     method='leastsq', recheckMethod=None, verbose=False):
+        
+        """Class methods are similar to regular functions.
+
+        Note:
+            Do not include the `self` parameter in the ``Args`` section.
+
+        Args:
+            param1: The first parameter.
+            param2: The second parameter.
+
+        Returns:
+            True if successful, False otherwise.
+
+        """
         
         if isnan(self.imageCube).any():
             self.imageCube[where(isnan(self.imageCube))] = median(self.imageCube)
@@ -1094,6 +1586,19 @@ class wanderer(object):
         self.centering_df['Gaussian_Fit_Offset']    = self.background_GaussianFit
         
     def mp_fit_gaussian_centering(self, nSig=False, method='la', initc='fw', subArray=False, print_compare=False):
+        """Class methods are similar to regular functions.
+
+        Note:
+            Do not include the `self` parameter in the ``Args`` section.
+
+        Args:
+            param1: The first parameter.
+            param2: The second parameter.
+
+        Returns:
+            True if successful, False otherwise.
+
+        """
         
         if isnan(self.imageCube).any():
             self.imageCube[where(isnan(self.imageCube))] = median(self.imageCube)
@@ -1155,6 +1660,20 @@ class wanderer(object):
         # self.centering_df['Gaussian_Fit_Rotation']    = self.rotation_GaussianFit
     
     def fit_flux_weighted_centering(self):
+        """Class methods are similar to regular functions.
+
+        Note:
+            Do not include the `self` parameter in the ``Args`` section.
+
+        Args:
+            param1: The first parameter.
+            param2: The second parameter.
+
+        Returns:
+            True if successful, False otherwise.
+
+        """
+        
         y,x = 0,1
         
         yinds0, xinds0 = indices(self.imageCube[0].shape)
@@ -1187,6 +1706,20 @@ class wanderer(object):
         self.centering_df['FluxWeighted_X_Centers'] = self.centering_FluxWeight.T[self.x]
     
     def mp_fit_flux_weighted_centering(self, nSig=False):
+        """Class methods are similar to regular functions.
+
+        Note:
+            Do not include the `self` parameter in the ``Args`` section.
+
+        Args:
+            param1: The first parameter.
+            param2: The second parameter.
+
+        Returns:
+            True if successful, False otherwise.
+
+        """
+        
         yinds0, xinds0 = indices(self.imageCube[0].shape)
         
         ylower = self.yguess - self.npix
@@ -1217,6 +1750,19 @@ class wanderer(object):
         self.centering_df['FluxWeighted_X_Centers'] = self.centering_FluxWeight.T[self.x]
     
     def fit_least_asymmetry_centering(self):
+        """Class methods are similar to regular functions.
+
+        Note:
+            Do not include the `self` parameter in the ``Args`` section.
+
+        Args:
+            param1: The first parameter.
+            param2: The second parameter.
+
+        Returns:
+            True if successful, False otherwise.
+
+        """
         
         y,x = 0,1
         
@@ -1332,6 +1878,19 @@ class wanderer(object):
         self.centering_df['LeastAsymmetry_X_Centers'] = self.centering_LeastAsym.T[self.x]
     
     def mp_fit_least_asymmetry_centering(self):
+        """Class methods are similar to regular functions.
+
+        Note:
+            Do not include the `self` parameter in the ``Args`` section.
+
+        Args:
+            param1: The first parameter.
+            param2: The second parameter.
+
+        Returns:
+            True if successful, False otherwise.
+
+        """
         
         y,x = 0,1
         
@@ -1367,6 +1926,20 @@ class wanderer(object):
         self.centering_df['LeastAsymmetry_X_Centers'] = self.centering_LeastAsym.T[self.x]
     
     def fit_all_centering(self):
+        """Class methods are similar to regular functions.
+
+        Note:
+            Do not include the `self` parameter in the ``Args`` section.
+
+        Args:
+            param1: The first parameter.
+            param2: The second parameter.
+
+        Returns:
+            True if successful, False otherwise.
+
+        """
+        
         print('Fit for Gaussian Fitting Centers\n')
         self.mp_lmfit_gaussian_centering()
         
@@ -1377,6 +1950,20 @@ class wanderer(object):
         self.fit_least_asymmetry_centering()
     
     def measure_effective_width(self, subFrame=False):
+        """Class methods are similar to regular functions.
+
+        Note:
+            Do not include the `self` parameter in the ``Args`` section.
+
+        Args:
+            param1: The first parameter.
+            param2: The second parameter.
+
+        Returns:
+            True if successful, False otherwise.
+
+        """
+        
         if subFrame:
             midFrame = self.imageCube.shape[1]//2
             lower    = midFrame - self.npix
@@ -1396,6 +1983,20 @@ class wanderer(object):
         self.centering_df['Quadrature_Widths']  = self.quadrature_widths
     
     def measure_background_circle_masked(self, aperRad=10, centering='FluxWeight'):
+        """Class methods are similar to regular functions.
+
+        Note:
+            Do not include the `self` parameter in the ``Args`` section.
+
+        Args:
+            param1: The first parameter.
+            param2: The second parameter.
+
+        Returns:
+            True if successful, False otherwise.
+
+        """
+        
         """
             Assigning all zeros in the mask to NaNs because the `mean` and `median` 
                 functions are set to `nanmean` functions, which will skip all NaNs
@@ -1416,6 +2017,20 @@ class wanderer(object):
         self.background_df['CircleMask'] = self.background_CircleMask.copy()
     
     def mp_measure_background_circle_masked(self, aperRad=10, centering='Gauss'):
+        """Class methods are similar to regular functions.
+
+        Note:
+            Do not include the `self` parameter in the ``Args`` section.
+
+        Args:
+            param1: The first parameter.
+            param2: The second parameter.
+
+        Returns:
+            True if successful, False otherwise.
+
+        """
+        
         """
             Assigning all zeros in the mask to NaNs because the `mean` and `median` 
                 functions are set to `nanmean` functions, which will skip all NaNs
@@ -1439,6 +2054,19 @@ class wanderer(object):
         self.background_df['CircleMask'] = self.background_CircleMask.copy()
     
     def measure_background_annular_mask(self, innerRad=8, outerRad=13):
+        """Class methods are similar to regular functions.
+
+        Note:
+            Do not include the `self` parameter in the ``Args`` section.
+
+        Args:
+            param1: The first parameter.
+            param2: The second parameter.
+
+        Returns:
+            True if successful, False otherwise.
+
+        """
         
         self.background_Annulus = np.zeros(self.nFrames)
         
@@ -1459,6 +2087,19 @@ class wanderer(object):
         self.background_df['AnnularMask'] = self.background_Annulus.copy()
     
     def mp_measure_background_annular_mask(self, innerRad=8, outerRad=13, method='exact', centering='Gauss'):
+        """Class methods are similar to regular functions.
+
+        Note:
+            Do not include the `self` parameter in the ``Args`` section.
+
+        Args:
+            param1: The first parameter.
+            param2: The second parameter.
+
+        Returns:
+            True if successful, False otherwise.
+
+        """
         
         if centering=='Gauss':
             centers = self.centering_GaussianFit
@@ -1478,6 +2119,19 @@ class wanderer(object):
         self.background_df['AnnularMask'] = self.background_Annulus.copy()
     
     def measure_background_median_masked(self, aperRad=10, nSig=5):
+        """Class methods are similar to regular functions.
+
+        Note:
+            Do not include the `self` parameter in the ``Args`` section.
+
+        Args:
+            param1: The first parameter.
+            param2: The second parameter.
+
+        Returns:
+            True if successful, False otherwise.
+
+        """
         
         self.background_MedianMask  = np.zeros(self.nFrames)
         
@@ -1500,6 +2154,19 @@ class wanderer(object):
         self.background_df['MedianMask'] = self.background_MedianMask
     
     def mp_measure_background_median_masked(self, aperRad=10, nSig=5, centering='Gauss'):
+        """Class methods are similar to regular functions.
+
+        Note:
+            Do not include the `self` parameter in the ``Args`` section.
+
+        Args:
+            param1: The first parameter.
+            param2: The second parameter.
+
+        Returns:
+            True if successful, False otherwise.
+
+        """
         
         if centering=='Gauss':
             centers = self.centering_GaussianFit
@@ -1519,6 +2186,19 @@ class wanderer(object):
         self.background_df['MedianMask'] = self.background_MedianMask
     
     def measure_background_KDE_Mode(self, aperRad=10):
+        """Class methods are similar to regular functions.
+
+        Note:
+            Do not include the `self` parameter in the ``Args`` section.
+
+        Args:
+            param1: The first parameter.
+            param2: The second parameter.
+
+        Returns:
+            True if successful, False otherwise.
+
+        """
         
         self.background_KDEUniv = np.zeros(self.nFrames)
         
@@ -1536,6 +2216,19 @@ class wanderer(object):
         self.background_df['KDEUnivMask'] = self.background_KDEUniv
     
     def mp_measure_background_KDE_Mode(self, aperRad=10, centering='Gauss'):
+        """Class methods are similar to regular functions.
+
+        Note:
+            Do not include the `self` parameter in the ``Args`` section.
+
+        Args:
+            param1: The first parameter.
+            param2: The second parameter.
+
+        Returns:
+            True if successful, False otherwise.
+
+        """
         
         if centering=='Gauss':
             centers = self.centering_GaussianFit
@@ -1557,18 +2250,50 @@ class wanderer(object):
         self.background_df['KDEUnivMask_mp'] = self.background_KDEUniv
     
     def measure_all_background(self, aperRad=10, nSig=5):
+        """Class methods are similar to regular functions.
+
+        Note:
+            Do not include the `self` parameter in the ``Args`` section.
+
+        Args:
+            param1: The first parameter.
+            param2: The second parameter.
+
+        Returns:
+            True if successful, False otherwise.
+
+        """
+        
         pInner  = 0.2 # Percent Inner = -20%
         pOuter  = 0.3 # Percent Outer = +30%
+        
         print('Measuring Background Using Circle Mask with Multiprocessing')
         self.mp_measure_background_circle_masked(aperRad=aperRad)
+        
         print('Measuring Background Using Annular Mask with Multiprocessing')
         self.mp_measure_background_annular_mask(innerRad=(1-pInner)*aperRad, outerRad=(1+pOuter)*aperRad)
+        
         print('Measuring Background Using Median Mask with Multiprocessing')
         self.mp_measure_background_median_masked(aperRad=aperRad, nSig=nSig)
+        
         print('Measuring Background Using KDE Mode with Multiprocessing')
         self.mp_measure_background_KDE_Mode(aperRad=aperRad)
     
     def compute_flux_over_time(self, aperRad=None, centering='GaussianFit', background='AnnularMask', useTheForce=False):
+        """Class methods are similar to regular functions.
+
+        Note:
+            Do not include the `self` parameter in the ``Args`` section.
+
+        Args:
+            param1: The first parameter.
+            param2: The second parameter.
+
+        Returns:
+            True if successful, False otherwise.
+
+        """
+        
         y,x = 0,1
         
         if background not in self.background_df.columns:
@@ -1613,6 +2338,19 @@ class wanderer(object):
     
     def compute_flux_over_time_over_aperRad(self, aperRads=[], centering_choices=[], background_choices=[], \
                                             useTheForce=False, verbose=False):
+        """Class methods are similar to regular functions.
+
+        Note:
+            Do not include the `self` parameter in the ``Args`` section.
+
+        Args:
+            param1: The first parameter.
+            param2: The second parameter.
+
+        Returns:
+            True if successful, False otherwise.
+
+        """
         
         ppm   = 1e6
         start = time()
@@ -1636,6 +2374,20 @@ class wanderer(object):
         print('Operation took: ', time()-start)
     
     def mp_compute_flux_over_time(self, aperRad=3.0, centering='GaussianFit', background='AnnularMask', useTheForce=False):
+        """Class methods are similar to regular functions.
+
+        Note:
+            Do not include the `self` parameter in the ``Args`` section.
+
+        Args:
+            param1: The first parameter.
+            param2: The second parameter.
+
+        Returns:
+            True if successful, False otherwise.
+
+        """
+        
         y,x = 0,1
         
         if background not in self.background_df.columns:
@@ -1671,205 +2423,245 @@ class wanderer(object):
             
         else:
             print(flux_key_now + ' exists: if you want to overwrite, then you `useTheForce=True`')
+    
+    def mp_compute_flux_over_time_varRad(self, staticRad, varRad=None, centering='GaussianFit', background='AnnularMask', useTheForce=False):
+        """Class methods are similar to regular functions.
 
-#
-# # Necessary Constants for Both Module A and Module B
-# # ---
-#
-# # In[ ]:
-#
-# ppm             = 1e6
-# y,x             = 0,1
-#
-# yguess, xguess  = 160., 167. # Specific to JWST WLP Test Data
-# filetype        = 'slp.fits' # Specific to JWST WLP Test Data
-#
-#
-# # Load Stored Instance from Save Files
-# # ---
-#
-# # In[ ]:
-#
-# dataDir     = '/path/to/fits/files/main/directory/'
-# fitsFileDir = 'path/to/fits/subdirectories/'
-#
-# self.fitsFileDir = dataDir + fitsFileDir
-#
-#
-# # In[ ]:
-#
-# method = 'mean'
-# example_wanderer_mean = wanderer(fitsFileDir=self.fitsFileDir, filetype=filetype,
-#                                             yguess=yguess, xguess=xguess, method=method)
-#
-# example_wanderer_mean.load_data_from_save_files(savefiledir='./SaveFiles/',
-#                                                      saveFileNameHeader='Example_Wanderer_Mean_', saveFileType='.pickle.save')
-#
-#
-# # In[ ]:
-#
-# method = 'median'
-# self = wanderer(fitsFileDir=self.fitsFileDir_ModA, filetype=filetype,
-#                                             yguess=yguess, xguess=xguess, method=method)
-#
-# self.load_data_from_save_files(savefiledir='./SaveFiles/', saveFileNameHeader='self_', saveFileType='.pickle.save')
-#
-#
-# # Start a New Instance with Median for the Metric
-# # ---
-#
-# # In[ ]:
-#
-# dataDir     = '/path/to/fits/files/main/directory/'
-# fitsFileDir = 'path/to/fits/subdirectories/'
-#
-# self.fitsFileDir = dataDir + fitsFileDir
-#
-#
-# # In[ ]:
-#
-# method = 'median'
-#
-# print('Initialize an instance of `wanderer` as `self`\n')
-# self = wanderer(fitsFileDir=self.fitsFileDir_ModB, filetype=filetype,
-#                                             yguess=yguess, xguess=xguess, method=method)
-#
-# print('Load Data From Fits Files in ' + fitsFileDir_ModB + '\n')
-# self.load_data_from_fits_files()
-#
-# print('Skipping Load Data From Save Files in ' + fitsFileDir_ModB + '\n')
-# # self.load_data_from_save_files()
-#
-# print('Find, flag, and NaN the "Bad Pixels" Outliers' + '\n')
-# self.find_bad_pixels()
-#
-# print('Fit for All Centers: Flux Weighted, Gaussian Fitting, Gaussian Moments, Least Asymmetry' + '\n')
-# # self.fit_gaussian_fitting_centering()
-# # self.fit_flux_weighted_centering()
-# # self.fit_least_asymmetry_centering()
-# self.fit_all_centering()
-#
-# print('Measure Background Estimates with All Methods: Circle Masked, Annular Masked, KDE Mode, Median Masked' + '\n')
-# # self.measure_background_circle_masked()
-# # self.measure_background_annular_mask()
-# # self.measure_background_KDE_Mode()
-# # self.measure_background_median_masked()
-# self.measure_all_background()
-#
-# print('Iterating over Background Techniques, Centering Techniques, Aperture Radii' + '\n')
-# background_choices = self.background_df.columns
-# centering_choices  = ['Gaussian_Fit', 'Gaussian_Mom', 'FluxWeighted', 'LeastAsymmetry']
-# aperRads           = np.arange(1, 100.5,0.5)
-#
-# start = time()
-# self.SDNR_df = DataFrame()
-# for kBG, bgNow in tqdm_notebook(enumerate(background_choices), desc='Background', \
-#                                 leave = True, total=len(background_choices)):
-#     for kCTR, ctrNow in tqdm_notebook(enumerate(centering_choices), desc='Centering', \
-#                                       leave = True, total=len(centering_choices)):
-#         for staticRad in tqdm_notebook(staticRads, desc='StaticRad', leave = True, total=len(staticRads)):
-#             for varRad in tqdm_notebook(varRads, desc='VarRad', leave = True, total=len(varRads)):
-#                 if varRad is not None:
-#                     flux_key_now  = ctrNow + '_' + bgNow+'_' + 'rad' + '_' + str(staticRad) + '_' + str(varRad)
-#                 else:
-#                     flux_key_now  = ctrNow + '_' + bgNow+'_' + 'rad' + '_' + str(staticRad) + '_None'
-#
-#                 self.compute_flux_over_time(staticRad=staticRad, varRad=varRad, \
-#                                                          centering=ctrNow, background=bgNow,useTheForce=useTheForce)
-#
-#                 fluxNow     = self.flux_TSO_df[flux_key_now]
-#                 medFluxNow  = median(self.flux_TSO_df[flux_key_now])
-#
-#                 # average SDNR per `staticRad`
-#                 fluxNow    /= len(varRads)
-#                 medFluxNow /= len(varRads)
-#
-#                 # Standard Deviation of the Normalized Residuals
-#                 SDNR        = std(fluxNow / medFluxNow)*ppm
-#                 self.SDNR_df[flux_key_now]  = [SDNR]
-#
-#                 print('Finished with Background ' + str(kBG) + ' ' + bgNow + ' with Centering ' + str(kCTR) \
-#                           + ' ' + ctrNow + ' and staticRad ' + str(staticRad) + ' and varRad ' + str(varRad), \
-#                       int(np.round(SDNR)), 'ppm')
-#
-# print('Saving `self` to a set of pickles for various Image Cubes and the Storage Dictionary')
-# self.save_data_to_save_files(savefiledir='./SaveFiles/', saveFileNameHeader='self_', saveFileType='.pickle.save')
-#
-#
-# # Start a New Instance with Mean for the Metric
-# # ---
-#
-# # In[ ]:
-#
-# method = 'mean'
-#
-# print('Initialize an instance of `wanderer` as `example_wanderer_mean`')
-# example_wanderer_mean = wanderer(fitsFileDir=self.fitsFileDir_ModB, filetype = filetype,
-#                                 yguess=yguess, xguess=xguess, method=method)
-#
-# print('Load Data From Fits Files in ' + self.fitsFileDir)
-# example_wanderer_mean.load_data_from_fits_files()
-#
-# print('Skipping Load Data From Save Files in ' + self.fitsFileDir)
-# # example_wanderer_mean.load_data_from_save_files()
-#
-# print('Find, flag, and NaN the "Bad Pixels" Outliers')
-# example_wanderer_mean.find_bad_pixels()
-#
-# print('Fit for All Centers: Flux Weighted, Gaussian Fitting, Gaussian Moments, Least Asymmetry')
-# # example_wanderer_mean.fit_gaussian_fitting_centering()
-# # example_wanderer_mean.fit_flux_weighted_centering()
-# # example_wanderer_mean.fit_least_asymmetry_centering()
-# example_wanderer_mean.fit_all_centering()
-#
-# print('Measure Background Estimates with All Methods: Circle Masked, Annular Masked, KDE Mode, Median Masked')
-# # example_wanderer_mean.measure_background_circle_masked()
-# # example_wanderer_mean.measure_background_annular_mask()
-# # example_wanderer_mean.measure_background_KDE_Mode()
-# # example_wanderer_mean.measure_background_median_masked()
-# example_wanderer_mean.measure_all_background()
-#
-# print('Iterating over Background Techniques, Centering Techniques, Aperture Radii')
-# background_choices = example_wanderer_mean.background_df.columns
-# centering_choices  = ['Gaussian_Fit', 'Gaussian_Mom', 'FluxWeighted', 'LeastAsymmetry']
-# aperRads           = np.arange(1, 100.5,0.5)
-#
-# useTheForce = False # True :: recompute flux for a given aperature radius, centering method, and background technique
-#
-# # print('Working on Background ' + str(kBG) + ' ' + bgNow + ' with Centering ' + str(kCTR) \
-# #       + ' ' + ctrNow + ' and staticRad ' + str(staticRad) + ' with varRad ' + str(varRad), end=" ")
-#
-# start = time()
-# example_wanderer_mean.SDNR_df = DataFrame()
-# for kBG, bgNow in tqdm_notebook(enumerate(background_choices), desc='Background', \
-#                                 leave = True, total=len(background_choices)):
-#     for kCTR, ctrNow in tqdm_notebook(enumerate(centering_choices), desc='Centering', \
-#                                       leave = True, total=len(centering_choices)):
-#         for staticRad in tqdm_notebook(staticRads, desc='StaticRad', leave = True, total=len(staticRads)):
-#             for varRad in tqdm_notebook(varRads, desc='VarRad', leave = True, total=len(varRads)):
-#                 if varRad is not None:
-#                     flux_key_now  = ctrNow + '_' + bgNow+'_' + 'rad' + '_' + str(staticRad) + '_' + str(varRad)
-#                 else:
-#                     flux_key_now  = ctrNow + '_' + bgNow+'_' + 'rad' + '_' + str(staticRad) + '_None'
-#
-#                 example_wanderer_mean.compute_flux_over_time(staticRad=staticRad, varRad=varRad, \
-#                                                          centering=ctrNow, background=bgNow,useTheForce=useTheForce)
-#
-#                 fluxNow     = example_wanderer_mean.flux_TSO_df[flux_key_now]
-#                 medFluxNow  = median(example_wanderer_mean.flux_TSO_df[flux_key_now])
-#
-#                 # average SDNR per `staticRad`
-#                 fluxNow    /= len(varRads)
-#                 medFluxNow /= len(varRads)
-#
-#                 # Standard Deviation of the Normalized Residuals
-#                 SDNR        = std(fluxNow / medFluxNow)*ppm
-#                 example_wanderer_mean.SDNR_df[flux_key_now]  = [SDNR]
-#
-#                 print('Finished with Background ' + str(kBG) + ' ' + bgNow + ' with Centering ' + str(kCTR) \
-#                           + ' ' + ctrNow + ' and staticRad ' + str(staticRad) + ' and varRad ' + str(varRad), \
-#                       int(np.round(SDNR)), 'ppm')
-#
-# print('Saving `example_wanderer_mean` to a set of pickles for various Image Cubes and the Storage Dictionary')
-# example_wanderer_mean.save_data_to_save_files(savefiledir='./SaveFiles/', saveFileNameHeader='Example_Wanderer_Mean_', saveFileType='.pickle.save')
-#
+        Note:
+            Do not include the `self` parameter in the ``Args`` section.
+
+        Args:
+            param1: The first parameter.
+            param2: The second parameter.
+
+        Returns:
+            True if successful, False otherwise.
+
+        """
+        
+        y,x = 0,1
+        
+        if background not in self.background_df.columns:
+            raise Exception("`background` must be in", self.background_df.columns)
+        
+        if centering not in ['Gaussian_Fit', 'Gaussian_Mom', 'FluxWeighted', 'LeastAsymmetry']:
+            raise Exception("`centering` must be either 'Gaussian_Fit', 'Gaussian_Mom', 'FluxWeighted', or 'LeastAsymmetry'")
+        
+        centering_Use = np.transpose([self.centering_df[centering + '_Y_Centers'], 
+                                      self.centering_df[centering + '_X_Centers']])
+        
+        background_Use= self.background_df[background]
+        
+        flux_key_now  = centering + '_' + background+'_' + 'rad' + '_' + str(staticRad) + '_' + str(varRad)
+        
+        if varRad is None and isinstance(staticRad, (float, int)):
+            aperRad = [staticRad]*self.nFrames
+        
+        else:
+            quad_rad_dist = self.quadrature_widths.copy() - np.median(self.quadrature_widths)
+            quad_rad_dist = clipOutlier(quad_rad_dist, nSig=5)
+            aperRads = staticRad + varRad*quad_rad_dist
+        
+        if flux_key_now not in self.flux_TSO_df.keys() or useTheForce:            
+            # for kf in tqdm_notebook(range(self.nFrames), desc='Flux', leave = False, total=self.nFrames):
+                        
+            pool = Pool(self.nCores)
+            
+            # func = partial(compute_flux_one_frame)
+            
+            fluxNow = pool.starmap(compute_flux_one_frame, 
+                                    zip(self.imageCube, centering_Use, background_Use, aperRads))
+            
+            pool.close()
+            pool.join()
+            
+            # fluxNow[~np.isfinite(fluxNow)]  = np.median(fluxNow[np.isfinite(fluxNow)])
+            # fluxNow[fluxNow < 0]            = np.median(fluxNow[fluxNow > 0])
+            
+            self.flux_TSO_df[flux_key_now]  = fluxNow
+            self.noise_TSO_df[flux_key_now] = np.sqrt(fluxNow)
+            
+        else:
+            print(flux_key_now + ' exists: if you want to overwrite, then you `useTheForce=True`')
+    
+    def extract_PLD_components(self, ycenter=None, xcenter=None, nCols=3, nRows=3, order=1):
+        """Class methods are similar to regular functions.
+
+        Note:
+            Do not include the `self` parameter in the ``Args`` section.
+
+        Args:
+            param1: The first parameter.
+            param2: The second parameter.
+
+        Returns:
+            True if successful, False otherwise.
+
+        """
+        
+        nPLDComp= nCols*nRows
+        
+        # nCols   = nCols // 2 # User input assumes matrix structure, which starts at y- and x-center
+        # nRows   = nRows // 2 #   and moves +\- nRows/2 and nCols/2, respectively
+        
+        ycenter = int(ycenter) if ycenter is not None else self.imageCube.shape[1]//2-1 # nominally 15
+        xcenter = int(xcenter) if xcenter is not None else self.imageCube.shape[2]//2-1 # nominally 15
+        
+        ylower  = ycenter - nRows // 2     # nominally 14
+        yupper  = ycenter + nRows // 2 + 1 # nominally 17 (to include 16)
+        xlower  = xcenter - nCols // 2     # nominally 14
+        xupper  = xcenter + nCols // 2 + 1 # nominally 17 (to include 16)
+        
+        PLD_comps_local = self.imageCube[:,ylower:yupper,xlower:xupper].reshape((self.imageCube.shape[0],nPLDComp)).T
+        
+        PLD_norm       = sum(PLD_comps_local,axis=0)
+        PLD_comps_local= PLD_comps_local / PLD_norm
+        
+        self.PLD_components = PLD_comps_local
+        self.PLD_norm       = PLD_norm
+        
+        if order > 1:
+            for o in range(2, order+1):
+                self.PLD_components = vstack([self.PLD_components, PLD_comps_local**o])
+    
+    def DBScan_Flux_All(self, centering='gaussian', dbsClean=0):
+        """Class methods are similar to regular functions.
+
+        Note:
+            Do not include the `self` parameter in the ``Args`` section.
+
+        Args:
+            param1: The first parameter.
+            param2: The second parameter.
+
+        Returns:
+            True if successful, False otherwise.
+
+        """
+        
+        if centering == 'gaussian':
+            ycenters    = self.centering_GaussianFit.T[y]
+            xcenters    = self.centering_GaussianFit.T[x]
+        else:
+            print('Only Gaussian Centering is supported at the moment')
+            print('Continuting with Gaussian Centering')
+            ycenters    = self.centering_GaussianFit.T[y]
+            xcenters    = self.centering_GaussianFit.T[x]
+        
+        try: 
+            self.inliers_Phots = self.inliers_Phots
+        except: 
+            self.inliers_Phots = {}
+        
+        for flux_key_now in self.flux_TSO_df.keys():
+            
+            phots       = self.flux_TSO_df[flux_key_now]
+            
+            if flux_key_now not in self.inliers_Phots.keys() or useTheForce:
+                self.inliers_Phots[flux_key_now]  = DBScan_Flux(phots, ycenters, xcenters, dbsClean=dbsClean)
+            else:
+                print(flux_key_now + ' exists: if you want to overwrite, then you `useTheForce=True`')
+    
+    def mp_DBScan_Flux_All(self, centering='gaussian', dbsClean=0):
+        """Class methods are similar to regular functions.
+
+        Note:
+            Do not include the `self` parameter in the ``Args`` section.
+
+        Args:
+            param1: The first parameter.
+            param2: The second parameter.
+
+        Returns:
+            True if successful, False otherwise.
+
+        """
+        
+        if centering == 'gaussian':
+            ycenters    = self.centering_GaussianFit.T[y]
+            xcenters    = self.centering_GaussianFit.T[x]
+        else:
+            print('Only Gaussian Centering is supported at the moment')
+            print('Continuting with Gaussian Centering')
+            ycenters    = self.centering_GaussianFit.T[y]
+            xcenters    = self.centering_GaussianFit.T[x]
+        
+        try: 
+            self.inliers_Phots = self.inliers_Phots
+        except: 
+            self.inliers_Phots = {}
+        
+        pool = Pool(self.nCores) # This starts the multiprocessing call to arms
+        
+        func = partial(DBScan_Flux, ycenters=ycenters, xcenters=xcenters, dbsClean=dbsClean)
+        
+        inliersMP = pool.starmap(func, zip(self.flux_TSO_df.values.T)) # the order is very important
+        
+        pool.close()
+        pool.join()
+        
+        for k_mp, flux_key_now in enumerate(self.flux_TSO_df.keys()):
+            self.inliers_Phots[flux_key_now] = inliersMP[k_mp]
+    
+    def mp_DBScan_PLD_All(self, dbsClean=0):
+        raise Exception('This Function is Not Working; please use lame_`DBScan_PLD_all`')
+        """Class methods are similar to regular functions.
+
+        Note:
+            Do not include the `self` parameter in the ``Args`` section.
+
+        Args:
+            param1: The first parameter.
+            param2: The second parameter.
+
+        Returns:
+            True if successful, False otherwise.
+
+        """
+        
+        try: 
+            self.inliers_PLD = self.inliers_PLD
+        except: 
+            self.inliers_PLD = np.ones(self.PLD_components.shape, dtype=bool)
+        
+        pool = Pool(self.nCores) # This starts the multiprocessing call to arms
+        
+        func = partial(DBScan_PLD, dbsClean=dbsClean)
+        
+        inliersMP = pool.starmap(func, zip(self.PLD_components.T)) # the order is very important
+        
+        pool.close()
+        pool.join()
+        
+        for k_mp, inlier in enumerate(inliersMP):
+            self.inliers_PLD[k_mp] = inlier
+    
+    def mp_DBScan_PLD_All(self, dbsClean=0):
+        """Class methods are similar to regular functions.
+    
+        Note:
+            Do not include the `self` parameter in the ``Args`` section.
+    
+        Args:
+            param1: The first parameter.
+            param2: The second parameter.
+    
+        Returns:
+            True if successful, False otherwise.
+    
+        """
+        
+        try: 
+            self.inliers_PLD = self.inliers_PLD
+        except: 
+            self.inliers_PLD = np.ones(self.PLD_components.shape, dtype=bool)
+        
+        for kPLD, PLDnow in enumerate(self.PLD_components):
+            self.inliers_PLD[kPLD] = DBScan_PLD(PLDnow, dbsClean=dbsClean)
+
+
+
+
+
+
+# END OF FILE
