@@ -29,12 +29,13 @@ from statsmodels.robust        import scale
 from statsmodels.nonparametric import kde
 from sys                       import exit
 from time                      import time, localtime, sleep
-from tqdm                      import tnrange, tqdm_notebook
+from tqdm                      import tqdm, tqdm_notebook
 
 from scipy                     import optimize
 from sklearn.externals         import joblib
 from skimage.filters           import gaussian as gaussianFilter
 from sys                       import exit
+
 import numpy as np
 
 rcParams['image.interpolation'] = 'None'
@@ -866,7 +867,7 @@ class wanderer(object):
     """
     
     def __init__(self, fitsFileDir = './', filetype = 'slp.fits', telescope = None,
-                 yguess=None, xguess=None, npix=5, method='mean', nCores = None):
+                 yguess=None, xguess=None, npix=5, method='mean', nCores = None, jupyter=True):
         """Example of docstring on the __init__ method.
 
                 The __init__ method may be documented in either the class level
@@ -886,6 +887,8 @@ class wanderer(object):
 
         """
         print('\n\n** Not all who wander are lost **\n\n')
+        
+        self.tqdm = tqdm_notebook if jupyter else tqdm
         
         self.method   = method
         self.filetype = filetype
@@ -970,7 +973,7 @@ class wanderer(object):
         
         del testfits
         
-        for kf, fname in tqdm_notebook(enumerate(self.fitsFilenames), desc='JWST Load File', leave = False, total=self.nSlopeFiles):
+        for kf, fname in self.tqdm(enumerate(self.fitsFilenames), desc='JWST Load File', leave = False, total=self.nSlopeFiles):
             fitsNow = fits.open(fname)
             
             self.imageCube[kf] = fitsNow[0].data[0]
@@ -1033,7 +1036,7 @@ class wanderer(object):
             raise Exception("`outputUnits` must be either 'electrons' or 'muJ_per_Pixel'")
         
         print('Loading Spitzer Data')
-        for kfile, fname in tqdm_notebook(enumerate(self.fitsFilenames),
+        for kfile, fname in self.tqdm(enumerate(self.fitsFilenames),
                                           desc='Spitzer Load File', leave = False, total=self.nSlopeFiles):
             bcdNow  = fits.open(fname)
             # buncNow = fits.open(fname[:-len(filetype)] + 'bunc.fits')
@@ -1415,7 +1418,7 @@ class wanderer(object):
         # self.rotation_GaussianFit     = zeros(self.imageCube.shape[0])
         self.background_GaussianFit   = zeros(self.imageCube.shape[0])
         
-        for kf in tqdm_notebook(range(self.nFrames), desc='GaussFit', leave = False, total=self.nFrames):
+        for kf in self.tqdm(range(self.nFrames), desc='GaussFit', leave = False, total=self.nFrames):
             subFrameNow = self.imageCube[kf][ylower:yupper, xlower:xupper]
             subFrameNow[isnan(subFrameNow)] = median(~isnan(subFrameNow))
             
@@ -1691,7 +1694,7 @@ class wanderer(object):
         nFWCParams                = 2 # Xc, Yc
         self.centering_FluxWeight = np.zeros((self.nFrames, nFWCParams))
         print(self.imageCube.shape)
-        for kf in tqdm_notebook(range(self.nFrames), desc='FWC', leave = False, total=self.nFrames):
+        for kf in self.tqdm(range(self.nFrames), desc='FWC', leave = False, total=self.nFrames):
             subFrameNow = self.imageCube[kf][ylower:yupper, xlower:xupper]
             subFrameNow[isnan(subFrameNow)] = median(~isnan(subFrameNow))
             
@@ -1781,7 +1784,7 @@ class wanderer(object):
         nAsymParams = 2 # Xc, Yc
         self.centering_LeastAsym  = np.zeros((self.nFrames, nAsymParams))
         
-        for kf in tqdm_notebook(range(self.nFrames), desc='Asym', leave = False, total=self.nFrames):
+        for kf in self.tqdm(range(self.nFrames), desc='Asym', leave = False, total=self.nFrames):
             # The following is a sequence of error handling and reattempts to center fit
             #   using the least_asymmetry algorithm
             #
@@ -1910,7 +1913,7 @@ class wanderer(object):
         
         nAsymParams = 2 # Xc, Yc
         # self.centering_LeastAsym  = np.zeros((self.nFrames, nAsymParams))
-        # for kf in tqdm_notebook(range(self.nFrames), desc='Asym', leave = False, total=self.nFrames):
+        # for kf in self.tqdm(range(self.nFrames), desc='Asym', leave = False, total=self.nFrames):
         pool = Pool(self.nCores) # This starts the multiprocessing call to arms
         
         func = partial(actr, asym_rad=8, asym_size=5, maxcounts=2, method='gaus', half_pix=False, resize=False, weights=False)
@@ -2003,7 +2006,7 @@ class wanderer(object):
         """
         
         self.background_CircleMask = np.zeros(self.nFrames)
-        for kf in tqdm_notebook(range(self.nFrames), desc='CircleBG', leave = False, total=self.nFrames):
+        for kf in self.tqdm(range(self.nFrames), desc='CircleBG', leave = False, total=self.nFrames):
             aperture       = CircularAperture(self.centering_FluxWeight[kf], aperRad)
             
             aper_mask = aperture.to_mask(method='exact')[0]    # list of ApertureMask objects (one for each position)
@@ -2070,7 +2073,7 @@ class wanderer(object):
         
         self.background_Annulus = np.zeros(self.nFrames)
         
-        for kf in tqdm_notebook(range(self.nFrames), desc='AnnularBG', leave = False, total=self.nFrames):
+        for kf in self.tqdm(range(self.nFrames), desc='AnnularBG', leave = False, total=self.nFrames):
             innerAperture = CircularAperture(self.centering_FluxWeight[kf], innerRad)
             outerAperture = CircularAperture(self.centering_FluxWeight[kf], outerRad)
             
@@ -2135,7 +2138,7 @@ class wanderer(object):
         
         self.background_MedianMask  = np.zeros(self.nFrames)
         
-        for kf in tqdm_notebook(range(self.nFrames), desc='MedianMaskedBG', leave = False, total=self.nFrames):
+        for kf in self.tqdm(range(self.nFrames), desc='MedianMaskedBG', leave = False, total=self.nFrames):
             aperture       = CircularAperture(self.centering_FluxWeight[kf], aperRad)
             aperture       = aperture.to_mask(method='exact')[0]
             aperture       = aperture.to_image(self.imageCube[0].shape).astype(bool)
@@ -2202,7 +2205,7 @@ class wanderer(object):
         
         self.background_KDEUniv = np.zeros(self.nFrames)
         
-        for kf in tqdm_notebook(range(self.nFrames), desc='KDE_BG', leave = False, total=self.nFrames):
+        for kf in self.tqdm(range(self.nFrames), desc='KDE_BG', leave = False, total=self.nFrames):
             aperture       = CircularAperture(self.centering_FluxWeight[kf], aperRad)
             aperture       = aperture.to_mask(method='exact')[0]
             aperture       = aperture.to_image(self.imageCube[0].shape).astype(bool)
@@ -2319,7 +2322,7 @@ class wanderer(object):
             flux_TSO_now  = np.zeros(self.nFrames)
             noise_TSO_now = np.zeros(self.nFrames)
             
-            for kf in tqdm_notebook(range(self.nFrames), desc='Flux', leave = False, total=self.nFrames):
+            for kf in self.tqdm(range(self.nFrames), desc='Flux', leave = False, total=self.nFrames):
                 frameNow  = np.copy(self.imageCube[kf]) - background_Use[kf]
                 frameNow[np.isnan(frameNow)] = median(frameNow)
 
@@ -2404,7 +2407,7 @@ class wanderer(object):
         flux_key_now  = centering + '_' + background+'_' + 'rad' + '_' + str(aperRad)
         
         if flux_key_now not in self.flux_TSO_df.keys() or useTheForce:            
-            # for kf in tqdm_notebook(range(self.nFrames), desc='Flux', leave = False, total=self.nFrames):
+            # for kf in self.tqdm(range(self.nFrames), desc='Flux', leave = False, total=self.nFrames):
                         
             pool = Pool(self.nCores)
             
@@ -2463,7 +2466,7 @@ class wanderer(object):
             aperRads = staticRad + varRad*quad_rad_dist
         
         if flux_key_now not in self.flux_TSO_df.keys() or useTheForce:            
-            # for kf in tqdm_notebook(range(self.nFrames), desc='Flux', leave = False, total=self.nFrames):
+            # for kf in self.tqdm(range(self.nFrames), desc='Flux', leave = False, total=self.nFrames):
                         
             pool = Pool(self.nCores)
             
