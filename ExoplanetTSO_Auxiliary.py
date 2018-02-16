@@ -15,8 +15,8 @@ from photutils                 import CircularAperture, CircularAnnulus, apertur
 from least_asymmetry.asym      import actr
 from pylab                     import ion, gcf, sort, linspace, indices, nanmedian as median, nanmean as mean, nanstd as std, empty, figure, transpose, ceil
 from pylab                     import concatenate, pi, sqrt, ones, diag, inf, rcParams, isnan, isfinite, array, nanmax, shape, zeros
-from numpy                     import min as npmin, max as npmax, zeros, arange, sum, float, isnan, hstack, int32, exp
-from numpy                     import int32 as npint, round as npround, nansum as sum, std as std, where, bitwise_and
+from numpy                     import min as npmin, max as npmax, zeros, arange, sum, float, isnan, hstack, int32, exp, log
+from numpy                     import int32 as npint, round as npround, nansum as sum, std as std, where, bitwise_and, vstack
 from seaborn                   import *
 from scipy.special             import erf
 from scipy                     import stats
@@ -549,39 +549,41 @@ def lmfit_one_center(image, yy, xx, gfit_model, lmfit_init_params, yupper, ylowe
     lmfit_init_params.height   = init_params[ihg]
     lmfit_init_params.center_y = init_params[iyc]
     lmfit_init_params.center_x = init_params[ixc]
-    lmfit_init_params.widths_y = init_params[iyw]
-    lmfit_init_params.widths_x = init_params[ixw]
+    lmfit_init_params.width_y  = init_params[iyw]
+    lmfit_init_params.width_x  = init_params[ixw]
     lmfit_init_params.offset   = init_params[ibg]
     
     # print(lmfit_init_params)
     
     gfit_res    = gfit_model.fit(subFrameNow, params=lmfit_init_params, xx=xx, yy=yy, method=method)
+    # print(list(gfit_res.best_values.values()))
     
-    return gfit_res.best_values
+    fit_values = gfit_res.best_values
+    
+    return fit_values['center_y'], fit_values['center_x'], fit_values['width_y'], fit_values['width_x'], fit_values['height'], fit_values['offset']
 
 def fit_gauss(subFrameNow, xinds, yinds, initParams, print_compare=False):
     """Class methods are similar to regular functions.
-
+    
     Note:
         Do not include the `self` parameter in the ``Args`` section.
-
+    
     Args:
         param1: The first parameter.
         param2: The second parameter.
-
+    
     Returns:
         True if successful, False otherwise.
-
+    
     """
     
     # initParams = (height, x, y, width_x, width_y, offset)
-    fit_lvmq = fitting.LevMarLSQFitter()
-    model0  = models.Gaussian2D(amplitude=initParams[0], x_mean=initParams[1], y_mean=initParams[2], 
-                                x_stddev=initParams[3], y_stddev=initParams[4], theta=0.0) + \
-              models.Const2D(amplitude=initParams[5])
+    fit_lvmq  = fitting.LevMarLSQFitter()
+    model0    = models.Gaussian2D(amplitude=initParams[0], x_mean=initParams[1], y_mean=initParams[2], 
+                                 x_stddev=initParams[3], y_stddev=initParams[4], theta=0.0) + models.Const2D(amplitude=initParams[5])
     
-    model1  = fit_lvmq(model0, xinds, yinds, subFrameNow)
-    model1  = fit_lvmq(model1, xinds, yinds, subFrameNow)
+    model1    = fit_lvmq(model0, xinds, yinds, subFrameNow)
+    model1    = fit_lvmq(model1, xinds, yinds, subFrameNow)
     
     if print_compare:
         print(model1.amplitude_0 - initParams[0], end=" ")
@@ -823,7 +825,60 @@ def DBScan_Flux(phots, ycenters, xcenters, dbsClean=0, useTheForce=False):
                                 stdScaler.fit_transform(xcenters[:,None]).ravel(), \
                                 stdScaler.fit_transform(phots[:,None]).ravel()   ] )
     
+    print(featuresNow.shape)
     dbsPhotsPred= dbsPhots.fit_predict(featuresNow)
+    
+    return dbsPhotsPred == dbsClean
+
+def factor(numberToFactor, arr=list()):
+    i = 2
+    maximum = numberToFactor / 2 + 1
+    while i < maximum:
+        if numberToFactor % i == 0:
+            return factor(numberToFactor/i,arr + [i])
+        i += 1
+    return list(set(arr + [numberToFactor]))
+
+def DBScan_Segmented_Flux(phots, ycenters, xcenters, dbsClean=0, nSegments=None, maxSegment = int(6e4), useTheForce=False):
+    """Class methods are similar to regular functions.
+    
+    Note:
+        Do not include the `self` parameter in the ``Args`` section.
+    
+    Args:
+        param1: The first parameter.
+        param2: The second parameter.
+    
+    Returns:
+        True if successful, False otherwise.
+    
+    """
+    if phots.size <= maxSegment:
+        # Default to un-segmented
+        return DBScan_Flux(phots, ycenters, xcenters, dbsClean=dbsClean, useTheForce=useTheForce)
+    
+    dbsPhots    = DBSCAN()#n_jobs=-1)
+    stdScaler   = StandardScaler()
+    
+    if nSegments is None:
+        nSegments = phots.size // maxSegment
+    
+    segSize     = phots.size // nSegments
+    max_in_segs = nSegments * segSize
+    
+    segments = list(np.arange(max_in_segs).reshape(nSegments, -1))
+    
+    leftovers= np.arange(max_in_segs, phots.size)
+    
+    segments[-1] = np.hstack([segments[-1], leftovers])
+    
+    phots        = np.copy(phots.ravel())
+    phots[~np.isfinite(phots)] = np.median(phots[np.isfinite(phots)])
+    
+    dbsPhotsPred = np.zeros(phots.size) + dbsClean # default to array of `dbsClean` values
+    
+    for segment in segments:
+        dbsPhotsPred[segment]= DBScan_Flux(phots[segment], ycenters[segment], xcenters[segment], dbsClean=dbsClean, useTheForce=useTheForce)
     
     return dbsPhotsPred == dbsClean
 
@@ -846,6 +901,46 @@ def DBScan_PLD(PLDNow, dbsClean=0, useTheForce=False):
     stdScaler   = StandardScaler()
     
     dbsPLDPred= dbsPLD.fit_predict(stdScaler.fit_transform(PLDNow[:,None]))
+    
+    return dbsPLDPred == dbsClean
+
+def DBScan_Segmented_PLD(PLDNow, dbsClean=0, nSegments=None, maxSegment = int(6e4), useTheForce=False):
+    """Class methods are similar to regular functions.
+    
+    Note:
+        Do not include the `self` parameter in the ``Args`` section.
+    
+    Args:
+        param1: The first parameter.
+        param2: The second parameter.
+    
+    Returns:
+        True if successful, False otherwise.
+    
+    """
+    if PLDNow.size <= maxSegment:
+        # Default to un-segmented
+        return DBScan_PLD(PLDNow, dbsClean=dbsClean, useTheForce=useTheForce)
+    
+    # dbsPLD      = DBSCAN()#n_jobs=-1)
+    # stdScaler   = StandardScaler()
+    #
+    if nSegments is None:
+        nSegments = PLDNow.size // maxSegment
+    
+    segSize     = PLDNow.size // nSegments
+    max_in_segs = nSegments * segSize
+    
+    segments = list(np.arange(max_in_segs).reshape(nSegments, -1))
+    
+    leftovers= np.arange(max_in_segs, PLDNow.size)
+    
+    segments[-1] = np.hstack([segments[-1], leftovers])
+    
+    dbsPLDPred  = np.zeros(PLDNow.size) + dbsClean # default to array of `dbsClean` values
+    
+    for segment in segments:
+        dbsPLDPred[segment]= DBScan_PLD(PLDNow[segment], dbsClean=dbsClean, useTheForce=useTheForce)
     
     return dbsPLDPred == dbsClean
 
@@ -971,6 +1066,8 @@ class wanderer(object):
         self.noiseCube      = np.zeros((self.nFrames, testfits.data[0].shape[0], testfits.data[0].shape[1]))
         self.timeCube       = np.zeros(self.nFrames)
         
+        self.imageBadPixMasks = None
+        
         del testfits
         
         for kf, fname in self.tqdm(enumerate(self.fitsFilenames), desc='JWST Load File', leave = False, total=self.nSlopeFiles):
@@ -1017,6 +1114,8 @@ class wanderer(object):
         self.imageCube      = zeros((self.nFrames, bcd_shape[0], bcd_shape[1]))
         self.noiseCube      = zeros((self.nFrames, bcd_shape[0], bcd_shape[1]))
         self.timeCube       = zeros(self.nFrames)
+        
+        self.imageBadPixMasks = None
         
         del testfits
         
@@ -1133,7 +1232,7 @@ class wanderer(object):
         for key in self.save_dict.keys():
             exec("self." + key + " = self.save_dict['" + key + "']")
         
-    def save_data_to_save_files(self, savefiledir=None, saveFileNameHeader=None, saveFileType='.pickle.save'):
+    def save_data_to_save_files(self, savefiledir=None, saveFileNameHeader=None, saveFileType='.pickle.save', SaveMaster=True, SaveTime=True):
         """Class methods are similar to regular functions.
 
         Note:
@@ -1179,31 +1278,33 @@ class wanderer(object):
         
         #self.save_dict = self.__dict__
         
-        print('\nSaving to Master File -- Overwriting Previous Master')
-        self.centering_df.to_pickle(savefiledir  + saveFileNameHeader + '_centering_dataframe'  + saveFileType)
-        self.background_df.to_pickle(savefiledir + saveFileNameHeader + '_background_dataframe' + saveFileType)
-        self.flux_TSO_df.to_pickle(savefiledir   + saveFileNameHeader + '_flux_TSO_dataframe'   + saveFileType)
+        if SaveMaster:
+            print('\nSaving to Master File -- Overwriting Previous Master')
+            self.centering_df.to_pickle(savefiledir  + saveFileNameHeader + '_centering_dataframe'  + saveFileType)
+            self.background_df.to_pickle(savefiledir + saveFileNameHeader + '_background_dataframe' + saveFileType)
+            self.flux_TSO_df.to_pickle(savefiledir   + saveFileNameHeader + '_flux_TSO_dataframe'   + saveFileType)
         
-        joblib.dump(self.imageCube, savefiledir  + saveFileNameHeader + '_image_cube_array' + saveFileType)
-        joblib.dump(self.noiseCube, savefiledir  + saveFileNameHeader + '_noise_cube_array' + saveFileType)
-        joblib.dump(self.timeCube , savefiledir  + saveFileNameHeader + '_time_cube_array'  + saveFileType)
+            joblib.dump(self.imageCube, savefiledir  + saveFileNameHeader + '_image_cube_array' + saveFileType)
+            joblib.dump(self.noiseCube, savefiledir  + saveFileNameHeader + '_noise_cube_array' + saveFileType)
+            joblib.dump(self.timeCube , savefiledir  + saveFileNameHeader + '_time_cube_array'  + saveFileType)
         
-        joblib.dump(self.imageBadPixMasks, savefiledir  + saveFileNameHeader + '_image_bad_pix_cube_array' + saveFileType)
+            joblib.dump(self.imageBadPixMasks, savefiledir  + saveFileNameHeader + '_image_bad_pix_cube_array' + saveFileType)
         
-        joblib.dump(self.save_dict, savefiledir + saveFileNameHeader + '_save_dict' + saveFileType)
+            joblib.dump(self.save_dict, savefiledir + saveFileNameHeader + '_save_dict' + saveFileType)
         
-        print('Saving to New TimeStamped File -- These Tend to Pile Up!')
-        self.centering_df.to_pickle(savefiledir + 'TimeStamped/' + saveFileNameHeader + '_centering_dataframe'  + saveFileTypeBak)
-        self.background_df.to_pickle(savefiledir + 'TimeStamped/' + saveFileNameHeader + '_background_dataframe' + saveFileTypeBak)
-        self.flux_TSO_df.to_pickle(savefiledir + 'TimeStamped/' + saveFileNameHeader + '_flux_TSO_dataframe'   + saveFileTypeBak)
+        if SaveTime:
+            print('Saving to New TimeStamped File -- These Tend to Pile Up!')
+            self.centering_df.to_pickle(savefiledir + 'TimeStamped/' + saveFileNameHeader + '_centering_dataframe'  + saveFileTypeBak)
+            self.background_df.to_pickle(savefiledir + 'TimeStamped/' + saveFileNameHeader + '_background_dataframe' + saveFileTypeBak)
+            self.flux_TSO_df.to_pickle(savefiledir + 'TimeStamped/' + saveFileNameHeader + '_flux_TSO_dataframe'   + saveFileTypeBak)
         
-        joblib.dump(self.imageCube, savefiledir + 'TimeStamped/' + saveFileNameHeader + '_image_cube_array' + saveFileTypeBak)
-        joblib.dump(self.noiseCube, savefiledir + 'TimeStamped/' + saveFileNameHeader + '_noise_cube_array' + saveFileTypeBak)
-        joblib.dump(self.timeCube , savefiledir + 'TimeStamped/' + saveFileNameHeader + '_time_cube_array'  + saveFileTypeBak)
+            joblib.dump(self.imageCube, savefiledir + 'TimeStamped/' + saveFileNameHeader + '_image_cube_array' + saveFileTypeBak)
+            joblib.dump(self.noiseCube, savefiledir + 'TimeStamped/' + saveFileNameHeader + '_noise_cube_array' + saveFileTypeBak)
+            joblib.dump(self.timeCube , savefiledir + 'TimeStamped/' + saveFileNameHeader + '_time_cube_array'  + saveFileTypeBak)
         
-        joblib.dump(self.imageBadPixMasks, savefiledir + 'TimeStamped/' + saveFileNameHeader + '_image_bad_pix_cube_array' + saveFileTypeBak)
+            joblib.dump(self.imageBadPixMasks, savefiledir + 'TimeStamped/' + saveFileNameHeader + '_image_bad_pix_cube_array' + saveFileTypeBak)
         
-        joblib.dump(self.save_dict, savefiledir + 'TimeStamped/' + saveFileNameHeader + '_save_dict' + saveFileTypeBak)
+            joblib.dump(self.save_dict, savefiledir + 'TimeStamped/' + saveFileNameHeader + '_save_dict' + saveFileTypeBak)
     
     def initiate_save_dict(self, dummy=None):
         """Class methods are similar to regular functions.
@@ -1224,7 +1325,7 @@ class wanderer(object):
                              'background_MedianMask','centering_FluxWeight', 'centering_GaussianFit', 'centering_LeastAsym',
                              'effective_widths', 'fitsFileDir', 'fitsFilenames', 'heights_GaussianFit', 'inliers_Phots',
                              'inliers_PLD', 'inliers_Master', 'method', 'npix', 'nFrames', 'PLD_components', 'PLD_norm',
-                             'quadrature_widths', 'yguess', 'xguess', 'widths_GaussianFit']
+                             'quadrature_widths', 'yguess', 'xguess', 'widths_GaussianFit', 'AOR', 'planetName', 'channel']
         
         _max_str_len = 0
         for thing in _stored_variables:
@@ -1463,21 +1564,22 @@ class wanderer(object):
     
     def mp_lmfit_gaussian_centering(self, yguess=15, xguess=15, subArraySize=10, 
                                     init_params=None, useMoments=False, nCores=cpu_count(), 
-                                    center_range=None, width_range=None, nSig=False, 
-                                    method='leastsq', recheckMethod=None, verbose=False):
+                                    center_range=None, width_range=None, nSig=6.1, 
+                                    method='leastsq', recheckMethod=None, 
+                                    median_crop=False, verbose=False):
         
         """Class methods are similar to regular functions.
-
+        
         Note:
             Do not include the `self` parameter in the ``Args`` section.
-
+        
         Args:
             param1: The first parameter.
             param2: The second parameter.
-
+        
         Returns:
             True if successful, False otherwise.
-
+        
         """
         
         if isnan(self.imageCube).any():
@@ -1536,49 +1638,59 @@ class wanderer(object):
         pool.close()
         pool.join()
         
+        print('Finished with Fitting Centers. Now assigning to instance values.')
         self.centering_GaussianFit    = zeros((self.imageCube.shape[0], 2))
         self.widths_GaussianFit       = zeros((self.imageCube.shape[0], 2))
         
         self.heights_GaussianFit      = zeros(self.imageCube.shape[0])
         self.background_GaussianFit   = zeros(self.imageCube.shape[0])
         
-        print('Finished with Fitting Centers. Now assigning to instance values.')
-        for kf, gaussP in enumerate(gaussian_centers):
-            self.centering_GaussianFit[kf][self.y]     = gaussP['center_y']
-            self.centering_GaussianFit[kf][self.x]     = gaussP['center_x']
-            
-            self.widths_GaussianFit[kf][self.y]        = gaussP['width_y']
-            self.widths_GaussianFit[kf][self.x]        = gaussP['width_x']
-            
-            self.heights_GaussianFit[kf]               = gaussP['height']
-            
-            self.background_GaussianFit[kf]            = gaussP['offset']
+        gaussian_centers              = np.array(gaussian_centers)
         
-        if recheckMethod is not None and isinstance(recheckMethod, str):
-            if verbose: print('Rechecking corner cases:')
-            medY, medX = median(self.centering_GaussianFit,axis=0)
-            stdX, stdY = std(   self.centering_GaussianFit,axis=0)
-            nSig       = 5.1
-            outliers   = (((self.centering_GaussianFit.T[y] - medY)/stdY)**2 + ((self.centering_GaussianFit.T[x] - medX)/stdX)**2) > nSig
-            
+        self.centering_GaussianFit.T[self.y]  = gaussian_centers.T[0]#['center_y']
+        self.centering_GaussianFit.T[self.x]  = gaussian_centers.T[1]#['center_x']
+        
+        self.widths_GaussianFit.T[self.y]     = gaussian_centers.T[2]#['width_y']
+        self.widths_GaussianFit.T[self.x]     = gaussian_centers.T[3]#['width_x']
+        
+        self.heights_GaussianFit[:]           = gaussian_centers.T[4]#['height']
+        self.background_GaussianFit[:]        = gaussian_centers.T[5]#['offset']
+        
+        if verbose: print('Rechecking corner cases:')
+        
+        medY, medX = median(self.centering_GaussianFit,axis=0)
+        stdX, stdY = std(   self.centering_GaussianFit,axis=0)
+        
+        outliers   = (((self.centering_GaussianFit.T[y] - medY)/stdY)**2 + ((self.centering_GaussianFit.T[x] - medX)/stdX)**2) > nSig
+        
+        if recheckMethod is not None and isinstance(recheckMethod, str):    
             for kf in where(outliers)[0]:
                 if verbose: print('    Corner Case:\t{}\tPreviousSolution={}'.format(kf, self.centering_GaussianFit[kf]), end="\t")
                 gaussP = lmfit_one_center(self.imageCube[kf], yy=yy, xx=xx, gfit_model=gfit_model, lmfit_init_params=lmfit_init_params, 
                                             yupper=yupper, ylower=ylower, xupper=xupper, xlower=xlower, method=recheckMethod)
                 
-                self.centering_GaussianFit[kf][self.y]     = gaussP['center_y']
-                self.centering_GaussianFit[kf][self.x]     = gaussP['center_x']
+                self.centering_GaussianFit[kf][self.y]     = gaussP[0]#['center_y']
+                self.centering_GaussianFit[kf][self.x]     = gaussP[1]#['center_x']
             
-                self.widths_GaussianFit[kf][self.y]        = gaussP['width_y']
-                self.widths_GaussianFit[kf][self.x]        = gaussP['width_x']
+                self.widths_GaussianFit[kf][self.y]        = gaussP[2]#['width_y']
+                self.widths_GaussianFit[kf][self.x]        = gaussP[3]#['width_x']
             
-                self.heights_GaussianFit[kf]               = gaussP['height']
+                self.heights_GaussianFit[kf]               = gaussP[4]#['height']
             
-                self.background_GaussianFit[kf]            = gaussP['offset']
+                self.background_GaussianFit[kf]            = gaussP[5]#['offset']
                 
                 if verbose: print('NewSolution={}'.format(self.centering_GaussianFit[kf]))
+        elif median_crop:
+            print('Setting Gaussian Centerintg Outliers to the Median')
+            inliers    = (((self.centering_GaussianFit.T[y] - medY)/stdY)**2 + ((self.centering_GaussianFit.T[x] - medX)/stdX)**2) <= nSig
+            medY, medX = median(self.centering_GaussianFit[inliers],axis=0)
+            
+            self.centering_GaussianFit.T[y][outliers] = medY
+            self.centering_GaussianFit.T[x][outliers] = medX
         
-        self.centering_df = DataFrame()
+        try:    self.centering_df = self.centering_df # check if it exists
+        except: self.centering_df = DataFrame()       # create it if it does not exist
+        
         self.centering_df['Gaussian_Fit_Y_Centers'] = self.centering_GaussianFit.T[self.y]
         self.centering_df['Gaussian_Fit_X_Centers'] = self.centering_GaussianFit.T[self.x]
         
@@ -2427,7 +2539,7 @@ class wanderer(object):
         else:
             print(flux_key_now + ' exists: if you want to overwrite, then you `useTheForce=True`')
     
-    def mp_compute_flux_over_time_varRad(self, staticRad, varRad=None, centering='GaussianFit', background='AnnularMask', useTheForce=False):
+    def mp_compute_flux_over_time_varRad(self, staticRad, varRad=None, centering='Gaussian_Fit', background='AnnularMask', useTheForce=False):
         """Class methods are similar to regular functions.
 
         Note:
@@ -2484,6 +2596,64 @@ class wanderer(object):
             self.flux_TSO_df[flux_key_now]  = fluxNow
             self.noise_TSO_df[flux_key_now] = np.sqrt(fluxNow)
             
+        else:
+            print(flux_key_now + ' exists: if you want to overwrite, then you `useTheForce=True`')
+    
+    def mp_compute_flux_over_time_betaRad(self, centering='Gaussian_Fit', \
+                                                background='AnnularMask', \
+                                                useQuad=False,
+                                                useTheForce=False):
+        """Class methods are similar to regular functions.
+
+        Note:
+            Do not include the `self` parameter in the ``Args`` section.
+
+        Args:
+            param1: The first parameter.
+            param2: The second parameter.
+
+        Returns:
+            True if successful, False otherwise.
+
+        """
+        
+        y,x = 0,1
+        
+        if background not in self.background_df.columns:
+            raise Exception("`background` must be in", self.background_df.columns)
+        
+        if centering not in ['Gaussian_Fit', 'Gaussian_Mom', 'FluxWeighted', 'LeastAsymmetry']:
+            raise Exception("`centering` must be either 'Gaussian_Fit', 'Gaussian_Mom', 'FluxWeighted', or 'LeastAsymmetry'")
+        
+        centering_Use = np.transpose([self.centering_df[centering + '_Y_Centers'], 
+                                      self.centering_df[centering + '_X_Centers']])
+        
+        background_Use= self.background_df[background]
+        
+        flux_key_now  = centering + '_' + background+'_' + 'rad'
+        
+        flux_key_now  = flux_key_now + '_quadRad_0.0_0.0' if useQuad else flux_key_now + '_betaRad_0.0_0.0'
+        
+        if flux_key_now not in self.flux_TSO_df.keys() or useTheForce:            
+            # for kf in self.tqdm(range(self.nFrames), desc='Flux', leave = False, total=self.nFrames):
+            sig2FW   = 2*sqrt(2*log(2))
+            aperRads = sig2FW*self.quadrature_widths if useQuad else sqrt(self.effective_widths)
+            
+            pool = Pool(self.nCores)
+            
+            # func = partial(compute_flux_one_frame)
+            
+            fluxNow = pool.starmap(compute_flux_one_frame, zip(self.imageCube, centering_Use, background_Use, aperRads))
+            
+            pool.close()
+            pool.join()
+            
+            # fluxNow[~np.isfinite(fluxNow)]  = np.median(fluxNow[np.isfinite(fluxNow)])
+            # fluxNow[fluxNow < 0]            = np.median(fluxNow[fluxNow > 0])
+            
+            self.flux_TSO_df[flux_key_now]  = fluxNow
+            self.noise_TSO_df[flux_key_now] = np.sqrt(fluxNow)
+        
         else:
             print(flux_key_now + ' exists: if you want to overwrite, then you `useTheForce=True`')
     
@@ -2561,7 +2731,7 @@ class wanderer(object):
             phots       = self.flux_TSO_df[flux_key_now]
             
             if flux_key_now not in self.inliers_Phots.keys() or useTheForce:
-                self.inliers_Phots[flux_key_now]  = DBScan_Flux(phots, ycenters, xcenters, dbsClean=dbsClean)
+                self.inliers_Phots[flux_key_now]  = DBScan_Segmented_Flux(phots, ycenters, xcenters, dbsClean=dbsClean)
             else:
                 print(flux_key_now + ' exists: if you want to overwrite, then you `useTheForce=True`')
     
@@ -2629,7 +2799,7 @@ class wanderer(object):
         
         pool = Pool(self.nCores) # This starts the multiprocessing call to arms
         
-        func = partial(DBScan_PLD, dbsClean=dbsClean)
+        func = partial(DBScan_Segmented_Flux, dbsClean=dbsClean)
         
         inliersMP = pool.starmap(func, zip(self.PLD_components.T)) # the order is very important
         
