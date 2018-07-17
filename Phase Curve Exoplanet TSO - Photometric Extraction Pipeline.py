@@ -20,6 +20,7 @@ planetName = args['planet_name']
 channel = args['channel']
 AORNow = args['aor_dir']
 planetDirectory = args['planets_dir']
+save_sub_dir = args['save_sub_dir']
 data_sub_dir = args['data_sub_dir']
 data_tail_dir = args['data_tail_dir']
 fits_format = args['fits_format']
@@ -247,7 +248,7 @@ saveFileNameHeader  = planetName+'_'+ AORNow +'_Median'
 saveFileType        = '.joblib.save'
 
 if not path.exists(environ['HOME']+planetDirectory+planetName+'/'+save_sub_dir+'/'):
-    mkdir(environ['HOME']+planetDirectory+planetName+'/'+save_sub_dir+'/'):
+    mkdir(environ['HOME']+planetDirectory+planetName+'/'+save_sub_dir+'/')
 
 if not path.exists(savefiledir):
     print('Creating ' + savefiledir)
