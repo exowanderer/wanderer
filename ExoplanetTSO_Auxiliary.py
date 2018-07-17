@@ -962,7 +962,7 @@ class wanderer(object):
     """
     
     def __init__(self, fitsFileDir = './', filetype = 'slp.fits', telescope = None,
-                 yguess=None, xguess=None, npix=5, method='mean', nCores = None, jupyter=True):
+                 yguess=None, xguess=None, npix=5, method='mean', nCores = None, jupyter=False):
         """Example of docstring on the __init__ method.
 
                 The __init__ method may be documented in either the class level
