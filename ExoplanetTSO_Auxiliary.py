@@ -12,7 +12,7 @@ from multiprocessing           import cpu_count, Pool
 from os                        import listdir, path, mkdir, chdir
 from pandas                    import DataFrame, Series, read_csv, read_pickle, scatter_matrix
 from photutils                 import CircularAperture, CircularAnnulus, aperture_photometry, findstars
-from least_asymmetry.asym      import actr
+# from least_asymmetry.asym      import actr
 from pylab                     import ion, gcf, sort, linspace, indices, nanmedian as median, nanmean as mean, nanstd as std, empty, figure, transpose, ceil
 from pylab                     import concatenate, pi, sqrt, ones, diag, inf, rcParams, isnan, isfinite, array, nanmax, shape, zeros
 from numpy                     import min as npmin, max as npmax, zeros, arange, sum, float, isnan, hstack, int32, exp, log
@@ -825,7 +825,7 @@ def DBScan_Flux(phots, ycenters, xcenters, dbsClean=0, useTheForce=False):
                                 stdScaler.fit_transform(xcenters[:,None]).ravel(), \
                                 stdScaler.fit_transform(phots[:,None]).ravel()   ] )
     
-    print(featuresNow.shape)
+    # print(featuresNow.shape)
     dbsPhotsPred= dbsPhots.fit_predict(featuresNow)
     
     return dbsPhotsPred == dbsClean
