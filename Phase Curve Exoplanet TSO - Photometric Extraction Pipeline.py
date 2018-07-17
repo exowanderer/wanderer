@@ -1,18 +1,19 @@
 from argparse import ArgumentParser
 
 ap = ArgumentParser()
-ap.add_argument('-pn', '--planet_name', required=True, type=str, help='Directory Name for the Planet (i.e. GJ1214)')
-ap.add_argument('-c', '--channel', required=True, type=str, help='Channel number string (i.e. ch1 or ch2)')
-ap.add_argument('-ad', '--aor_dir', required=True, type=str, help='AOR director (i.e. r59217921)')
-ap.add_argument('-pd', '--planets_dir', required=False, type=str, default='/Research/Planets/', help='Location of planet directory name from $HOME')
+ap.add_argument('-pn', '--planet_name', required=True, type=str, help='Directory Name for the Planet (i.e. GJ1214).')
+ap.add_argument('-c', '--channel', required=True, type=str, help='Channel number string (i.e. ch1 or ch2).')
+ap.add_argument('-ad', '--aor_dir', required=True, type=str, help='AOR director (i.e. r59217921).')
+ap.add_argument('-sd', '--save_sub_dir', required=False, type=str, default='ExtracedData', help='Subdirectory inside Planet_Directory to store extracted outputs.')
+ap.add_argument('-pd', '--planets_dir', required=False, type=str, default='/Research/Planets/', help='Location of planet directory name from $HOME.')
 ap.add_argument('-ds', '--data_sub_dir', required=False, type=str, default='/data/raw/', help='Sub directory structure from $HOME/Planet_Name/THIS/aor_dir/..')
-ap.add_argument('-dt', '--data_tail_dir', required=False, type=str, default='/big/', help='String inside AOR DIR')
-ap.add_argument('-ff', '--fits_format', required=False, type=str, default='bcd', help='Format of the fits files (i.e. bcd)')
-ap.add_argument('-uf', '--unc_format', required=False, type=str, default='bunc', help='Format of the photometric noise files (i.e. bcd)')
-ap.add_argument('-m', '--method', required=False, type=str, default='median', help='method for photmetric extraction (i.e. median)')
-ap.add_argument('-t', '--telescope', required=False, type=str, default='Spitzer', help='Telescope: [Spitzer, Hubble, JWST]')
-ap.add_argument('-ou', '--outputUnits', required=False, type=str, default='electrons', help='Units for the extracted photometry [electrons, muJ_per_Pixel, etc]')
-ap.add_argument('-d', '--data_dir', required=False, type=str, default='', help='Set location of all `bcd` and `bunc` files: bypass previous setup')
+ap.add_argument('-dt', '--data_tail_dir', required=False, type=str, default='/big/', help='String inside AOR DIR.')
+ap.add_argument('-ff', '--fits_format', required=False, type=str, default='bcd', help='Format of the fits files (i.e. bcd).')
+ap.add_argument('-uf', '--unc_format', required=False, type=str, default='bunc', help='Format of the photometric noise files (i.e. bcd).')
+ap.add_argument('-m', '--method', required=False, type=str, default='median', help='method for photmetric extraction (i.e. median).')
+ap.add_argument('-t', '--telescope', required=False, type=str, default='Spitzer', help='Telescope: [Spitzer, Hubble, JWST].')
+ap.add_argument('-ou', '--outputUnits', required=False, type=str, default='electrons', help='Units for the extracted photometry [electrons, muJ_per_Pixel, etc].')
+ap.add_argument('-d', '--data_dir', required=False, type=str, default='', help='Set location of all `bcd` and `bunc` files: bypass previous setup.')
 args = vars(ap.parse_args())
 
 planetName = args['planet_name']
@@ -241,12 +242,12 @@ if do_db_scan:
     example_wanderer_median.mp_DBScan_PLD_All()
 
 print('Saving `example_wanderer_median` to a set of pickles for various Image Cubes and the Storage Dictionary')
-savefiledir         = environ['HOME']+'/Research/Planets/'+planetName+'/ExtracedData/' + channel 
+savefiledir         = environ['HOME']+planetDirectory+planetName+'/ExtracedData/' + channel 
 saveFileNameHeader  = planetName+'_'+ AORNow +'_Median'
 saveFileType        = '.joblib.save'
 
-if not path.exists(environ['HOME']+'/Research/Planets/'+planetName+'/ExtracedData/'):
-    mkdir(environ['HOME']+'/Research/Planets/'+planetName+'/ExtracedData/')
+if not path.exists(environ['HOME']+planetDirectory+planetName+'/'+save_sub_dir+'/'):
+    mkdir(environ['HOME']+planetDirectory+planetName+'/'+save_sub_dir+'/'):
 
 if not path.exists(savefiledir):
     print('Creating ' + savefiledir)
