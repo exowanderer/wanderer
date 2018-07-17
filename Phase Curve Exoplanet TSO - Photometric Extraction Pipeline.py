@@ -245,7 +245,7 @@ if do_db_scan:
     example_wanderer_median.mp_DBScan_PLD_All()
 
 print('Saving `example_wanderer_median` to a set of pickles for various Image Cubes and the Storage Dictionary')
-savefiledir         = environ['HOME']+planetDirectory+planetName+'/ExtracedData/' + channel 
+savefiledir         = environ['HOME']+planetDirectory+planetName+'/' + save_sub_dir + '/' + channel 
 saveFileNameHeader  = planetName+'_'+ aor_dir +'_Median'
 saveFileType        = '.joblib.save'
 
