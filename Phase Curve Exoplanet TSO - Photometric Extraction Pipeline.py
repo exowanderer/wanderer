@@ -61,7 +61,7 @@ from statsmodels.robust        import scale
 from statsmodels.nonparametric import kde
 from sys                       import exit
 from time                      import time, localtime
-from tqdm                      import tqdm_notebook
+from tqdm                      import tqdm
 
 from numpy                     import zeros, nanmedian as median, nanmean as mean, nan
 from sys                       import exit
@@ -220,8 +220,8 @@ varRads            = [0.0, 0.25, 0.50, 0.75, 1.0, 1.25, 1.50]#[None]#
 vrad_dist = example_wanderer_median.quadrature_widths - np.median(example_wanderer_median.quadrature_widths)
 vrad_dist = clipOutlier2D(vrad_dist, nSig=5)
 
-for staticRad in tqdm_notebook(staticRads, total=len(staticRads), desc='Static'):
-    for varRad in tqdm_notebook(varRads, total=len(varRads), desc='Variable'):
+for staticRad in tqdm(staticRads, total=len(staticRads), desc='Static'):
+    for varRad in tqdm(varRads, total=len(varRads), desc='Variable'):
         startMPFlux = time()
         example_wanderer_median.mp_compute_flux_over_time_varRad(staticRad, varRad, centering_choices[0], background_choices[0], useTheForce=True)
 
