@@ -18,7 +18,7 @@ args = vars(ap.parse_args())
 
 planetName = args['planet_name']
 channel = args['channel']
-AORNow = args['aor_dir']
+aor_dir = args['aor_dir']
 planetDirectory = args['planets_dir']
 save_sub_dir = args['save_sub_dir']
 data_sub_dir = args['data_sub_dir']
@@ -106,7 +106,7 @@ print('Current Data Dir: {}'.format(data_dir))
 fileExt = '*{}.fits'.format(fits_format)
 uncsExt = '*{}.fits'.format(unc_format)
 
-loadfitsdir = data_dir + AORNow + '/' + channel + '/' + dataSub
+loadfitsdir = data_dir + aor_dir + '/' + channel + '/' + dataSub
 
 print('Directory to load fits files from: {}'.format(loadfitsdir))
 
@@ -145,7 +145,7 @@ print('Initialize an instance of `wanderer` as `example_wanderer_median`\n')
 example_wanderer_median = wanderer(fitsFileDir=loadfitsdir, filetype=filetype, telescope=telescope, 
                                             yguess=yguess, xguess=xguess, method=method, nCores=nCores)
 
-example_wanderer_median.AOR        = AORNow
+example_wanderer_median.AOR        = aor_dir
 example_wanderer_median.planetName = planetName
 example_wanderer_median.channel    = channel
 
@@ -244,7 +244,7 @@ if do_db_scan:
 
 print('Saving `example_wanderer_median` to a set of pickles for various Image Cubes and the Storage Dictionary')
 savefiledir         = environ['HOME']+planetDirectory+planetName+'/ExtracedData/' + channel 
-saveFileNameHeader  = planetName+'_'+ AORNow +'_Median'
+saveFileNameHeader  = planetName+'_'+ aor_dir +'_Median'
 saveFileType        = '.joblib.save'
 
 if not path.exists(environ['HOME']+planetDirectory+planetName+'/'+save_sub_dir+'/'):
