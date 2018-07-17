@@ -1232,7 +1232,7 @@ class wanderer(object):
         for key in self.save_dict.keys():
             exec("self." + key + " = self.save_dict['" + key + "']")
         
-    def save_data_to_save_files(self, savefiledir=None, saveFileNameHeader=None, saveFileType='.pickle.save', SaveMaster=True, SaveTime=True):
+    def save_data_to_save_files(self, savefiledir=None, saveFileNameHeader=None, saveFileType='.joblib.save', SaveMaster=True, SaveTime=True):
         """Class methods are similar to regular functions.
 
         Note:
@@ -1252,6 +1252,9 @@ class wanderer(object):
         
         if savefiledir is None:
             savefiledir = './'
+        
+        if savefiledir[-1] is not '/':
+            savefiledir = savefiledir + '/'
         
         if not path.exists(savefiledir):
             mkdir(savefiledir)
@@ -1280,10 +1283,14 @@ class wanderer(object):
         
         if SaveMaster:
             print('\nSaving to Master File -- Overwriting Previous Master')
-            self.centering_df.to_pickle(savefiledir  + saveFileNameHeader + '_centering_dataframe'  + saveFileType)
-            self.background_df.to_pickle(savefiledir + saveFileNameHeader + '_background_dataframe' + saveFileType)
-            self.flux_TSO_df.to_pickle(savefiledir   + saveFileNameHeader + '_flux_TSO_dataframe'   + saveFileType)
-        
+            # self.centering_df.to_pickle(savefiledir  + saveFileNameHeader + '_centering_dataframe'  + saveFileType)
+            # self.background_df.to_pickle(savefiledir + saveFileNameHeader + '_background_dataframe' + saveFileType)
+            # self.flux_TSO_df.to_pickle(savefiledir   + saveFileNameHeader + '_flux_TSO_dataframe'   + saveFileType)
+            
+            joblib.dump(self.centering_df, savefiledir  + saveFileNameHeader + '_centering_dataframe'  + saveFileType)
+            joblib.dump(self.background_df, savefiledir  + saveFileNameHeader + '_background_dataframe'  + saveFileType)
+            joblib.dump(self.flux_TSO_df, savefiledir  + saveFileNameHeader + '_flux_TSO_dataframe'  + saveFileType)
+            
             joblib.dump(self.imageCube, savefiledir  + saveFileNameHeader + '_image_cube_array' + saveFileType)
             joblib.dump(self.noiseCube, savefiledir  + saveFileNameHeader + '_noise_cube_array' + saveFileType)
             joblib.dump(self.timeCube , savefiledir  + saveFileNameHeader + '_time_cube_array'  + saveFileType)
@@ -1294,13 +1301,17 @@ class wanderer(object):
         
         if SaveTime:
             print('Saving to New TimeStamped File -- These Tend to Pile Up!')
-            self.centering_df.to_pickle(savefiledir + 'TimeStamped/' + saveFileNameHeader + '_centering_dataframe'  + saveFileTypeBak)
-            self.background_df.to_pickle(savefiledir + 'TimeStamped/' + saveFileNameHeader + '_background_dataframe' + saveFileTypeBak)
-            self.flux_TSO_df.to_pickle(savefiledir + 'TimeStamped/' + saveFileNameHeader + '_flux_TSO_dataframe'   + saveFileTypeBak)
-        
+            # self.centering_df.to_pickle(savefiledir + 'TimeStamped/' + saveFileNameHeader + '_centering_dataframe'  + saveFileTypeBak)
+            # self.background_df.to_pickle(savefiledir + 'TimeStamped/' + saveFileNameHeader + '_background_dataframe' + saveFileTypeBak)
+            # self.flux_TSO_df.to_pickle(savefiledir + 'TimeStamped/' + saveFileNameHeader + '_flux_TSO_dataframe'   + saveFileTypeBak)
+            
+            joblib.dump(self.centering_df, savefiledir + 'TimeStamped/' + saveFileNameHeader + '_centering_dataframe'  + saveFileTypeBak)
+            joblib.dump(self.background_df, savefiledir + 'TimeStamped/' + saveFileNameHeader + '_background_dataframe'  + saveFileTypeBak)
+            joblib.dump(self.flux_TSO_df, savefiledir + 'TimeStamped/' + saveFileNameHeader + '_flux_TSO_dataframe'  + saveFileTypeBak)
+            
             joblib.dump(self.imageCube, savefiledir + 'TimeStamped/' + saveFileNameHeader + '_image_cube_array' + saveFileTypeBak)
             joblib.dump(self.noiseCube, savefiledir + 'TimeStamped/' + saveFileNameHeader + '_noise_cube_array' + saveFileTypeBak)
-            joblib.dump(self.timeCube , savefiledir + 'TimeStamped/' + saveFileNameHeader + '_time_cube_array'  + saveFileTypeBak)
+            joblib.dump(self.timeCube, savefiledir + 'TimeStamped/' + saveFileNameHeader + '_time_cube_array'  + saveFileTypeBak)
         
             joblib.dump(self.imageBadPixMasks, savefiledir + 'TimeStamped/' + saveFileNameHeader + '_image_bad_pix_cube_array' + saveFileTypeBak)
         
