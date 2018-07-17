@@ -30,6 +30,7 @@ method = args['method']
 telescope = args['telescope']
 outputUnits = args['outputUnits']
 data_dir = args['data_dir']
+verbose = args['verbose']
 
 # from astroML.plotting          import hist
 from astropy.io                import fits
