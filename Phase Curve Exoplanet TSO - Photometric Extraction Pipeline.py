@@ -185,8 +185,8 @@ else:
 
 npix = 3
 
-stillOutliers = np.where(abs(example_wanderer_median.centering_GaussianFit - medGaussCenters) > 4*sclGaussCenterAvg)[0]
-print('There are {} outliers remaining'.format(len(stillOutliers)))
+# stillOutliers = np.where(abs(example_wanderer_median.centering_GaussianFit - medGaussCenters) > 4*sclGaussCenterAvg)[0]
+# print('There are {} outliers remaining'.format(len(stillOutliers)))
 
 if do_db_scan:
     dbsClean  = 0
