@@ -14,7 +14,7 @@ ap.add_argument('-m', '--method', required=False, type=str, default='median', he
 ap.add_argument('-t', '--telescope', required=False, type=str, default='Spitzer', help='Telescope: [Spitzer, Hubble, JWST].')
 ap.add_argument('-ou', '--outputUnits', required=False, type=str, default='electrons', help='Units for the extracted photometry [electrons, muJ_per_Pixel, etc].')
 ap.add_argument('-d', '--data_dir', required=False, type=str, default='', help='Set location of all `bcd` and `bunc` files: bypass previous setup.')
-ap.add_argument('-d', '--verbose', required=False, type=bool, default=False, help='Print out normally irrelevent things.')
+ap.add_argument('-v', '--verbose', required=False, type=bool, default=False, help='Print out normally irrelevent things.')
 args = vars(ap.parse_args())
 
 planetName = args['planet_name']
