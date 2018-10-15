@@ -1,4 +1,4 @@
-Copyright (c) 2018, Carlos Munoz, Jonathan Fraine, Kevin Stevenson
+Copyright (c) 2018, Jonathan Fraine
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without modification,
