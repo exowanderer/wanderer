@@ -1,15 +1,15 @@
 Documentation
 =============
 
-This is the documentation for SKYWALKER.
+This is the documentation for ExoplanetTSO.
 Spitzer Systematic Noise Decorrelation
 
 .. toctree::
   :maxdepth: 2
 
-  skywalker/index.rst
+  ExoplanetTSO/index.rst
 
 .. note:: The layout of this directory is simply a suggestion.  To follow
           traditional practice, do *not* edit this page, but instead place
-          all documentation for the package inside ``skywalker/``.
+          all documentation for the package inside ``ExoplanetTSO/``.
           You can follow this practice or choose your own layout.
