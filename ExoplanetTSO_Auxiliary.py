@@ -1,4 +1,4 @@
-from astroML.plotting          import hist
+# from astroML.plotting          import hist
 from astropy.io                import fits
 from astropy.modeling          import models, fitting
 from datetime                  import datetime
@@ -6,18 +6,18 @@ from functools                 import partial
 # from image_registration        import cross_correlation_shifts
 from glob                      import glob
 from lmfit                     import Model, Parameters
-from matplotlib.ticker         import MaxNLocator
-from matplotlib                import style, colors
+# from matplotlib.ticker         import MaxNLocator
+# from matplotlib                import style, colors
 from multiprocessing           import cpu_count, Pool
 from os                        import listdir, path, mkdir, chdir
 from pandas                    import DataFrame, Series, read_csv, read_pickle, scatter_matrix
 from photutils                 import CircularAperture, CircularAnnulus, aperture_photometry, findstars
 # from least_asymmetry.asym      import actr
-from pylab                     import ion, gcf, sort, linspace, indices, nanmedian as median, nanmean as mean, nanstd as std, empty, figure, transpose, ceil
-from pylab                     import concatenate, pi, sqrt, ones, diag, inf, rcParams, isnan, isfinite, array, nanmax, shape, zeros
+from numpy                     import sort, linspace, indices, nanmedian as median, nanmean as mean, nanstd as std, empty, transpose, ceil#ion, gcf, figure, 
+from numpy                     import concatenate, pi, sqrt, ones, diag, inf, isnan, isfinite, array, nanmax, shape, zeros#rcParams,
 from numpy                     import min as npmin, max as npmax, zeros, arange, sum, float, isnan, hstack, int32, exp, log
 from numpy                     import int32 as npint, round as npround, nansum as sum, std as std, where, bitwise_and, vstack
-from seaborn                   import *
+# from seaborn                   import *
 from scipy.special             import erf
 from scipy                     import stats
 from sklearn.cluster           import DBSCAN
@@ -38,9 +38,9 @@ from sys                       import exit
 
 import numpy as np
 
-rcParams['image.interpolation'] = 'None'
-rcParams['image.cmap']          = 'Blues_r'
-rcParams['axes.grid']           = False
+# rcParams['image.interpolation'] = 'None'
+# rcParams['image.cmap']          = 'Blues_r'
+# rcParams['axes.grid']           = False
 
 y,x = 0,1
 

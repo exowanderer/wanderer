@@ -48,8 +48,8 @@ from numpy                     import int32 as npint, round as npround, nansum a
 from os                        import environ, path, mkdir
 from pandas                    import DataFrame, read_csv, read_pickle, scatter_matrix
 from photutils                 import CircularAperture, CircularAnnulus, aperture_photometry, findstars
-from pylab                     import sort, linspace, indices, median, mean, std, empty, transpose, ceil
-from pylab                     import concatenate, pi, sqrt, ones, diag, inf, isnan, isfinite, array, nanmax
+from numpy                     import sort, linspace, indices, median, mean, std, empty, transpose, ceil
+from numpy                     import concatenate, pi, sqrt, ones, diag, inf, isnan, isfinite, array, nanmax
 # from pylab                     import gcf, ion, figure, plot, imshow, scatter, legend, rcParams
 # from seaborn                   import *
 from scipy.special             import erf
@@ -124,7 +124,7 @@ print('Found {} unc.fits files'.format(len(uncsFilenames)))
 if len(fitsFilenames) == 0: raise ValueError('There are NO `{}.fits` files in the directory {}'.format(fits_format, loadfitsdir))
 if len(uncsFilenames) == 0: raise ValueError('There are NO `{}.fits` files in the directory {}'.format(unc_format, loadfitsdir))
 
-do_db_scan = len(fitsFilenames*64) < 1e5
+do_db_scan = False# len(fitsFilenames*64) < 6e4
 if do_db_scan:
     pass
 else:
@@ -235,7 +235,7 @@ if do_db_scan:
     example_wanderer_median.mp_DBScan_Flux_All()
 
 print('Creating master Inliers Array')
-inlier_master = array(list(example_wanderer_median.inliers_Phots.values())).mean(axis=0) == 1.0
+# inlier_master = array(list(example_wanderer_median.inliers_Phots.values())).mean(axis=0) == 1.0
 
 print('Extracting PLD Components')
 example_wanderer_median.extract_PLD_components()

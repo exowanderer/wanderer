@@ -3,7 +3,7 @@
 
 # In[ ]:
 
-get_ipython().magic('matplotlib inline')
+# get_ipython().magic('matplotlib inline')
 
 from astroML.plotting          import hist
 from astropy.io                import fits
@@ -11,17 +11,17 @@ from astropy.modeling          import models, fitting
 from datetime                  import datetime
 from image_registration        import cross_correlation_shifts
 from glob                      import glob
-from matplotlib.ticker         import MaxNLocator
-from matplotlib                import style
+# from matplotlib.ticker         import MaxNLocator
+# from matplotlib                import style
 from os                        import listdir
 from pandas                    import DataFrame, read_csv, read_pickle, scatter_matrix
 from photutils                 import CircularAperture, CircularAnnulus, aperture_photometry, findstars
 from least_asymmetry           import actr, moments, fitgaussian
-from pylab                     import ion, gcf, sort, linspace, indices, median, mean, std, empty, figure, transpose, ceil
-from pylab                     import concatenate, pi, sqrt, ones, diag, inf, rcParams, isnan, isfinite, array, nanmax
+from numpy                     import sort, linspace, indices, median, mean, std, empty, transpose, ceil#ion, gcf, figure, 
+from numpy                     import concatenate, pi, sqrt, ones, diag, inf, isnan, isfinite, array, nanmax#rcParams,
 from numpy                     import min as npmin, max as npmax, zeros, arange, sum, float, isnan, hstack
 from numpy                     import int32 as npint, round as npround, nansum as sum, nanstd as std
-from seaborn                   import *
+# from seaborn                   import *
 from scipy.special             import erf
 from scipy                     import stats
 from sklearn.externals         import joblib
@@ -41,9 +41,9 @@ import numpy as np
 
 # In[ ]:
 
-rcParams['image.interpolation'] = 'None'
-rcParams['image.cmap']          = 'Blues_r'
-rcParams['axes.grid']           = False
+# rcParams['image.interpolation'] = 'None'
+# rcParams['image.cmap']          = 'Blues_r'
+# rcParams['axes.grid']           = False
 
 
 # In[ ]:
