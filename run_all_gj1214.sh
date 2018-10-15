@@ -1,4 +1,4 @@
-for filename in `ls $HOME/Research/Planets/GJ1214/data/raw/ch2/wand_did_it/`
+for filename in `ls $HOME/Research/Planets/GJ1214/data/raw/ch2/WHERE_THE_AOR_DIRs_EXIST/`
 do
 	echo $filename
 	python Phase\ Curve\ Exoplanet\ TSO\ -\ Photometric\ Extraction\ Pipeline.py	--aor_dir $filename \
