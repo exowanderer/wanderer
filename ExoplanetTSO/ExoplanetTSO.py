@@ -38,10 +38,6 @@ from sys                       import exit
 
 import numpy as np
 
-# rcParams['image.interpolation'] = 'None'
-# rcParams['image.cmap']          = 'Blues_r'
-# rcParams['axes.grid']           = False
-
 y,x = 0,1
 
 '''Start: From least_asymmetry.asym by N.Lust (github.com/natelust/least_asymmetry) and modified (reversed XY -> YX)'''
