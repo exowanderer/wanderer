@@ -1,89 +1,17 @@
 
 
-```python
-%reload_ext autoreload
-%load_ext autoreload
-%autoreload 2
-```
+** Wanderer is the Master Class for Exoplanet Time Series Observation Photometry**
 
 
 ```python
-%matplotlib inline
-from astroML.plotting          import hist
-from astropy.io                import fits
-from astropy.modeling          import models, fitting
-from datetime                  import datetime
-from image_registration        import cross_correlation_shifts
-from glob                      import glob
-from functools                 import partial
-from matplotlib.ticker         import MaxNLocator
-from matplotlib                import style
-from os                        import listdir
-# from least_asymmetry.asym      import actr, moments, fitgaussian
-from multiprocessing           import cpu_count, Pool
-from numpy                     import min as npmin, max as npmax, zeros, arange, sum, float, isnan, hstack
-from numpy                     import int32 as npint, round as npround, nansum as sum, nanstd as std
-from os                        import environ, path, mkdir
-from pandas                    import DataFrame, read_csv, read_pickle, scatter_matrix
-from photutils                 import CircularAperture, CircularAnnulus, aperture_photometry, findstars
-from pylab                     import ion, gcf, sort, linspace, indices, median, mean, std, empty, figure, transpose, ceil
-from pylab                     import concatenate, pi, sqrt, ones, diag, inf, rcParams, isnan, isfinite, array, nanmax
-from pylab                     import figure, plot, imshow, scatter, legend
-from seaborn                   import *
-from scipy.special             import erf
-from scipy                     import stats
-from sklearn.cluster           import DBSCAN
-from sklearn.externals         import joblib
-from sklearn.preprocessing     import StandardScaler
-from socket                    import gethostname
-from statsmodels.robust        import scale
-from statsmodels.nonparametric import kde
-from sys                       import exit
-from time                      import time, localtime
-from tqdm                      import tqdm_notebook
-
-from numpy                     import zeros, nanmedian as median, nanmean as mean, nan
-from sys                       import exit
-from sklearn.externals         import joblib
+from wanderer import wanderer
 
 import numpy as np
 ```
 
+In our example, Spitzer data is expected to be store in the directory structure:
 
-```python
-startFull = time()
-```
-
-**Master Class for Exoplanet Time Series Observation Photometry**
-
-
-```python
-from ExoplanetTSO.ExoplanetTSO import wanderer
-```
-
-
-```python
-def clipOutlier2D(arr2D, nSig=10):
-    arr2D     = arr2D.copy()
-    medArr2D  = median(arr2D,axis=0)
-    sclArr2D  = np.sqrt(((scale.mad(arr2D)**2.).sum()))
-    outliers  = abs(arr2D - medArr2D) >  nSig*sclArr2D
-    inliers   = abs(arr2D - medArr2D) <= nSig*sclArr2D
-    arr2D[outliers] = median(arr2D[inliers],axis=0)
-    return arr2D
-```
-
-
-```python
-rcParams['figure.dpi'] = 150
-rcParams['image.interpolation'] = 'None'
-rcParams['image.cmap']          = 'Blues_r'
-rcParams['axes.grid']           = False
-```
-
-As an example, Spitzer data is expected to be store in the directory structure:
-
-`$HOME/PLANET_DIRECTORY/PLANETNAME/data/raw/AORDIR/CHANNEL/bcd/`
+`$HOME/BASE_RESEARCH_DIRECTORY/PLANETNAME/data/raw/AORDIR/CHANNEL/bcd/`
 
 EXAMPLE:
 
@@ -94,21 +22,20 @@ EXAMPLE:
 5. Observed during AOR r11235813
 6. In CH2 (4.5 microns)
 
-The `loadfitsdir` should read as: `/home/tempuser/Research/Planets/HATP26/data/raw/r11235813/ch2/bcd/`
-
+For fun, we will call our planet HAPPY5: HApp Planet Population Yield 5  
+The `loadfitsdir` should read as: `/home/tempuser/Research/Planets/HAPPY5/data/raw/r11235813/ch2/bcd/`
 
 ```python
 from os import environ
 
-planetName      = 'HATP26'
-planetDirectory = '/Research/Planets/'
+planetName      = 'HAPPY5' # name of planet AND the directory where all planet files (fits, py, ipynb, joblib, etc) are stored
+planetDirectory = '/Research/Planets/' # location of the `HAPPY5` directory
 
-channel = 'ch2'
-# channel = 'ch2/'
+channel = 'ch2' # channel to use for "this" AOR -- must match subdirectory inside `HAPPY5` data/raw/$AOR/ directory
 
-dataSub = 'bcd/'
+dataSub = 'bcd/' # filetype -- must match subdirectory inside `HAPPY5` data/raw/$AOR/channel/ directory
 
-dataDir     = environ['HOME'] + planetDirectory + planetName + '/data/raw/' + channel + '/big/'
+dataDir     = environ['HOME'] + planetDirectory + planetName + '/data/raw/' + channel + '/' # trailing forward slash may not be necessary
 
 AORs = []
 for dirNow in glob(dataDir + '/*'):
@@ -117,46 +44,39 @@ for dirNow in glob(dataDir + '/*'):
 fileExt = '*bcd.fits'
 uncsExt = '*bunc.fits'
 
-print(dataDir)
+print(dataDir) # just to check that this is where you think it is
 ```
 
-
 ```python
-len(AORs)
-```
-
-
-```python
-iAOR        = 0 # Change this to 0,1,2,3,4,5,6,7 to "cycle" over the 8 AORs in the base directory /home/tempuser/Research/Planets/HATP26/data/raw/
+iAOR        = 0 # Change this to 0,1,2,3,...,N to "cycle" over the N AORs in the base directory /home/tempuser/Research/Planets/HAPPY5/data/raw/
 AORNow      = AORs[iAOR] # This will flag an error if no AORs were found in the directory `dataDir`
 loadfitsdir = dataDir + AORNow + '/' + channel + '/' + dataSub
-print(loadfitsdir)
+print(loadfitsdir) # just to make sure this [directory] means what you think it means
 ```
 
 
+Set to max for multiprocessing: use cpu_count() - 1 if you want to use your computer at the same time.
 ```python
 nCores = cpu_count()
 ```
 
-
+Check that the files exist in the directory by printing out the number of each file (unc = uncertainty)
 ```python
 fitsFilenames = glob(loadfitsdir + fileExt);print(len(fitsFilenames))
 uncsFilenames = glob(loadfitsdir + uncsExt);print(len(uncsFilenames))
 ```
 
-
+Check the first header in the list of files to make sure it's the data you were expecting
 ```python
 header_test = fits.getheader(fitsFilenames[0])
 print('AORLABEL:\t{}\nNum Fits Files:\t{}\nNum Unc Files:\t{}'.format\
           (header_test['AORLABEL'], len(fitsFilenames), len(uncsFilenames)))
 ```
-fitsFilenamesuncsFilenames
+
 # Load ExoplanetTSO Class
 
-Necessary Constants Spitzer
+Necessary Constants Spitzer (subarray with 32x32 pixels; center = 15,15)
 ---
-
-
 ```python
 ppm             = 1e6
 y,x             = 0,1
@@ -167,8 +87,6 @@ filetype        = 'bcd.fits' # Specific to Spitzer Basic Calibrated Data
 
 Start a New Instance with Median for the Metric
 ---
-
-
 ```python
 method = 'median'
 
