@@ -1,6 +1,6 @@
 
 
-** Wanderer is the Master Class for Exoplanet Time Series Observation Photometry**
+# Wanderer is the Master Class for Exoplanet Time Series Observation Photometry
 
 
 ```python
@@ -121,16 +121,14 @@ print('Find, flag, and NaN the "Bad Pixels" Outliers' + '\n')
 example_wanderer_median.find_bad_pixels()
 ```
 
-Flux Weighted Centroiding -- just to say we tried it
-
+Flux Weighted Centroiding -- some people like this one
 
 ```python
 print('Fit for All Centers: Flux Weighted, Gaussian Fitting, Gaussian Moments, Least Asymmetry' + '\n')
 example_wanderer_median.fit_flux_weighted_centering()
 ```
 
-Gaussian centroid fitting -- the most widely used version
-
+Gaussian centroid fitting -- this is the most widely used centroiding method
 
 ```python
 start = time()
@@ -139,8 +137,6 @@ print('Operation took {} seconds with {} cores'.format(time()-start, example_wan
 ```
 
 Compute the sigma-clipping outliers for plotting purpose
-
-
 ```python
 nSig       = 10.1
 medY       = median(example_wanderer_median.centering_GaussianFit.T[y])
@@ -155,8 +151,6 @@ outliers   = (((example_wanderer_median.centering_GaussianFit.T[y] - medY)/(ySig
 ```
 
 Plot the inliers (blue) vs outliers (not blue)
-
-
 ```python
 ax = figure().add_subplot(111)
 cx, cy = example_wanderer_median.centering_GaussianFit.T[x],example_wanderer_median.centering_GaussianFit.T[y]
@@ -168,14 +162,12 @@ ax.set_ylim(medY-nSig*stdY,medY+nSig*stdY)
 ```
 
 Use advanced clustering algorithms (DBSCAN) to determine the inliers vs outliers
-
-
 ```python
 dbs     = DBSCAN(n_jobs=-1, eps=0.2, leaf_size=10)
 dbsPred = dbs.fit_predict(example_wanderer_median.centering_GaussianFit)
 ```
 
-
+Check over the clusteres to see the population of each 
 ```python
 dbs_options = [k for k in range(-1,100) if (dbsPred==k).sum()]
 ```
