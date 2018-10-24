@@ -1,6 +1,6 @@
 
 
-# Wanderer is the Master Class for Exoplanet Time Series Observation Photometry
+# Wanderer for Exoplanet Time Series Observation Photometry
 
 
 ```python
