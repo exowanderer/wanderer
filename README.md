@@ -1,50 +1,13 @@
-# ExoplanetTSO
-# Exoplanet Photometric Analysis for Time Series Observations
----
 
-Many ground and space telescopes missions contain the capacity to perform photometric time series observations.  
-In order to process that data, it is important to identify the host star, accurately estimate it's PSF (point spread function) center -- for all images in the time series.
-
-**METHOD**
-
-1. Develop a single routine that inputs 
-    1. Directory name with fits files to generate the image array from both Spitzer and JWST-NIRCam
-    2. Type of files using the file extension
-    3. The expected location of the star (center of frame is default)
-    4. Subframe size (for better estimation during center fitting)
-    5. List of aperture radii (or a float for a single aperture radii)
-    6. Method of measuring the backgrounds and/or clipping algorithms (mean or median)
-2. This routine will load all files that match the specific extension given in (1.2) above
-3. For each fits file:
-    1. Load the data.
-    2. Compute the time element (varies between Spiter and JWST) 
-    3. Subtract the background (store background level)
-        1. use mean/median full frame, mean/median outside a circle, mean/median from annulus, mean/median from median mask
-    4. Isolate the star into a subframe
-    5. Fit the center to this subframe, starting at guessed center:
-        1. use Gaussian Moments, Gaussian Fits, Flux Weighted, Least Asymmetry centering methods
-    6. Perform aperture photometry with each radius, looped over with both static and variable aperture radii
-    7. Store aperture photometry vs aperture radii
-
-This routine ensures that the user can manipulate the inputs as needed. Users can either send a single fits array, a set of fits array, a single string with the location of the fits files.
-
-The result will be an instance of the `wanderer` class, containing (labeled as instance.values) the 
-- 'sky background'
-- 'gaussian center'
-- 'gaussian width'
-- 'gaussian ampitude'
-- 'aperture photometry dataframe'
-    - the keys to the aperture photometry Dataframe will be a string corresponding to CENTERING_BACKGROUND_STATIC_VARIABLE
-- 'time' (in in MJD)
-
-===
-Jupyter Notebook Re-written in Markdown
-===
-Load All Necessary Libraries and Functions
----
 
 ```python
-# Matplotlib for Plotting
+%reload_ext autoreload
+%load_ext autoreload
+%autoreload 2
+```
+
+
+```python
 %matplotlib inline
 from astroML.plotting          import hist
 from astropy.io                import fits
@@ -52,119 +15,624 @@ from astropy.modeling          import models, fitting
 from datetime                  import datetime
 from image_registration        import cross_correlation_shifts
 from glob                      import glob
+from functools                 import partial
 from matplotlib.ticker         import MaxNLocator
 from matplotlib                import style
 from os                        import listdir
-from pandas                    import DataFrame, read_csv, read_pickle, scatter_matrix
-from photutils                 import CircularAperture, CircularAnnulus, aperture_photometry, findstars
-from least_asymmetry           import actr, moments, fitgaussian
-from pylab                     import ion, gcf, sort, linspace, indices, median, mean, std, empty, figure, transpose, ceil
-from pylab                     import concatenate, pi, sqrt, ones, diag, inf, rcParams, isnan, isfinite, array, nanmax
+# from least_asymmetry.asym      import actr, moments, fitgaussian
+from multiprocessing           import cpu_count, Pool
 from numpy                     import min as npmin, max as npmax, zeros, arange, sum, float, isnan, hstack
 from numpy                     import int32 as npint, round as npround, nansum as sum, nanstd as std
+from os                        import environ, path, mkdir
+from pandas                    import DataFrame, read_csv, read_pickle, scatter_matrix
+from photutils                 import CircularAperture, CircularAnnulus, aperture_photometry, findstars
+from pylab                     import ion, gcf, sort, linspace, indices, median, mean, std, empty, figure, transpose, ceil
+from pylab                     import concatenate, pi, sqrt, ones, diag, inf, rcParams, isnan, isfinite, array, nanmax
+from pylab                     import figure, plot, imshow, scatter, legend
 from seaborn                   import *
 from scipy.special             import erf
 from scipy                     import stats
+from sklearn.cluster           import DBSCAN
 from sklearn.externals         import joblib
+from sklearn.preprocessing     import StandardScaler
 from socket                    import gethostname
 from statsmodels.robust        import scale
 from statsmodels.nonparametric import kde
 from sys                       import exit
 from time                      import time, localtime
+from tqdm                      import tqdm_notebook
 
 from numpy                     import zeros, nanmedian as median, nanmean as mean, nan
 from sys                       import exit
 from sklearn.externals         import joblib
-from least_asymmetry           import actr
 
 import numpy as np
-
-style.use('fivethirtyeight')
 ```
 
-This is an example input for the requests below. The directory contains a collection of fits files within it
 
-'/path/to/fits/files/'
+```python
+startFull = time()
+```
 
+**Master Class for Exoplanet Time Series Observation Photometry**
+
+
+```python
+from ExoplanetTSO.ExoplanetTSO import wanderer
+```
+
+
+```python
+def clipOutlier2D(arr2D, nSig=10):
+    arr2D     = arr2D.copy()
+    medArr2D  = median(arr2D,axis=0)
+    sclArr2D  = np.sqrt(((scale.mad(arr2D)**2.).sum()))
+    outliers  = abs(arr2D - medArr2D) >  nSig*sclArr2D
+    inliers   = abs(arr2D - medArr2D) <= nSig*sclArr2D
+    arr2D[outliers] = median(arr2D[inliers],axis=0)
+    return arr2D
+```
+
+
+```python
+rcParams['figure.dpi'] = 150
+rcParams['image.interpolation'] = 'None'
+rcParams['image.cmap']          = 'Blues_r'
+rcParams['axes.grid']           = False
+```
+
+As an example, Spitzer data is expected to be store in the directory structure:
+
+`$HOME/PLANET_DIRECTORY/PLANETNAME/data/raw/AORDIR/CHANNEL/bcd/`
+
+EXAMPLE:
+
+1. On a Linux machine
+2. With user `tempuser`,
+3. And all Spitzer data is store in `Research/Planets`
+4. The planet named `Happy-5b`
+5. Observed during AOR r11235813
+6. In CH2 (4.5 microns)
+
+The `loadfitsdir` should read as: `/home/tempuser/Research/Planets/HATP26/data/raw/r11235813/ch2/bcd/`
+
+
+```python
+from os import environ
+
+planetName      = 'HATP26'
+planetDirectory = '/Research/Planets/'
+
+channel = 'ch2'
+# channel = 'ch2/'
+
+dataSub = 'bcd/'
+
+dataDir     = environ['HOME'] + planetDirectory + planetName + '/data/raw/' + channel + '/big/'
+
+AORs = []
+for dirNow in glob(dataDir + '/*'):
+    AORs.append(dirNow.split('/')[-1])
+
+fileExt = '*bcd.fits'
+uncsExt = '*bunc.fits'
+
+print(dataDir)
+```
+
+
+```python
+len(AORs)
+```
+
+
+```python
+iAOR        = 0 # Change this to 0,1,2,3,4,5,6,7 to "cycle" over the 8 AORs in the base directory /home/tempuser/Research/Planets/HATP26/data/raw/
+AORNow      = AORs[iAOR] # This will flag an error if no AORs were found in the directory `dataDir`
+loadfitsdir = dataDir + AORNow + '/' + channel + '/' + dataSub
+print(loadfitsdir)
+```
+
+
+```python
+nCores = cpu_count()
+```
+
+
+```python
+fitsFilenames = glob(loadfitsdir + fileExt);print(len(fitsFilenames))
+uncsFilenames = glob(loadfitsdir + uncsExt);print(len(uncsFilenames))
+```
+
+
+```python
+header_test = fits.getheader(fitsFilenames[0])
+print('AORLABEL:\t{}\nNum Fits Files:\t{}\nNum Unc Files:\t{}'.format\
+          (header_test['AORLABEL'], len(fitsFilenames), len(uncsFilenames)))
+```
+fitsFilenamesuncsFilenames
+# Load ExoplanetTSO Class
+
+Necessary Constants Spitzer
 ---
 
-This function is a wrapper for `julian_date` in the `jd.py` package (soon to be converted to `julian_date.py` package.
-It's utility is in taking in the time stamps from the headers and converting them to the julian date; to be saved in the 'master' data frame below.
 
-**Load Saved Data from the Wanderer Class**
 ```python
-method    = 'median'
-midFrame  = frameSize//2 # We need to know frameSize ahead of time
-yguess    = midFrame     # We assume that the stellar PSF is in the center of the frame
-xguess    = midFrame     # We assume that the stellar PSF is in the center of the frame
+ppm             = 1e6
+y,x             = 0,1
 
-dataDir     = '/path/to/fits/files/main/directory/'
-fitsFileDir = 'path/to/fits/subdirectories/'
-
-loadfitsdir = dataDir + fitsFileDir
-
-example_wanderer_median = wanderer(fitsFileDir=loadfitsdir, filetype=filetype, 
-                                            yguess=yguess, xguess=xguess, method=method)
-
-print('Loading a saved instance of `wanderer` as `example_wanderer_median`\n')
-example_wanderer_median.load_data_from_save_files(savefiledir='./SaveFiles/', saveFileNameHeader='Example_Wanderer_Median_', saveFileType='.pickle.save')
+yguess, xguess  = 15., 15.   # Specific to Spitzer circa 2010 and beyond
+filetype        = 'bcd.fits' # Specific to Spitzer Basic Calibrated Data
 ```
 
-**Start from Scratch with the Wanderer Class**
+Start a New Instance with Median for the Metric
+---
+
+
 ```python
-method    = 'median'
-midFrame  = frameSize//2 # We need to know frameSize ahead of time
-yguess    = midFrame     # We assume that the stellar PSF is in the center of the frame
-xguess    = midFrame     # We assume that the stellar PSF is in the center of the frame
+method = 'median'
 
-dataDir     = '/path/to/fits/files/main/directory/'
-fitsFileDir = 'path/to/fits/subdirectories/'
+print('Initialize an instance of `wanderer` as `example_wanderer_median`\n')
+example_wanderer_median = wanderer(fitsFileDir=loadfitsdir, filetype=filetype, telescope='Spitzer', 
+                                            yguess=yguess, xguess=xguess, method=method, nCores=nCores)
 
-loadfitsdir = dataDir + fitsFileDir
+example_wanderer_median.AOR        = AORNow
+example_wanderer_median.planetName = planetName
+example_wanderer_median.channel    = channel
+```
 
-print('Initializing an instance of `wanderer` as `example_wanderer_median`\n')
-example_wanderer_median = wanderer(fitsFileDir=loadfitsdir, filetype=filetype, 
-                                            yguess=yguess, xguess=xguess, method=method)
 
+```python
 print('Load Data From Fits Files in ' + loadfitsdir + '\n')
-example_wanderer_median.load_data_from_fits_files()
+example_wanderer_median.spitzer_load_fits_file(outputUnits='electrons')#(outputUnits='muJ_per_Pixel')
+```
 
-print('Skipping Load Data From Save Files in ' + loadfitsdir + '\n')
-# example_wanderer_median.load_data_from_save_files()
+**Double check for NaNs**
 
+
+```python
+example_wanderer_median.imageCube[np.where(isnan(example_wanderer_median.imageCube))] = \
+                                                    np.nanmedian(example_wanderer_median.imageCube)
+```
+
+**Identifier Strong Outliers**
+
+
+```python
 print('Find, flag, and NaN the "Bad Pixels" Outliers' + '\n')
 example_wanderer_median.find_bad_pixels()
-
-print('Fit for All Centers: Flux Weighted, Gaussian Fitting, Gaussian Moments, Least Asymmetry' + '\n')
-example_wanderer_median.mp_lmfit_gaussian_fitting_centering()
-example_wanderer_median.fit_flux_weighted_centering()
-# example_wanderer_median.fit_least_asymmetry_centering()
-# example_wanderer_median.fit_all_centering()
-
-print('Measure Background Estimates with All Methods: Circle Masked, Annular Masked, KDE Mode, Median Masked' + '\n')
-# example_wanderer_median.measure_background_circle_masked()
-# example_wanderer_median.measure_background_annular_mask()
-# example_wanderer_median.measure_background_KDE_Mode()
-# example_wanderer_median.measure_background_median_masked()
-example_wanderer_median.measure_all_background()
-
-print('Iterating over Background Techniques, Centering Techniques, Aperture Radii' + '\n')
-background_choices = example_wanderer_median.background_df.columns
-centering_choices  = ['Gaussian_Fit', 'Gaussian_Mom', 'FluxWeighted', 'LeastAsymmetry']
-aperRads           = np.arange(1, 100.5,0.5)
-
-start = time()
-for bgNow in background_choices:
-    for ctrNow in centering_choices:
-        for aperRad in aperRads:
-            print('Working on Background ' + bgNow + ' with Centering ' + ctrNow + ' and AperRad ' + str(aperRad), end=" ")
-            example_wanderer_median.compute_flux_over_time(aperRad=aperRad, centering=ctrNow, background=bgNow)
-            flux_key_now  = ctrNow + '_' + bgNow+'_' + 'rad' + '_' + str(aperRad)
-            print(std(example_wanderer_median.flux_TSO_df[flux_key_now] / median(example_wanderer_median.flux_TSO_df[flux_key_now]))*ppm)
-
-print('Operation took: ', time()-start)
-
-print('Saving `example_wanderer_median` to a set of pickles for various Image Cubes and the Storage Dictionary')
-example_wanderer_median.save_data_to_save_files(savefiledir='./SaveFiles/', saveFileNameHeader='Example_Wanderer_Median_', saveFileType='.pickle.save')
-
 ```
+
+Flux Weighted Centroiding -- just to say we tried it
+
+
+```python
+print('Fit for All Centers: Flux Weighted, Gaussian Fitting, Gaussian Moments, Least Asymmetry' + '\n')
+example_wanderer_median.fit_flux_weighted_centering()
+```
+
+Gaussian centroid fitting -- the most widely used version
+
+
+```python
+start = time()
+example_wanderer_median.mp_lmfit_gaussian_centering(subArraySize=6, recheckMethod=None, median_crop=False)
+print('Operation took {} seconds with {} cores'.format(time()-start, example_wanderer_median.nCores))
+```
+
+Compute the sigma-clipping outliers for plotting purpose
+
+
+```python
+nSig       = 10.1
+medY       = median(example_wanderer_median.centering_GaussianFit.T[y])
+medX       = median(example_wanderer_median.centering_GaussianFit.T[x])
+stdY       = std(example_wanderer_median.centering_GaussianFit.T[y])
+stdX       = std(example_wanderer_median.centering_GaussianFit.T[x])
+
+ySig = 4
+xSig = 4
+outliers   = (((example_wanderer_median.centering_GaussianFit.T[y] - medY)/(ySig*stdY))**2 + \
+              ((example_wanderer_median.centering_GaussianFit.T[x] - medX)/(xSig*stdX))**2) > 1
+```
+
+Plot the inliers (blue) vs outliers (not blue)
+
+
+```python
+ax = figure().add_subplot(111)
+cx, cy = example_wanderer_median.centering_GaussianFit.T[x],example_wanderer_median.centering_GaussianFit.T[y]
+ax.plot(cx,cy,'.',ms=1)
+ax.plot(cx[outliers],cy[outliers],'.',ms=1)
+# ax.plot(median(cx), median(cy),'ro',ms=1)
+ax.set_xlim(medX-nSig*stdX,medX+nSig*stdX)
+ax.set_ylim(medY-nSig*stdY,medY+nSig*stdY)
+```
+
+Use advanced clustering algorithms (DBSCAN) to determine the inliers vs outliers
+
+
+```python
+dbs     = DBSCAN(n_jobs=-1, eps=0.2, leaf_size=10)
+dbsPred = dbs.fit_predict(example_wanderer_median.centering_GaussianFit)
+```
+
+
+```python
+dbs_options = [k for k in range(-1,100) if (dbsPred==k).sum()]
+```
+
+Plot the full extent of the data to show that DBSCAN was able to identify the inliers correctly
+
+
+```python
+fig = figure(figsize=(6,6))
+ax  = fig.add_subplot(111)
+
+medGaussCenters   = median(example_wanderer_median.centering_GaussianFit,axis=0)
+sclGaussCenters   = scale.mad(example_wanderer_median.centering_GaussianFit)
+sclGaussCenterAvg = np.sqrt(((sclGaussCenters**2.).sum()))
+
+yctrs = example_wanderer_median.centering_GaussianFit.T[y]
+xctrs = example_wanderer_median.centering_GaussianFit.T[x]
+
+nSigmas         = 5
+for nSig in linspace(1,10,10):
+    CircularAperture(medGaussCenters[::-1],nSig*sclGaussCenterAvg).plot(ax=ax)
+
+for dbsOpt in dbs_options:
+    ax.plot(xctrs[dbsPred==dbsOpt], yctrs[dbsPred==dbsOpt],'.',zorder=0, ms=1)
+```
+
+Make sure that there are only a handful (<< 1%) of outliers
+
+
+```python
+npix = 3
+
+stillOutliers = np.where(abs(example_wanderer_median.centering_GaussianFit - medGaussCenters) > 4*sclGaussCenterAvg)[0]
+print(len(stillOutliers))
+```
+
+Select the "class" dbsClean == 0 for the `inliers`
+
+
+```python
+dbsClean  = 0
+dbsKeep   = (dbsPred == dbsClean)
+```
+
+
+```python
+nCores = example_wanderer_median.nCores
+start = time()
+example_wanderer_median.mp_measure_background_annular_mask()
+print('AnnularBG took {} seconds with {} cores'.format(time() - start, nCores))
+```
+
+Plot the background to make sure that the (to be subtracted) flux is stable overtime
+
+
+```python
+fig = figure(figsize=(20,10))
+ax  = fig.add_subplot(111)
+ax.plot(example_wanderer_median.timeCube, example_wanderer_median.background_CircleMask,'.',alpha=0.2)
+ax.plot(example_wanderer_median.timeCube, example_wanderer_median.background_Annulus,'.',alpha=0.2)
+ax.plot(example_wanderer_median.timeCube, example_wanderer_median.background_MedianMask,'.',alpha=0.2)
+ax.plot(example_wanderer_median.timeCube, example_wanderer_median.background_KDEUniv,'.',alpha=0.2)
+ax.axvline(example_wanderer_median.timeCube.min()-.01+0.02)
+ax.set_ylim(-25,100)
+```
+
+Compute the `effective widths` of each image to use later as the "beta pixels" and "optimal apertures"
+
+
+```python
+example_wanderer_median.measure_effective_width()
+print(example_wanderer_median.effective_widths.mean(), sqrt(example_wanderer_median.effective_widths).mean())
+```
+
+
+```python
+print('Pipeline took {} seconds thus far'.format(time() - startFull))
+```
+
+Compute the time series with static aperture radii only
+
+
+```python
+print('Iterating over Background Techniques, Centering Techniques, Aperture Radii' + '\n')
+centering_choices  = ['Gaussian_Fit']#, 'Gaussian_Mom', 'FluxWeighted']#, 'LeastAsymmetry']
+background_choices = ['AnnularMask']#example_wanderer_median.background_df.columns
+staticRads         = np.arange(1, 6,0.5)#[1.0 ]# aperRads = np.arange(1, 6,0.5)
+
+for staticRad in tqdm_notebook(staticRads, total=len(staticRads), desc='Static'):
+    example_wanderer_median.mp_compute_flux_over_time_varRad(staticRad, varRad=None, centering_choices[0], background_choices[0], useTheForce=True)
+```
+
+Create Beta Variable Radius
+
+
+```python
+example_wanderer_median.mp_compute_flux_over_time_betaRad()
+```
+
+
+```python
+print('Entire Pipeline took {} seconds'.format(time() - startFull))
+```
+
+Use Advanced clustering algorithms `DBSCAN` to compute the outliers of the flux distribution. This is sensitive the structure in the data (i.e. transit vs outlier), which is not always true with sigma-clipping.
+
+
+```python
+example_wanderer_median.mp_DBScan_Flux_All()
+```
+
+Check that the majority of data is an `inlier`
+
+
+```python
+inlier_master = array(list(example_wanderer_median.inliers_Phots.values())).mean(axis=0) == 1.0
+```
+
+
+```python
+((~inlier_master).sum() / inlier_master.size)*100
+```
+
+Compute the PLD components -- normalized and store the PLD vectors
+
+
+```python
+example_wanderer_median.extract_PLD_components()
+```
+
+Use Advanced clustering algorithms `DBSCAN` to compute the outliers of the PLD distributions.
+
+
+```python
+example_wanderer_median.mp_DBScan_PLD_All()
+```
+
+# Save all of your progress per AOR
+
+
+```python
+print('Saving `example_wanderer_median` to a set of pickles for various Image Cubes and the Storage Dictionary')
+
+savefiledir         = environ['HOME']+'/Research/Planets/'+planetName+'/ExtracedData/' + channel 
+saveFileNameHeader  = planetName+'_'+ AORNow +'_Median'
+saveFileType        = '.joblib.save'
+
+if not path.exists(environ['HOME']+'/Research/Planets/'+planetName+'/ExtracedData/'):
+    mkdir(environ['HOME']+'/Research/Planets/'+planetName+'/ExtracedData/')
+
+if not path.exists(savefiledir):
+    print('Creating ' + savefiledir)
+    mkdir(savefiledir)
+
+print()
+print('Saving to ' + savefiledir + saveFileNameHeader + saveFileType)
+print()
+
+example_wanderer_median.save_data_to_save_files(savefiledir=savefiledir, \
+                                                saveFileNameHeader=saveFileNameHeader, \
+                                                saveFileType=saveFileType)
+```
+
+Compute the RMS in the raw data as a function of the apeture radius
+
+
+```python
+color_cycle = rcParams['axes.prop_cycle'].by_key()['color']
+
+ax = figure().add_subplot(111)
+for key in example_wanderer_median.flux_TSO_df.keys():
+    aperRad = float(key.split('_')[-2])
+    ax.scatter(aperRad, scale.mad(np.diff(example_wanderer_median.flux_TSO_df[key])), color=color_cycle[0])
+
+ax.set_xlabel('Aperture Radius')
+ax.set_ylabel('MAD( Diff ( Flux ) )')
+```
+
+
+```python
+print('Entire Pipeline took {} seconds'.format(time() - startFull))
+```
+
+# Convert Wanderer output to Skywalker input
+
+# I made up this loop and did not test it
+
+Keys for `skywalker` input
+
+
+```python
+flux_key = 'phots'
+time_key = 'times'
+flux_err_key = 'noise'
+eff_width_key = 'npix'
+pld_coeff_key = 'pld'
+ycenter_key = 'ycenters'
+xcenter_key = 'xcenters'
+ywidth_key = 'ywidths'
+xwidth_key = 'xwidths'
+```
+
+Things that **DON'T** change with respect to aperture radii
+
+
+```python
+timeCube = example_wanderer_median.timeCube
+phots_array = example_wanderer_median.flux_TSO_df.values
+PLDFeatures = example_wanderer_median.PLD_components.T
+
+try:
+    inliers_Phots = example_wanderer_median.inliers_Phots.values()
+except:
+    inliers_Phots = np.ones(photsLocal.shape)
+
+try:
+    inliers_PLD = example_wanderer_median.inliers_PLD.values()
+except:
+    inliers_PLD = np.ones(PLDFeatureLocal.shape)
+
+inliersMaster = array(list(inliers_Phots)).all(axis=0) # Need to Switch `axis=0` for Qatar-2
+inliersMaster = inliersMaster * inliers_PLD.all(axis=1)
+
+nSig = 6 # vary this as desired for 3D sigma clipping double check
+
+ypos, xpos = clipOutlier2D(transpose([example_wanderer_median.centering_GaussianFit.T[y][inliersMaster], \
+                                           example_wanderer_median.centering_GaussianFit.T[x][inliersMaster]])).T
+
+npix = sqrt(example_wanderer_median.effective_widths[inliersMaster])
+time_c = timeCube[inliersMaster]
+ywidths_c, xwidths_c = example_wanderer_median.widths_GaussianFit[inliersMaster].T
+pld_comp_c = example_wanderer_median.PLD_components.T # this is new to Carlos's notebook instance
+pld_output_c = np.array(list([time_c]) + list(pld_comp_c))
+```
+
+Things that **DO** change with respect to aperture radii
+
+
+```python
+for phot_select, key_flux_now in tqdm(enumerate(example_wanderer_median.flux_TSO_df.keys())):
+    if key_flux_now[-3:] == 0.0: # only do static radii
+        flux_c = example_wanderer_median.flux_TSO_df[key_flux_now].values[inliersMaster]
+        noise_c = example_wanderer_median.noise_TSO_df[key_flux_now].values[inliersMaster]
+        
+        output_dict = {time_key: time_c, 
+                       flux_key: flux_c, 
+                       flux_err_key: noise_c, 
+                       eff_width_key: npix_c, 
+                       xcenter_key: xpos_c, 
+                       ycenter_key: ypos_c, 
+                       xwidth_key: xwidth_c, 
+                       ywidth_key: ywidth_c, 
+                       pld_coeff_key: pld_comp_c}
+        
+        # This creates 1 joblib output file for one static aperture radius -- need to be cycled from above: change `staticRad = '2.5'` to new radius
+        joblib.dump(output_dict, '{}_full_output_for_skywalker_pipeline_{}_{}_{}.joblib.save'.format(planet_dir_name, channel, staticRad, varRad))
+```
+
+### The following code is a copy/paste from a different notebook of mine.
+
+This is the code I used to make the for loop above  
+If the for loop does not work, try / check this
+
+
+```python
+timeCube = example_wanderer_median.timeCube
+phots_array = example_wanderer_median.flux_TSO_df.values
+PLDFeatures = example_wanderer_median.PLD_components.T
+
+try:
+    inliers_Phots = example_wanderer_median.inliers_Phots.values()
+except:
+    inliers_Phots = np.ones(photsLocal.shape)
+
+try:
+    inliers_PLD = example_wanderer_median.inliers_PLD.values()
+except:
+    inliers_PLD = np.ones(PLDFeatureLocal.shape)
+```
+
+
+```python
+# Gaussian_Fit_AnnularMask_rad_2.5_0.0
+
+staticRad = '2.5' # Need to cycle over all possible values here: [1.0, 1.5, 2.0, ..., 5.5]
+varRad = '0.0'
+key_flux_now = 'Gaussian_Fit_AnnularMask_rad_'+staticRad+'_'+varRad
+phot_select = np.where(example_wanderer_median.flux_TSO_df.keys() == key_flux_now)[0][0]
+```
+
+
+```python
+inliersMaster = array(list(inliers_Phots)).all(axis=0) # Need to Switch `axis=0` for Qatar-2
+inliersMaster = inliersMaster * inliers_PLD.all(axis=1)
+```
+
+
+```python
+nSig = 6 # vary this as desired
+
+if inliersMaster.all():
+    # If inliersMaster keeps ALL values, then double check with 3D inlier flagging
+    print('Working on AOR {}'.format(AORNow))
+    cy_now, cx_now        = example_wanderer_median.centering_GaussianFit.T
+    phots_now             = phots_array[:,phot_select]
+    
+    phots_clipped         = clipOutlier2D(phots_now, nSig=nSig)
+    cy_clipped, cx_clipped= clipOutlier2D(transpose([cy_now, cx_now]),nSig=nSig).T
+    arr2D_clipped         = transpose([phots_clipped, cy_clipped, cx_clipped])
+    
+    # 3D inlier selection
+    inliersMaster = (phots_clipped == phots_now)*(cy_clipped==cy_now)*(cx_clipped==cx_now)
+else:
+    print("this box is just to double check -- keeping all inlier flags from above"
+```
+
+
+```python
+ypos, xpos = clipOutlier2D(transpose([example_wanderer_median.centering_GaussianFit.T[y][inliersMaster], \
+                                           example_wanderer_median.centering_GaussianFit.T[x][inliersMaster]])).T
+
+npix = sqrt(example_wanderer_median.effective_widths[inliersMaster])
+```
+
+
+```python
+flux_c = phots_array[:, phot_select][inliersMaster]
+
+# noise_c = np.sqrt(flux_c) # Photon limit
+noise_c = example_wanderer_median.noise_TSO_df[key_flux_now].values[inliersMaster]
+
+time_c = timeCube[inliersMaster]
+
+ywidths_c, xwidths_c = example_wanderer_median.widths_GaussianFit[inliersMaster].T
+```
+
+
+```python
+# I am guessing that this will work.
+# I'm keeping the commented line because that's what I used before
+# pld_comp_c = wanderer.extract_PLD_components(example_wanderer_median.imageCube, order=1)
+
+pld_comp_c = example_wanderer_median.PLD_components.T # this is new to Carlos's notebook instance
+pld_output_c = np.array(list([time_c]) + list(pld_comp_c))
+```
+
+
+```python
+flux_key = 'phots'
+time_key = 'times'
+flux_err_key = 'noise'
+eff_width_key = 'npix'
+pld_coeff_key = 'pld'
+ycenter_key = 'ycenters'
+xcenter_key = 'xcenters'
+ywidth_key = 'ywidths'
+xwidth_key = 'xwidths'
+
+output_dict = {time_key: time_c, 
+               flux_key: flux_c, 
+               flux_err_key: noise_c, 
+               eff_width_key: npix_c, 
+               xcenter_key: xpos_c, 
+               ycenter_key: ypos_c, 
+               xwidth_key: xwidth_c, 
+               ywidth_key: ywidth_c, 
+               pld_coeff_key: pld_comp_c}
+
+# This creates 1 joblib output file for one static aperture radius -- need to be cycled from above: change `staticRad = '2.5'` to new radius
+joblib.dump(output_dict, '{}_full_output_for_skywalker_pipeline_{}_{}_{}.joblib.save'.format(planet_dir_name, channel, staticRad, varRad))
+```
+
+
+
+
+    ['qatar2_full_output_for_pipeline_ch2_2.5_0.0.joblib.save']
+
+
