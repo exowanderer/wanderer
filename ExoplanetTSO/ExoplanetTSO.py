@@ -2576,9 +2576,10 @@ class wanderer(object):
         
         flux_key_now  = centering + '_' + background+'_' + 'rad' + '_' + str(staticRad) + '_' + str(varRad)
         
-        if varRad is None and isinstance(staticRad, (float, int)):
-            aperRads = [staticRad]*self.nFrames
+        assert(isinstance(staticRad, (float, int)))
         
+        if varRad is None or varRad == 0.0:
+            aperRads = [staticRad]*self.nFrames
         else:
             quad_rad_dist = self.quadrature_widths.copy() - np.median(self.quadrature_widths)
             quad_rad_dist = clipOutlier(quad_rad_dist, nSig=5)
