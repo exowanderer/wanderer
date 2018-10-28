@@ -1,6 +1,6 @@
-
-
 # Wanderer for Exoplanet Time Series Observation Photometry
+
+Planetai (πλανῆται) is Greek for "Wanderers".  Moreover, Spitzer wobble makes the PSF "wandere" across the detector, which we have to tack precisely here.
 
 
 ```python
