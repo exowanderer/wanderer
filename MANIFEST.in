@@ -3,9 +3,9 @@ include CHANGES.rst
 
 include ah_bootstrap.py
 include setup.cfg
-# include ExoplanetTSO/tests/coveragerc
+# include wanderer/tests/coveragerc
 
-recursive-include ExoplanetTSO *.pyx *.c *.pxd
+recursive-include wanderer *.pyx *.c *.pxd
 recursive-include docs *
 recursive-include licenses *
 recursive-include cextern *

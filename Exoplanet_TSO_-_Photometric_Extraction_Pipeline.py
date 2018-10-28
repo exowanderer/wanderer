@@ -72,7 +72,7 @@ import numpy as np
 startFull = time()
 
 print('\n\n**Initializing Master Class for Exoplanet Time Series Observation Photometry**\n\n')
-from ExoplanetTSO.ExoplanetTSO import wanderer
+from wanderer import wanderer
 
 def clipOutlier2D(arr2D, nSig=10):
     arr2D     = arr2D.copy()

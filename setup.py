@@ -12,18 +12,18 @@ conf = ConfigParser()
 conf.read(['setup.cfg'])
 metadata = dict(conf.items('metadata'))
 
-PACKAGENAME = metadata.get('package_name', 'ExoplanetTSO')
-DESCRIPTION = metadata.get('description', 'ExoplanetTSO-Wanderer: Spitzer Photometric Extraction Package for Optimal Exoplanet & Brown Dwarf Observational Extraction')
+PACKAGENAME = metadata.get('package_name', 'wanderer')
+DESCRIPTION = metadata.get('description', 'Wanderer: Spitzer Photometric Extraction Package for Optimal Exoplanet & Brown Dwarf Observational Extraction')
 AUTHOR = metadata.get('author', 'Jonathan Fraine')
 AUTHOR_EMAIL = metadata.get('author_email', 'jdfraine@gmail.com')
 LICENSE = metadata.get('license', 'unknown')
-URL = metadata.get('url', 'https://github.com/exowanderer/ExoplanetTSO')
+URL = metadata.get('url', 'https://github.com/exowanderer/wanderer')
 __minimum_python_version__ = metadata.get("minimum_python_version", "3.5")
 
 # Enforce Python version check - this is the same check as in __init__.py but
 # this one has to happen before importing ah_bootstrap.
 if sys.version_info < tuple((int(val) for val in __minimum_python_version__.split('.'))):
-    sys.stderr.write("ERROR: ExoplanetTSO requires Python {} or later\n".format(__minimum_python_version__))
+    sys.stderr.write("ERROR: Wanderer requires Python {} or later\n".format(__minimum_python_version__))
     sys.exit(1)
 
 # Import ah_bootstrap after the python version validation

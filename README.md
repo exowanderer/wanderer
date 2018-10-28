@@ -73,7 +73,7 @@ print('AORLABEL:\t{}\nNum Fits Files:\t{}\nNum Unc Files:\t{}'.format\
           (header_test['AORLABEL'], len(fitsFilenames), len(uncsFilenames)))
 ```
 
-# Load ExoplanetTSO Class
+# Load Wanderer Class
 
 Necessary Constants Spitzer (subarray with 32x32 pixels; center = 15,15)
 ---

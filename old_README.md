@@ -1,4 +1,4 @@
-# ExoplanetTSO
+# Wandererr
 # Exoplanet Photometric Analysis for Time Series Observations
 ---
 
