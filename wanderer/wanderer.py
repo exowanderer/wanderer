@@ -36,13 +36,23 @@ from tqdm import tqdm, tqdm_notebook
 # from .auxiliary import *
 from .auxiliary import (
     actr,
+    clipOutlier,
+    compute_flux_one_frame,
+    DBScan_Flux,
+    DBScan_PLD,
+    DBScan_Segmented_Flux,
     fit_gauss,
     fitgaussian,
+    fit_one_center,
+    flux_weighted_centroid,
     gaussian,
     get_julian_date_from_header,
     lmfit_one_center,
     measure_one_annular_bg,
-    moments
+    measure_one_circle_bg,
+    measure_one_median_bg,
+    measure_one_KDE_bg,
+    moments,
 )
 
 
@@ -98,7 +108,7 @@ class wanderer(object):
         elif method == 'median':
             self.metric = np.nanmedian
         else:
-            raise Exception(
+            raise ValueError(
                 "`method` must be from the list ['mean', 'median']"
             )
 
@@ -108,7 +118,7 @@ class wanderer(object):
         self.nSlopeFiles = len(self.fitsFilenames)
 
         if telescope is None:
-            raise Exception(
+            raise ValueError(
                 "Please specify `telescope` as either 'JWST' "
                 "or 'Spitzer' or 'HST'"
             )
@@ -120,7 +130,7 @@ class wanderer(object):
             for _ in range(4):
                 fitsdir_split.pop()
 
-            # self.calDir        = ''
+            # self.calDir = ''
             # for thing in fitsdir_split:
             #     self.calDir = self.calDir + thing + '/'
             #
@@ -141,17 +151,15 @@ class wanderer(object):
         self.flux_TSO_df = pd.DataFrame()
         self.noise_TSO_df = pd.DataFrame()
 
-        if yguess is None:
+        self.yguess = yguess
+        if self.yguess is None:
             self.yguess = self.imageCube.shape[self.y]//2
-        else:
-            self.yguess = yguess
-        if xguess is None:
+
+        self.xguess = xguess
+        if self.xguess is None:
             self.xguess = self.imageCube.shape[self.x]//2
-        else:
-            self.xguess = xguess
 
         self.pix_rad = pix_rad
-
         self.nCores = cpu_count()//2 if nCores is None else int(nCores)
 
         tm_year, tm_mon, tm_mday, tm_hour, tm_min, tm_sec, tm_wday, tm_yday, tm_isdst = localtime()
@@ -228,7 +236,7 @@ class wanderer(object):
             True if successful, False otherwise.
 
         """
-        # BMJD_2_BJD     = -0.5
+        # BMJD_2_BJD = -0.5
         from scipy.constants import arcsec  # pi / arcsec = 648000
 
         # sec2day = 1/(24*3600)
@@ -304,13 +312,20 @@ class wanderer(object):
                 self.imageCube[idx_] = bcdNow[0].data[iframe] * fluxConversion
                 self.noiseCube[idx_] = buncNow[0].data[iframe] * fluxConversion
 
-            del bcdNow[0].data
-            bcdNow.close()
-            del bcdNow
+            def delete_fits_data(fits_data):
+                del fits_data[0].data
+                fits_data.close()
+                del fits_data
 
-            del buncNow[0].data
-            buncNow.close()
-            del buncNow
+            delete_fits_data(bcdNow)
+            delete_fits_data(buncNow)
+            # del bcdNow[0].data
+            # bcdNow.close()
+            # del bcdNow
+
+            # del buncNow[0].data
+            # buncNow.close()
+            # del buncNow
 
         if remove_nans:
             # Set NaNs to Median
@@ -366,38 +381,51 @@ class wanderer(object):
             savefiledir = './'
 
         print('Loading from Master Files')
-        self.centering_df = pd.read_pickle(
-            savefiledir + saveFileNameHeader + '_centering_dataframe' + saveFileType)
-        self.background_df = pd.read_pickle(
-            savefiledir + saveFileNameHeader + '_background_dataframe' + saveFileType)
-        self.flux_TSO_df = pd.read_pickle(
-            savefiledir + saveFileNameHeader + '_flux_TSO_dataframe' + saveFileType)
+        files_path_start = os.path.join(savefiledir, saveFileNameHeader)
+        file_path_template = files_path_start + "{0}" + saveFileType
 
-        try:
-            self.noise_TSO_df = pd.read_pickle(
-                savefiledir + saveFileNameHeader + '_noise_TSO_dataframe' + saveFileType)
-        except:
+        self.centering_df = pd.read_pickle(
+            file_path_template.format('_centering_dataframe')
+        )
+        self.background_df = pd.read_pickle(
+            file_path_template.format('_background_dataframe')
+        )
+        self.flux_TSO_df = pd.read_pickle(
+            file_path_template.format('_flux_TSO_dataframe')
+        )
+
+        noise_file_path = file_path_template.format('_noise_TSO_dataframe')
+
+        if os.path.exists(noise_file_path):
+            self.noise_TSO_df = pd.read_pickle(noise_file_path)
+        else:
             self.noise_TSO_df = None
 
         self.imageCube = joblib.load(
-            savefiledir + saveFileNameHeader + '_image_cube_array' + saveFileType)
+            file_path_template.format('_image_cube_array')
+        )
         self.noiseCube = joblib.load(
-            savefiledir + saveFileNameHeader + '_noise_cube_array' + saveFileType)
+            file_path_template.format('_noise_cube_array')
+        )
         self.timeCube = joblib.load(
-            savefiledir + saveFileNameHeader + '_time_cube_array' + saveFileType)
+            file_path_template.format('_time_cube_array')
+        )
 
         self.imageBadPixMasks = joblib.load(
-            savefiledir + saveFileNameHeader + '_image_bad_pix_cube_array' + saveFileType)
+            file_path_template.format('_image_bad_pix_cube_array')
+        )
 
         self.save_dict = joblib.load(
-            savefiledir + saveFileNameHeader + '_save_dict' + saveFileType)
+            file_path_template.format('_save_dict')
+        )
 
         print('nFrames', 'nFrame' in self.save_dict.keys())
         print('Assigning Parts of `self.save_dict` to individual data structures')
         for key in self.save_dict.keys():
             exec("self." + key + " = self.save_dict['" + key + "']")
 
-    def save_data_to_save_files(self, savefiledir=None, saveFileNameHeader=None, saveFileType='.joblib.save', SaveMaster=True, SaveTime=True):
+    def save_data_to_save_files(
+            self, savefiledir=None, saveFileNameHeader=None, saveFileType='.joblib.save', SaveMaster=True, SaveTime=True):
         """Class methods are similar to regular functions.
 
         Note:
@@ -438,8 +466,13 @@ class wanderer(object):
         minute = date.tm_min
         sec = date.tm_sec
 
-        date_string = '_' + str(year) + '-' + str(month) + '-' + str(day) + '_' + \
-            str(hour) + 'h' + str(minute) + 'm' + str(sec) + 's'
+        date_string = (
+            f'_{str(year)}-{str(month)}-{str(day)}_'
+            f'{str(hour)}h{str(minute)}m{str(sec)}s'
+        )
+
+        # date_string = '_' + str(year) + '-' + str(month) + '-' + str(day) \
+        #     + '_' + str(hour) + 'h' + str(minute) + 'm' + str(sec) + 's'
 
         saveFileTypeBak = date_string + saveFileType
 
@@ -449,55 +482,138 @@ class wanderer(object):
 
         if SaveMaster:
             print('\nSaving to Master File -- Overwriting Previous Master')
-            # self.centering_df.to_pickle(savefiledir  + saveFileNameHeader + '_centering_dataframe'  + saveFileType)
-            # self.background_df.to_pickle(savefiledir + saveFileNameHeader + '_background_dataframe' + saveFileType)
-            # self.flux_TSO_df.to_pickle(savefiledir   + saveFileNameHeader + '_flux_TSO_dataframe'   + saveFileType)
 
-            joblib.dump(self.centering_df, savefiledir +
-                        saveFileNameHeader + '_centering_dataframe' + saveFileType)
-            joblib.dump(self.background_df, savefiledir +
-                        saveFileNameHeader + '_background_dataframe' + saveFileType)
-            joblib.dump(self.flux_TSO_df, savefiledir +
-                        saveFileNameHeader + '_flux_TSO_dataframe' + saveFileType)
+            files_path_start = os.path.join(savefiledir, saveFileNameHeader)
+            file_path_template = files_path_start + "{0}" + saveFileType
 
-            joblib.dump(self.imageCube, savefiledir +
-                        saveFileNameHeader + '_image_cube_array' + saveFileType)
-            joblib.dump(self.noiseCube, savefiledir +
-                        saveFileNameHeader + '_noise_cube_array' + saveFileType)
-            joblib.dump(self.timeCube, savefiledir +
-                        saveFileNameHeader + '_time_cube_array' + saveFileType)
+            # self.centering_df.to_pickle(
+            #    file_path_template.format('_centering_dataframe' )
+            #   )
+            # self.background_df.to_pickle(file_path_template.format('_background_dataframe')
+            #   )
+            # self.flux_TSO_df.to_pickle(file_path_template.format('_flux_TSO_dataframe'  )
+            #   )
 
-            joblib.dump(self.imageBadPixMasks, savefiledir +
-                        saveFileNameHeader + '_image_bad_pix_cube_array' + saveFileType)
+            dump_dict = {
+                '_centering_dataframe': self.centering_df,
+                '_background_dataframe': self.background_df,
+                '_flux_TSO_dataframe': self.flux_TSO_df,
+                '_image_cube_array': self.imageCube,
+                '_noise_cube_array': self.noiseCube,
+                '_time_cube_array': self.timeCube,
+                '_image_bad_pix_cube_array': self.imageBadPixMasks,
+                '_save_dict': self.save_dict,
+            }
 
-            joblib.dump(self.save_dict, savefiledir +
-                        saveFileNameHeader + '_save_dict' + saveFileType)
+            for filename_, df_ in dump_dict.items():
+                joblib.dump(df_, file_path_template.format(filename_))
+
+            """
+            joblib.dump(
+                self.,
+                file_path_template.format('')
+            )
+            joblib.dump(
+                self.,
+                file_path_template.format('')
+            )
+
+            joblib.dump(
+                self.,
+                file_path_template.format('')
+            )
+            joblib.dump(
+                self.,
+                file_path_template.format('')
+            )
+            joblib.dump(
+                self.,
+                file_path_template.format('')
+            )
+
+            joblib.dump(
+                self.,
+                file_path_template.format('')
+            )
+
+            joblib.dump(
+                self.,
+                file_path_template.format('')
+            )
+            """
 
         if SaveTime:
             print('Saving to New TimeStamped File -- These Tend to Pile Up!')
-            # self.centering_df.to_pickle(savefiledir + 'TimeStamped/' + saveFileNameHeader + '_centering_dataframe'  + saveFileTypeBak)
-            # self.background_df.to_pickle(savefiledir + 'TimeStamped/' + saveFileNameHeader + '_background_dataframe' + saveFileTypeBak)
-            # self.flux_TSO_df.to_pickle(savefiledir + 'TimeStamped/' + saveFileNameHeader + '_flux_TSO_dataframe'   + saveFileTypeBak)
+            # self.centering_df.to_pickle(
+            #   savefiledir + 'TimeStamped/' + saveFileNameHeader +
+            #   '_centering_dataframe'  + saveFileTypeBak)
+            # self.background_df.to_pickle(
+            #   savefiledir + 'TimeStamped/' + saveFileNameHeader +
+            #   '_background_dataframe' + saveFileTypeBak)
+            # self.flux_TSO_df.to_pickle(
+            #   savefiledir + 'TimeStamped/' + saveFileNameHeader +
+            #   '_flux_TSO_dataframe'   + saveFileTypeBak)
 
-            joblib.dump(self.centering_df, savefiledir + 'TimeStamped/' +
-                        saveFileNameHeader + '_centering_dataframe' + saveFileTypeBak)
-            joblib.dump(self.background_df, savefiledir + 'TimeStamped/' +
-                        saveFileNameHeader + '_background_dataframe' + saveFileTypeBak)
-            joblib.dump(self.flux_TSO_df, savefiledir + 'TimeStamped/' +
-                        saveFileNameHeader + '_flux_TSO_dataframe' + saveFileTypeBak)
+            file_path_base = os.path.join(
+                savefiledir, 'TimeStamped', saveFileNameHeader
+            )
+            file_path_template = file_path_base + '{0}' + saveFileTypeBak
 
-            joblib.dump(self.imageCube, savefiledir + 'TimeStamped/' +
-                        saveFileNameHeader + '_image_cube_array' + saveFileTypeBak)
-            joblib.dump(self.noiseCube, savefiledir + 'TimeStamped/' +
-                        saveFileNameHeader + '_noise_cube_array' + saveFileTypeBak)
-            joblib.dump(self.timeCube, savefiledir + 'TimeStamped/' +
-                        saveFileNameHeader + '_time_cube_array' + saveFileTypeBak)
+            dump_dict = {
+                '_centering_dataframe': self.centering_df,
+                '_background_dataframe': self.background_df,
+                '_flux_TSO_dataframe': self.flux_TSO_df,
+                '_image_cube_array': self.imageCube,
+                '_noise_cube_array': self.noiseCube,
+                '_time_cube_array': self.timeCube,
+                '_image_bad_pix_cube_array': self.imageBadPixMasks,
+                '_save_dict': self.save_dict,
+            }
 
-            joblib.dump(self.imageBadPixMasks, savefiledir + 'TimeStamped/' +
-                        saveFileNameHeader + '_image_bad_pix_cube_array' + saveFileTypeBak)
+            for filename_, df_ in dump_dict.items():
+                joblib.dump(df_, file_path_template.format(filename_))
 
-            joblib.dump(self.save_dict, savefiledir + 'TimeStamped/' +
-                        saveFileNameHeader + '_save_dict' + saveFileTypeBak)
+            """
+            joblib.dump(
+                self.centering_df,
+                filepath_template.format('')
+            )
+
+            joblib.dump(
+                self.background_df,
+                filepath_template.format('')
+            )
+
+            joblib.dump(
+                self.flux_TSO_df,
+                filepath_template.format('')
+            )
+
+            joblib.dump(
+                self.imageCube,
+                filepath_template.format('')
+            )
+
+            joblib.dump(
+                self.noiseCube,
+                filepath_template.format('')
+            )
+
+            joblib.dump(
+                self.timeCube,
+                filepath_template.format('')
+            )
+
+            joblib.dump(
+                self.imageBadPixMasks,
+                filepath_template.format('')
+            )
+
+            joblib.dump(
+                self.save_dict,
+                filepath_template.format('')
+            )
+            """
 
     def initiate_save_dict(self, dummy=None):
         """Class methods are similar to regular functions.
@@ -571,73 +687,73 @@ class wanderer(object):
         # for thing in _stored_variables:
         #     exec("try: self.save_dict['"+thing+"'] = self."+thing+"\nexcept: print('self."+thing+" does not yet exist')")
         #
-        # try:self.save_dict['background_Annulus']      = self.background_Annulus
+        # try:self.save_dict['background_Annulus'] = self.background_Annulus
         # except: pass
         #
-        # try:self.save_dict['background_CircleMask']   = self.background_CircleMask
+        # try:self.save_dict['background_CircleMask'] = self.background_CircleMask
         # except: pass
         #
-        # try:self.save_dict['background_GaussianFit']  = self.background_GaussianFit
+        # try:self.save_dict['background_GaussianFit'] = self.background_GaussianFit
         # except: pass
         #
-        # try:self.save_dict['background_KDEUniv']      = self.background_KDEUniv
+        # try:self.save_dict['background_KDEUniv'] = self.background_KDEUniv
         # except: pass
         #
-        # try:self.save_dict['background_MedianMask']   = self.background_MedianMask
+        # try:self.save_dict['background_MedianMask'] = self.background_MedianMask
         # except: pass
         #
-        # try:self.save_dict['centering_FluxWeight']    = self.centering_FluxWeight
+        # try:self.save_dict['centering_FluxWeight'] = self.centering_FluxWeight
         # except: pass
         #
-        # try:self.save_dict['centering_GaussianFit']   = self.centering_GaussianFit
+        # try:self.save_dict['centering_GaussianFit'] = self.centering_GaussianFit
         # except: pass
         #
-        # try:self.save_dict['centering_LeastAsym']     = self.centering_LeastAsym
+        # try:self.save_dict['centering_LeastAsym'] = self.centering_LeastAsym
         # except: pass
         #
-        # try:self.save_dict['effective_widths']        = self.effective_widths
+        # try:self.save_dict['effective_widths'] = self.effective_widths
         # except: pass
         #
-        # try:self.save_dict['fitsFileDir']             = self.fitsFileDir
+        # try:self.save_dict['fitsFileDir'] = self.fitsFileDir
         # except: pass
         #
-        # try:self.save_dict['fitsFilenames']           = self.fitsFilenames
+        # try:self.save_dict['fitsFilenames'] = self.fitsFilenames
         # except: pass
         #
-        # try:self.save_dict['heights_GaussianFit']     = self.heights_GaussianFit
+        # try:self.save_dict['heights_GaussianFit'] = self.heights_GaussianFit
         # except: pass
         #
-        # try:self.save_dict['inliers_Phots']           = self.inliers_Phots
+        # try:self.save_dict['inliers_Phots'] = self.inliers_Phots
         # except: pass
         #
-        # try:self.save_dict['inliersPLD']              = self.inliers_PLD
+        # try:self.save_dict['inliersPLD'] = self.inliers_PLD
         # except: pass
         #
-        # try:self.save_dict['method']                  = self.method
+        # try:self.save_dict['method'] = self.method
         # except: pass
         #
-        # try:self.save_dict['pix_rad']                    = self.pix_rad
+        # try:self.save_dict['pix_rad'] = self.pix_rad
         # except: pass
         #
-        # try:self.save_dict['nFrames']                 = self.nFrames
+        # try:self.save_dict['nFrames'] = self.nFrames
         # except: pass
         #
-        # try:self.save_dict['PLD_components']          = self.PLD_components
+        # try:self.save_dict['PLD_components'] = self.PLD_components
         # except: pass
         #
-        # try:self.save_dict['PLD_norm']                = self.PLD_norm
+        # try:self.save_dict['PLD_norm'] = self.PLD_norm
         # except: pass
         #
-        # try:self.save_dict['quadrature_widths']       = self.quadrature_widths
+        # try:self.save_dict['quadrature_widths'] = self.quadrature_widths
         # except: pass
         #
-        # try:self.save_dict['yguess']                  = self.yguess
+        # try:self.save_dict['yguess'] = self.yguess
         # except: pass
         #
-        # try:self.save_dict['xguess']                  = self.xguess
+        # try:self.save_dict['xguess'] = self.xguess
         # except: pass
         #
-        # try:self.save_dict['widths_GaussianFit']      = self.widths_GaussianFit
+        # try:self.save_dict['widths_GaussianFit'] = self.widths_GaussianFit
         # except: pass
 
     def copy_instance(self):
@@ -684,7 +800,7 @@ class wanderer(object):
 
         return temp
 
-    def find_bad_pixels(self, nSig=5):
+    def find_bad_pixels(self, n_sig=5):
         """Class methods are similar to regular functions.
 
         Note:
@@ -704,9 +820,12 @@ class wanderer(object):
         self.imageCubeMAD = scale.mad(self.imageCube, axis=0)
 
         self.imageBadPixMasks = abs(
-            self.imageCube - self.imageCubeMedian) > nSig*self.imageCubeMAD
+            self.imageCube - self.imageCubeMedian) > n_sig*self.imageCubeMAD
 
-        print("There are " + str(sum(self.imageBadPixMasks)) + " 'Hot' Pixels")
+        # print(
+        #   "There are " + str(sum(self.imageBadPixMasks)) + " 'Hot' Pixels"
+        # )
+        print(f"There are {str(sum(self.imageBadPixMasks))} 'Hot' Pixels")
 
         # self.imageCube[self.imageBadPixMasks] = nan
 
@@ -746,7 +865,7 @@ class wanderer(object):
         self.widths_GaussianFit = np.zeros((self.imageCube.shape[0], 2))
 
         self.heights_GaussianFit = np.zeros(self.imageCube.shape[0])
-        # self.rotation_GaussianFit     = np.zeros(self.imageCube.shape[0])
+        # self.rotation_GaussianFit = np.zeros(self.imageCube.shape[0])
         self.background_GaussianFit = np.zeros(self.imageCube.shape[0])
 
         progress_kframe = self.tqdm(
@@ -802,7 +921,7 @@ class wanderer(object):
         self.centering_df['Gaussian_Fit_Offset'] = self.background_GaussianFit
 
     def mp_lmfit_gaussian_centering(
-            self, yguess=15, xguess=15, subArraySize=10, init_params=None, useMoments=False, nCores=cpu_count(), center_range=None, width_range=None, nSig=6.1, method='leastsq', recheckMethod=None,
+            self, yguess=15, xguess=15, subArraySize=10, init_params=None, useMoments=False, nCores=cpu_count(), center_range=None, width_range=None, n_sig=6.1, method='leastsq', recheckMethod=None,
             median_crop=False, verbose=False):
         """Class methods are similar to regular functions.
 
@@ -817,7 +936,7 @@ class wanderer(object):
             True if successful, False otherwise.
 
         """
-
+        y, x = 0, 1
         if np.isnan(self.imageCube).any():
             is_nan_ = np.isnan(self.imageCube)
             self.imageCube[is_nan_] = np.nanmedian(self.imageCube)
@@ -917,7 +1036,7 @@ class wanderer(object):
         stdX, stdY = np.nanstd(self.centering_GaussianFit, axis=0)
 
         outliers = (((self.centering_GaussianFit.T[y] - medY)/stdY)**2 + (
-            (self.centering_GaussianFit.T[x] - medX)/stdX)**2) > nSig
+            (self.centering_GaussianFit.T[x] - medX)/stdX)**2) > n_sig
 
         if recheckMethod is not None and isinstance(recheckMethod, str):
             for kf in np.where(outliers)[0]:
@@ -963,7 +1082,7 @@ class wanderer(object):
             y_gaussball = ((self.centering_GaussianFit.T[y] - medY)/stdY)**2
             x_gaussball = ((self.centering_GaussianFit.T[x] - medX)/stdX)**2
 
-            inliers = (y_gaussball+x_gaussball) <= nSig
+            inliers = (y_gaussball+x_gaussball) <= n_sig
             medY, medX = np.nanmedian(
                 self.centering_GaussianFit[inliers], axis=0)
 
@@ -984,7 +1103,19 @@ class wanderer(object):
         self.centering_df['Gaussian_Fit_Heights'] = self.heights_GaussianFit
         self.centering_df['Gaussian_Fit_Offset'] = self.background_GaussianFit
 
-    def mp_fit_gaussian_centering(self, nSig=False, method='la', initc='fw', subArray=False, print_compare=False):
+    def assign_gaussian_centering(self, gaussP, xlower, kf, ylower):
+
+        y, x = self.y, self.x
+        self.centering_GaussianFit[kf][x] = gaussP[1] + xlower
+        self.centering_GaussianFit[kf][y] = gaussP[2] + ylower
+
+        self.widths_GaussianFit[kf][x] = gaussP[3]
+        self.widths_GaussianFit[kf][y] = gaussP[4]
+
+        self.heights_GaussianFit[kf] = gaussP[0]
+        self.background_GaussianFit[kf] = gaussP[5]
+
+    def mp_fit_gaussian_centering(self, n_sig=False, method='la', initc='fw', subArray=False, print_compare=False):
         """Class methods are similar to regular functions.
 
         Note:
@@ -1003,7 +1134,7 @@ class wanderer(object):
             is_nan_ = np.isnan(self.imageCube)
             self.imageCube[is_nan_] = np.nanmedian(self.imageCube)
 
-        y, x = 0, 1
+        y, x = self.y, self.x
 
         yinds0, xinds0 = np.indices(self.imageCube[0].shape)
 
@@ -1022,15 +1153,22 @@ class wanderer(object):
         self.widths_GaussianFit = np.zeros((self.imageCube.shape[0], 2))
 
         self.heights_GaussianFit = np.zeros(self.imageCube.shape[0])
-        # self.rotation_GaussianFit     = np.zeros(self.imageCube.shape[0])
+        # self.rotation_GaussianFit = np.zeros(self.imageCube.shape[0])
         self.background_GaussianFit = np.zeros(self.imageCube.shape[0])
 
         # Gaussian fit centering
         # This starts the multiprocessing call to arms
         pool = Pool(self.nCores)
 
-        func = partial(fit_one_center, nSig=nSig, method='gauss',
-                       ylower=ylower, yupper=yupper, xlower=xlower, xupper=xupper)
+        func = partial(
+            fit_one_center,
+            n_sig=n_sig,
+            method='gauss',
+            ylower=ylower,
+            yupper=yupper,
+            xlower=xlower,
+            xupper=xupper
+        )
 
         # the order is very important
         gaussian_centers = pool.starmap(func, zip(self.imageCube))
@@ -1040,6 +1178,8 @@ class wanderer(object):
 
         print('Finished with Fitting Centers. Now assigning to instance values.')
         for kf, gaussP in enumerate(gaussian_centers):
+            self.assign_gaussian_centering(self, gaussP, xlower, kf, ylower)
+            """ # TODO: confirm this is correct
             self.centering_GaussianFit[kf][self.x] = gaussP[1] + xlower
             self.centering_GaussianFit[kf][self.y] = gaussP[2] + ylower
 
@@ -1048,20 +1188,21 @@ class wanderer(object):
 
             self.heights_GaussianFit[kf] = gaussP[0]
             self.background_GaussianFit[kf] = gaussP[5]
+            """
 
         self.centering_df = pd.DataFrame()
-        self.centering_df['Gaussian_Fit_Y_Centers'] = self.centering_GaussianFit.T[self.y]
-        self.centering_df['Gaussian_Fit_X_Centers'] = self.centering_GaussianFit.T[self.x]
-        self.centering_df['Gaussian_Mom_Y_Centers'] = self.centering_GaussianFit.T[self.y]
-        self.centering_df['Gaussian_Mom_X_Centers'] = self.centering_GaussianFit.T[self.x]
+        self.centering_df['Gaussian_Fit_Y_Centers'] = self.centering_GaussianFit.T[y]
+        self.centering_df['Gaussian_Fit_X_Centers'] = self.centering_GaussianFit.T[x]
+        self.centering_df['Gaussian_Mom_Y_Centers'] = self.centering_GaussianFit.T[y]
+        self.centering_df['Gaussian_Mom_X_Centers'] = self.centering_GaussianFit.T[x]
 
-        self.centering_df['Gaussian_Fit_Y_Widths'] = self.widths_GaussianFit.T[self.y]
-        self.centering_df['Gaussian_Fit_X_Widths'] = self.widths_GaussianFit.T[self.x]
+        self.centering_df['Gaussian_Fit_Y_Widths'] = self.widths_GaussianFit.T[y]
+        self.centering_df['Gaussian_Fit_X_Widths'] = self.widths_GaussianFit.T[x]
 
         self.centering_df['Gaussian_Fit_Heights'] = self.heights_GaussianFit
         self.centering_df['Gaussian_Fit_Offset'] = self.background_GaussianFit
 
-        # self.centering_df['Gaussian_Fit_Rotation']    = self.rotation_GaussianFit
+        # self.centering_df['Gaussian_Fit_Rotation'] = self.rotation_GaussianFit
 
     def fit_flux_weighted_centering(self):
         """Class methods are similar to regular functions.
@@ -1101,8 +1242,12 @@ class wanderer(object):
             subFrameNow[np.isnan(subFrameNow)] = np.nanmedian(
                 ~np.isnan(subFrameNow))
 
-            self.centering_FluxWeight[kf] = flux_weighted_centroid(self.imageCube[kf],
-                                                                   self.yguess, self.xguess, bSize=7)
+            self.centering_FluxWeight[kf] = flux_weighted_centroid(
+                self.imageCube[kf],
+                self.yguess,
+                self.xguess,
+                bSize=7
+            )
             self.centering_FluxWeight[kf] = self.centering_FluxWeight[kf][::-1]
 
         self.centering_FluxWeight[:, 0] = clipOutlier(
@@ -1113,7 +1258,7 @@ class wanderer(object):
         self.centering_df['FluxWeighted_Y_Centers'] = self.centering_FluxWeight.T[self.y]
         self.centering_df['FluxWeighted_X_Centers'] = self.centering_FluxWeight.T[self.x]
 
-    def mp_fit_flux_weighted_centering(self, nSig=False):
+    def mp_fit_flux_weighted_centering(self, n_sig=False):
         """Class methods are similar to regular functions.
 
         Note:
@@ -1147,7 +1292,7 @@ class wanderer(object):
         # This starts the multiprocessing call to arms
         pool = Pool(self.nCores)
 
-        func = partial(fit_one_center, nSig=nSig, method='fwc', ylower=ylower,
+        func = partial(fit_one_center, n_sig=n_sig, method='fwc', ylower=ylower,
                        yupper=yupper, xlower=xlower, xupper=xupper, bSize=7)
 
         # the order is very important
@@ -1322,7 +1467,7 @@ class wanderer(object):
         xinds = xinds0[ylower:yupper+1, xlower:xupper+1]
 
         nAsymParams = 2  # Xc, Yc
-        # self.centering_LeastAsym  = np.zeros((self.nFrames, nAsymParams))
+        # self.centering_LeastAsym = np.zeros((self.nFrames, nAsymParams))
         # for kf in self.tqdm(range(self.nFrames), desc='Asym', leave = False, total=self.nFrames):
         # This starts the multiprocessing call to arms
         pool = Pool(self.nCores)
@@ -1405,7 +1550,7 @@ class wanderer(object):
         x_widths = self.centering_df['Gaussian_Fit_X_Widths']
         y_widths = self.centering_df['Gaussian_Fit_Y_Widths']
 
-        self.quadrature_widths = sqrt(x_widths**2 + y_widths**2)
+        self.quadrature_widths = np.sqrt(x_widths**2 + y_widths**2)
         self.centering_df['Quadrature_Widths'] = self.quadrature_widths
 
     def measure_background_circle_masked(self, aperRad=10, centering='FluxWeight'):
@@ -1424,7 +1569,7 @@ class wanderer(object):
         """
 
         """
-            Assigning all np.zeros in the mask to NaNs because the `mean` and `median` 
+            Assigning all np.zeros in the mask to NaNs because the `mean` and `median`
                 functions are set to `nanmean` functions, which will skip all NaNs
         """
 
@@ -1461,7 +1606,7 @@ class wanderer(object):
         """
 
         """
-            Assigning all np.zeros in the mask to NaNs because the `mean` and `median` 
+            Assigning all np.zeros in the mask to NaNs because the `mean` and `median`
                 functions are set to `nanmean` functions, which will skip all NaNs
         """
 
@@ -1473,11 +1618,17 @@ class wanderer(object):
         # This starts the multiprocessing call to arms
         pool = Pool(self.nCores)
 
-        func = partial(measure_one_circle_bg, aperRad=aperRad,
-                       metric=self.metric, apMethod='exact')
+        func = partial(
+            measure_one_circle_bg,
+            aperRad=aperRad,
+            metric=self.metric,
+            apMethod='exact'
+        )
 
         self.background_CircleMask = pool.starmap(
-            func, zip(self.imageCube, centers))
+            func,
+            zip(self.imageCube, centers)
+        )
 
         pool.close()
         pool.join()
@@ -1563,7 +1714,7 @@ class wanderer(object):
         self.background_Annulus = np.array(self.background_Annulus)
         self.background_df['AnnularMask'] = self.background_Annulus.copy()
 
-    def measure_background_median_masked(self, aperRad=10, nSig=5):
+    def measure_background_median_masked(self, aperRad=10, n_sig=5):
         """Class methods are similar to regular functions.
 
         Note:
@@ -1590,7 +1741,7 @@ class wanderer(object):
             # scale.mad(self.imageCube[kf][backgroundMask])
             madFrame = np.nanstd(self.imageCube[kf][backgroundMask])
 
-            medianMask = abs(self.imageCube[kf] - medFrame) < nSig*madFrame
+            medianMask = abs(self.imageCube[kf] - medFrame) < n_sig*madFrame
 
             maskComb = medianMask*backgroundMask
             # maskComb[maskComb == 0] = False
@@ -1600,7 +1751,7 @@ class wanderer(object):
 
         self.background_df['MedianMask'] = self.background_MedianMask
 
-    def mp_measure_background_median_masked(self, aperRad=10, nSig=5, centering='Gauss'):
+    def mp_measure_background_median_masked(self, aperRad=10, n_sig=5, centering='Gauss'):
         """Class methods are similar to regular functions.
 
         Note:
@@ -1624,7 +1775,7 @@ class wanderer(object):
         pool = Pool(self.nCores)
 
         func = partial(measure_one_median_bg, aperRad=aperRad,
-                       apMethod='exact', metric=self.metric, nSig=nSig)
+                       apMethod='exact', metric=self.metric, n_sig=n_sig)
 
         self.background_MedianMask = pool.starmap(
             func, zip(self.imageCube, centers))
@@ -1692,11 +1843,17 @@ class wanderer(object):
         # This starts the multiprocessing call to arms
         pool = Pool(self.nCores)
 
-        func = partial(measure_one_KDE_bg, aperRad=aperRad,
-                       apMethod='exact', metric=self.metric)
+        func = partial(
+            measure_one_KDE_bg,
+            aperRad=aperRad,
+            apMethod='exact',
+            metric=self.metric
+        )
 
         self.background_KDEUniv = pool.starmap(
-            func, zip(self.imageCube, centers))  # the order is very important
+            func,
+            zip(self.imageCube, centers)
+        )  # the order is very important
 
         pool.close()
         pool.join()
@@ -1704,7 +1861,7 @@ class wanderer(object):
         self.background_KDEUniv = np.array(self.background_KDEUniv)
         self.background_df['KDEUnivMask_mp'] = self.background_KDEUniv
 
-    def measure_all_background(self, aperRad=10, nSig=5):
+    def measure_all_background(self, aperRad=10, n_sig=5):
         """Class methods are similar to regular functions.
 
         Note:
@@ -1730,7 +1887,7 @@ class wanderer(object):
             innerRad=(1-pInner)*aperRad, outerRad=(1+pOuter)*aperRad)
 
         print('Measuring Background Using Median Mask with Multiprocessing')
-        self.mp_measure_background_median_masked(aperRad=aperRad, nSig=nSig)
+        self.mp_measure_background_median_masked(aperRad=aperRad, n_sig=n_sig)
 
         print('Measuring Background Using KDE Mode with Multiprocessing')
         self.mp_measure_background_KDE_Mode(aperRad=aperRad)
@@ -1790,7 +1947,7 @@ class wanderer(object):
 
                 flux_TSO_now[kf] = aperture_photometry(
                     frameNow, aperture)['aperture_sum']
-                noise_TSO_now[kf] = sqrt(aperture_photometry(
+                noise_TSO_now[kf] = np.sqrt(aperture_photometry(
                     noiseNow, aperture)['aperture_sum'])
 
             self.flux_TSO_df[flux_key_now] = flux_TSO_now
@@ -1884,8 +2041,8 @@ class wanderer(object):
             pool.close()
             pool.join()
 
-            # fluxNow[~np.isfinite(fluxNow)]  = np.nanmedian(fluxNow[np.isfinite(fluxNow)])
-            # fluxNow[fluxNow < 0]            = np.nanmedian(fluxNow[fluxNow > 0])
+            # fluxNow[~np.isfinite(fluxNow)] = np.nanmedian(fluxNow[np.isfinite(fluxNow)])
+            # fluxNow[fluxNow < 0] = np.nanmedian(fluxNow[fluxNow > 0])
 
             self.flux_TSO_df[flux_key_now] = fluxNow
             self.noise_TSO_df[flux_key_now] = np.sqrt(fluxNow)
@@ -1933,7 +2090,7 @@ class wanderer(object):
             aperRads = [staticRad]*self.nFrames
         else:
             quad_rad_dist = self.quadrature_widths.copy() - np.nanmedian(self.quadrature_widths)
-            quad_rad_dist = clipOutlier(quad_rad_dist, nSig=5)
+            quad_rad_dist = clipOutlier(quad_rad_dist, n_sig=5)
             aperRads = staticRad + varRad*quad_rad_dist
 
         if flux_key_now not in self.flux_TSO_df.keys() or useTheForce:
@@ -1949,8 +2106,8 @@ class wanderer(object):
             pool.close()
             pool.join()
 
-            # fluxNow[~np.isfinite(fluxNow)]  = np.nanmedian(fluxNow[np.isfinite(fluxNow)])
-            # fluxNow[fluxNow < 0]            = np.nanmedian(fluxNow[fluxNow > 0])
+            # fluxNow[~np.isfinite(fluxNow)] = np.nanmedian(fluxNow[np.isfinite(fluxNow)])
+            # fluxNow[fluxNow < 0] = np.nanmedian(fluxNow[fluxNow > 0])
 
             self.flux_TSO_df[flux_key_now] = fluxNow
             self.noise_TSO_df[flux_key_now] = np.sqrt(fluxNow)
@@ -1999,9 +2156,9 @@ class wanderer(object):
 
         if flux_key_now not in self.flux_TSO_df.keys() or useTheForce:
             # for kf in self.tqdm(range(self.nFrames), desc='Flux', leave = False, total=self.nFrames):
-            sig2FW = 2*sqrt(2*log(2))
+            sig2FW = 2*np.sqrt(2*log(2))
             aperRads = sig2FW * \
-                self.quadrature_widths if useQuad else sqrt(
+                self.quadrature_widths if useQuad else np.sqrt(
                     self.effective_widths)
 
             pool = Pool(self.nCores)
@@ -2014,8 +2171,8 @@ class wanderer(object):
             pool.close()
             pool.join()
 
-            # fluxNow[~np.isfinite(fluxNow)]  = np.nanmedian(fluxNow[np.isfinite(fluxNow)])
-            # fluxNow[fluxNow < 0]            = np.nanmedian(fluxNow[fluxNow > 0])
+            # fluxNow[~np.isfinite(fluxNow)] = np.nanmedian(fluxNow[np.isfinite(fluxNow)])
+            # fluxNow[fluxNow < 0] = np.nanmedian(fluxNow[fluxNow > 0])
 
             self.flux_TSO_df[flux_key_now] = fluxNow
             self.noise_TSO_df[flux_key_now] = np.sqrt(fluxNow)
@@ -2041,8 +2198,8 @@ class wanderer(object):
 
         nPLDComp = nCols*nRows
 
-        # nCols   = nCols // 2 # User input assumes matrix structure, which starts at y- and x-center
-        # nRows   = nRows // 2 #   and moves +\- nRows/2 and nCols/2, respectively
+        # nCols = nCols // 2 # User input assumes matrix structure, which starts at y- and x-center
+        # nRows = nRows // 2 #   and moves +\- nRows/2 and nCols/2, respectively
 
         # nominally 15
         ycenter = int(
@@ -2084,6 +2241,7 @@ class wanderer(object):
             True if successful, False otherwise.
 
         """
+        y, x = 0, 1
 
         if centering == 'gaussian':
             ycenters = self.centering_GaussianFit.T[y]

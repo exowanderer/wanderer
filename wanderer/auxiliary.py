@@ -1034,8 +1034,8 @@ def DBScan_Segmented_PLD(PLDNow, dbsClean=0, nSegments=None, maxSegment=int(6e4)
         # Default to un-segmented
         return DBScan_PLD(PLDNow, dbsClean=dbsClean, useTheForce=useTheForce)
 
-    # dbsPLD      = DBSCAN()#n_jobs=-1)
-    # stdScaler   = StandardScaler()
+    # dbsPLD = DBSCAN()#n_jobs=-1)
+    # stdScaler = StandardScaler()
     #
     if nSegments is None:
         nSegments = PLDNow.size // maxSegment
