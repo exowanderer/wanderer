@@ -35,7 +35,7 @@ from tqdm import tqdm, tqdm_notebook
 # import everything that `wanderer` needs to operate
 # from .auxiliary import *
 from .auxiliary import (
-    actr,
+    # actr,
     clipOutlier,
     compute_flux_one_frame,
     DBScan_Flux,
@@ -1162,7 +1162,9 @@ class wanderer(object):
             True if successful, False otherwise.
 
         """
-
+        raise NotImplementedError(
+            'fit_least_asymmetry_centering is not longer operational'
+        )
         y, x = 0, 1
 
         # yinds0, xinds0 = np.indices(self.imageCube[0].shape)

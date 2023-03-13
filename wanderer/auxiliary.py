@@ -566,7 +566,9 @@ def lame_lmfit_gaussian_centering(
     return heights, ycenters, xcenters, ywidths, xwidths, offsets
 
 
-def lmfit_one_center(image, yy, xx, gfit_model, lmfit_init_params, yupper, ylower, xupper, xlower, useMoments=True, n_sig=False, method='leastsq'):
+def lmfit_one_center(
+        image, yy, xx, gfit_model, lmfit_init_params, yupper, ylower, xupper,
+        xlower, useMoments=True, n_sig=False, method='leastsq'):
     """Class methods are similar to regular functions.
 
     Note:
@@ -753,7 +755,8 @@ def measure_one_circle_bg(image, center, aperRad, metric, apMethod='exact'):
     return metric(image[backgroundMask])
 
 
-def measure_one_annular_bg(image, center, innerRad, outerRad, metric, apMethod='exact'):
+def measure_one_annular_bg(
+        image, center, innerRad, outerRad, metric, apMethod='exact'):
     """Class methods are similar to regular functions.
 
     Note:
@@ -782,7 +785,8 @@ def measure_one_annular_bg(image, center, innerRad, outerRad, metric, apMethod='
     return metric(image[backgroundMask])
 
 
-def measure_one_median_bg(image, center, aperRad, metric, n_sig, apMethod='exact'):
+def measure_one_median_bg(
+        image, center, aperRad, metric, n_sig, apMethod='exact'):
     """Class methods are similar to regular functions.
 
     Note:
