@@ -1,35 +1,25 @@
-import joblib
 import numpy as np
 import matplotlib.pyplot as plt
-import os
-import pandas as pd
 import scipy as sp
-import sys
-
-# import image_registration as ir
 
 from astropy.io import fits
 from astropy.modeling import models, fitting
-from datetime import datetime
 from functools import partial
 from glob import glob
 from lmfit import Model, Parameters
 from multiprocessing import cpu_count, Pool
-from photutils import (
+from photutils.aperture import (
     CircularAperture,
-    CircularAnnulus,
+    # CircularAnnulus,
     aperture_photometry,
-    findstars
+    #     findstars
 )
 from sklearn.cluster import DBSCAN
 
 from sklearn.preprocessing import StandardScaler
 from skimage.filters import gaussian as gaussianFilter
-from socket import gethostname
 from statsmodels.robust import scale
 from statsmodels.nonparametric import kde
-from time import time, localtime, sleep
-from tqdm import tqdm, tqdm_notebook
 
 from skimage.filters import gaussian as gaussianFilter
 

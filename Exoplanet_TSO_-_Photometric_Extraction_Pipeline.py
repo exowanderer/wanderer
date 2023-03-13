@@ -1,29 +1,11 @@
 import numpy as np
-# from numpy import zeros, nanmedian as median, nanmean as mean, nan
 from tqdm import tqdm
-from time import time, localtime
+from time import time
 from sys import exit
-from statsmodels.nonparametric import kde
 from statsmodels.robust import scale
-from socket import gethostname
-from sklearn.preprocessing import StandardScaler
-# import joblib
-from scipy import stats
-from scipy.special import erf
-# from numpy import concatenate, pi, sqrt, ones, diag, inf, isnan, isfinite, array, nanmax
-# from numpy import sort, linspace, indices, median, mean, std, empty, transpose, ceil
-from photutils import CircularAperture, CircularAnnulus, aperture_photometry, findstars
-import pandas as pd
-# from pandas import DataFrame, read_csv, read_pickle, scatter_matrix
 import os
-# from os import environ, path, mkdir
-# from numpy import int32 as npint, round as npround, nansum as sum, nanstd as std
-# from numpy import min as npmin, max as npmax, zeros, arange, sum, float, isnan, hstack
-from multiprocessing import cpu_count, Pool
-from functools import partial
+from multiprocessing import cpu_count
 from glob import glob
-from datetime import datetime
-from astropy.modeling import models, fitting
 from astropy.io import fits
 from argparse import ArgumentParser
 
@@ -123,7 +105,7 @@ def clipOutlier2D(arr2D, n_sig=10):
 
 dataSub = fits_format+'/'
 
-if data_dir is '':
+if data_dir == '':
     data_dir = environ['HOME'] + planetDirectory + \
         planetName + data_sub_dir + channel + data_tail_dir
 print('Current Data Dir: {}'.format(data_dir))

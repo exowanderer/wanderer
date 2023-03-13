@@ -1,21 +1,21 @@
 import joblib
 import numpy as np
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 import os
 import pandas as pd
-import scipy as sp
-import sys
+# import scipy as sp
+# import sys
 
 # import image_registration as ir
 
 from astropy.io import fits
-from astropy.modeling import models, fitting
+# from astropy.modeling import models, fitting
 from datetime import datetime
 from functools import partial
 from glob import glob
 from lmfit import Model, Parameters
 from multiprocessing import cpu_count, Pool
-from photutils import (
+from photutils.aperture import (
     CircularAperture,
     # CircularAnnulus,
     aperture_photometry,
@@ -1683,7 +1683,8 @@ class wanderer(object):
         """
 
         self.background_MedianMask = np.zeros(self.nFrames)
-# the order is very important
+
+        # the order is very important
         progress_frames = self.tqdm(
             range(self.nFrames),
             desc='MedianMaskedBG',
