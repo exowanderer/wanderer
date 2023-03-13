@@ -9,7 +9,8 @@ from glob import glob
 from astropy.io import fits
 from argparse import ArgumentParser
 
-from wanderer import wanderer
+# TODO: make this more direct
+from wanderer.wanderer import Wanderer
 
 ap = ArgumentParser()
 ap.add_argument('-pn', '--planet_name', required=True, type=str,
