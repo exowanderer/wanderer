@@ -1325,7 +1325,7 @@ class wanderer(object):
 
             if fitFailed:
                 print(
-                    f'Least Asymmetry FAILED: Setting self.centering_LeastAsym'f
+                    f'Least Asymmetry FAILED: Setting self.centering_LeastAsym'
                     f'[{kf}] to Initial Guess: [{self.yguess},{self.xguess}]'
                 )
 
