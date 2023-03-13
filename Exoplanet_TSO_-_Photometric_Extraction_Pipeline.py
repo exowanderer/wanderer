@@ -77,11 +77,11 @@ print(
 
 def clipOutlier2D(arr2D, n_sig=10):
     arr2D = arr2D.copy()
-    medArr2D = median(arr2D, axis=0)
+    medArr2D = np.nanmedian(arr2D, axis=0)
     sclArr2D = np.sqrt(((scale.mad(arr2D)**2.).sum()))
     outliers = abs(arr2D - medArr2D) > n_sig*sclArr2D
     inliers = abs(arr2D - medArr2D) <= n_sig*sclArr2D
-    arr2D[outliers] = median(arr2D[inliers], axis=0)
+    arr2D[outliers] = np.nanmedian(arr2D[inliers], axis=0)
     return arr2D
 
 # As an example, Spitzer data is expected to be store in the directory structure:
@@ -260,7 +260,7 @@ background_choices = ['AnnularMask']
 staticRads = np.arange(1, 6, 0.5)  # [1.0 ]# aperRads = np.arange(1, 6,0.5)
 varRads = [0.0, 0.25, 0.50, 0.75, 1.0, 1.25, 1.50]  # [None]#
 
-med_quad_widths = np.median(example_wanderer_median.quadrature_widths)
+med_quad_widths = np.nanmedian(example_wanderer_median.quadrature_widths)
 vrad_dist = example_wanderer_median.quadrature_widths - med_quad_widths
 
 vrad_dist = clipOutlier2D(vrad_dist, n_sig=5)
