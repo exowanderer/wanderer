@@ -64,7 +64,7 @@ def gaussian(height, center_y, center_x, width_y, width_x, offset, yy, xx):
     return height * np.exp(-0.5*(y_dist_sq + x_dist_sq)) + offset
 
 
-def moments(data, kernel_size=2):
+def moments(data, kernel_size=2, n_sig=4):
     """Class methods are similar to regular functions.
 
     Note:
@@ -85,23 +85,17 @@ def moments(data, kernel_size=2):
 
     total = data.sum()
     Y, X = np.indices(data.shape)
-    y = (Y*data).sum()/total
-    x = (X*data).sum()/total
+    y = (Y * data).sum()/total
+    x = (X * data).sum()/total
     height = gaussianFilter(data, kernel_size).max()
 
     med_data = np.nanmedian(data)
     firstq = np.nanmedian(data[data < med_data])
     thirdq = np.nanmedian(data[data > med_data])
 
-    where_midrange = np.where(np.bitwise_and(data > firstq, data < thirdq))
-    offset = np.nanmedian(data[where_midrange])
-
-    big_offset = 4
-    above_threshold = data - offset > big_offset
-
-    std_midrange = np.nanstd(data[where_midrange])
-
-    places = np.where(np.bitwise_and(above_threshold, std_midrange))
+    in_range_ = np.where(np.bitwise_and(data > firstq, data < thirdq))
+    offset = np.nanmedian(data[in_range_])
+    places = np.where(data > n_sig * np.nanstd(data[in_range_]) + offset)
 
     width_y = np.nanstd(places[0])
     width_x = np.nanstd(places[1])
@@ -109,8 +103,10 @@ def moments(data, kernel_size=2):
     # These if statements take into account there might only be one significant
     # point above the background when that is the case it is assumend the width
     # of the gaussian must be smaller than one pixel
+
     if width_y == 0.0:
         width_y = 0.5
+
     if width_x == 0.0:
         width_x = 0.5
 
@@ -243,6 +239,14 @@ def get_julian_date_from_gregorian_date(*date):
     # Now calculate the fractional year. Do we have a leap year?
     daylist = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
     daylist2 = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+
+    days = daylist2  # TODO: Check if conditional can be simplified
+    if (yyyy % 4 != 0) or (yyyy % 400 == 0) or yyyy % 100 != 0:
+        days = daylist2
+    else:
+        days = daylist
+
+    """ # To be deleted
     if (yyyy % 4 != 0):
         days = daylist2
     elif (yyyy % 400 == 0):
@@ -251,12 +255,13 @@ def get_julian_date_from_gregorian_date(*date):
         days = daylist
     else:
         days = daylist2
+    """
 
     daysum = 0
     for y in range(mm-1):
         daysum = daysum + days[y]
 
-    daysum = daysum+dd-1+UT/24
+    daysum = daysum + dd - 1 + UT / 24
 
     # Fraction of year with respect to leap year or default
     fracyear = yyyy + daysum/366 if days[1] == 29 else yyyy + daysum/365
@@ -267,8 +272,9 @@ def get_julian_date_from_gregorian_date(*date):
     #     fracyear = yyyy + daysum/365
 
     if verbose:
-        total_seconds = hh*3600 + mns*60 + sec
-        fracday = total_seconds/86400
+        sec2day = 1 / 86400
+        total_seconds = hh * 3600 + mns * 60 + sec
+        fracday = total_seconds * sec2day
 
         months = [
             "January", "February", "March", "April", "May", "June", "July",
@@ -380,8 +386,12 @@ def flux_weighted_centroid(image, ypos, xpos, b_size=7):
     ypos, xpos, bsize = np.int32([ypos, xpos, b_size])
     # extract a box around the star:
     #im = a[ypos-b_size:ypos+b_size, xpos-b_size:xpos+b_size].copy()
-    subImage = image[ypos-b_size:ypos+b_size,
-                     xpos-b_size:xpos+b_size].transpose().copy()
+
+    ystart = ypos - b_size
+    ystop = ypos + b_size
+    xstart = xpos - b_size
+    xstop = xpos + b_size
+    subImage = image[ystart:ystop, xstart:xstop].transpose().copy()
 
     y, x = 0, 1
 
@@ -433,7 +443,7 @@ def gaussian(height, center_y, center_x, width_y, width_x, offset, yy, xx):
     return height * np.exp(-0.5*(chiY**2 + chiX**2)) + offset
 
 
-def moments(data):
+def moments(data, n_sig=4):
     """Class methods are similar to regular functions.
 
     Note:
@@ -458,10 +468,17 @@ def moments(data):
     height = data.max()
     firstq = np.nanmedian(data[data < np.nanmedian(data)])
     thirdq = np.nanmedian(data[data > np.nanmedian(data)])
-    offset = np.nanmedian(data[np.where(np.bitwise_and(data > firstq,
-                                                       data < thirdq))])
-    places = np.where((data-offset) > 4*np.nanstd(data[np.where(np.bitwise_and(
-        data > firstq, data < thirdq))]))
+
+    in_range_ = np.where(np.bitwise_and(data > firstq, data < thirdq))
+    offset = np.nanmedian(data[in_range_])
+    places = np.where(data > n_sig * np.nanstd(data[in_range_]) + offset)
+
+    """
+    in_range_ = np.where(np.bitwise_and(data > firstq, data < thirdq))
+    offset = np.nanmedian(data[in_range_])
+    places = np.where(data > n_sig * np.nanstd(data[in_range_]) + offset)
+    """
+
     width_y = np.nanstd(places[0])
     width_x = np.nanstd(places[1])
     # These if statements take into account there might only be one significant
@@ -508,7 +525,8 @@ def lame_lmfit_gaussian_centering(
         ('center_x', init_params[ixc], True, 0.0, imageSize),
         ('width_y', init_params[iyw], True, 0.0, imageSize),
         ('width_x', init_params[ixw], True, 0.0, imageSize),
-        ('offset', init_params[ibg], True))
+        ('offset', init_params[ibg], True)
+    )
 
     gfit_model = Model(gaussian, independent_vars=['yy', 'xx'])
 
@@ -595,17 +613,24 @@ def lmfit_one_center(image, yy, xx, gfit_model, lmfit_init_params, yupper, ylowe
 
     fit_values = gfit_res.best_values
 
-    return fit_values['center_y'], fit_values['center_x'], fit_values['width_y'], fit_values['width_x'], fit_values['height'], fit_values['offset']
+    return (
+        fit_values['center_y'],
+        fit_values['center_x'],
+        fit_values['width_y'],
+        fit_values['width_x'],
+        fit_values['height'],
+        fit_values['offset']
+    )
 
 
 # TODO Rename this here and in `fit_gauss`
-def _extracted_from_fit_gauss_25(model1, initParams):
-    print(model1.amplitude_0 - initParams[0], end=" ")
-    print(model1.x_mean_0 - initParams[1], end=" ")
-    print(model1.y_mean_0 - initParams[2], end=" ")
-    print(model1.x_stddev_0 - initParams[3], end=" ")
-    print(model1.y_stddev_0 - initParams[4], end=" ")
-    print(model1.amplitude_1 - initParams[5])
+def print_model_params(model, initParams):
+    print(model.amplitude_0 - initParams[0], end=" ")
+    print(model.x_mean_0 - initParams[1], end=" ")
+    print(model.y_mean_0 - initParams[2], end=" ")
+    print(model.x_stddev_0 - initParams[3], end=" ")
+    print(model.y_stddev_0 - initParams[4], end=" ")
+    print(model.amplitude_1 - initParams[5])
 
 
 def fit_gauss(subFrameNow, xinds, yinds, initParams, print_compare=False):
@@ -639,7 +664,7 @@ def fit_gauss(subFrameNow, xinds, yinds, initParams, print_compare=False):
     model1 = fit_lvmq(model1, xinds, yinds, subFrameNow)
 
     if print_compare:
-        _extracted_from_fit_gauss_25(model1, initParams)
+        print_model_params(model1, initParams)
 
     return model1.parameters
 
@@ -818,7 +843,7 @@ def measure_one_KDE_bg(image, center, aperRad, metric, apMethod='exact'):
     return kdeFrame.support[kdeFrame.density.argmax()]
 
 
-def _extracted_from_measure_one_background_23(
+def compute_annular_mask(
         aperRad, center, image, method='exact'):
 
     innerRad, outerRad = aperRad
@@ -852,19 +877,16 @@ def measure_one_background(
 
     """
 
-    if np.ndim(aperRad) == 0:
+    if np.ndim(aperRad):
+        aperture = compute_annular_mask(
+            aperRad, center, image, method=apMethod)
+    else:
         aperture = CircularAperture(center, aperRad)
         # list of ApertureMask objects (one for each position)
         aperture = aperture.to_mask(method=apMethod)[0]
-        aperture = ~aperture.to_image(image).astype(
-            bool)  # inverse to keep 'outside' aperture
-    else:
-        aperture = _extracted_from_measure_one_background_23(
-            aperRad,
-            center,
-            image,
-            method=apMethod
-        )
+
+        # inverse to keep 'outside' aperture
+        aperture = ~aperture.to_image(image).astype(bool)
 
     if bgMethod == 'median':
         medFrame = np.nanmedian(image[aperture])
