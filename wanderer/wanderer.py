@@ -53,6 +53,7 @@ from .auxiliary import (
     measure_one_median_bg,
     measure_one_KDE_bg,
     moments,
+    pool_run_func
 )
 
 
@@ -382,7 +383,7 @@ class wanderer(object):
 
         print('Loading from Master Files')
         files_path_start = os.path.join(savefiledir, saveFileNameHeader)
-        file_path_template = files_path_start + "{0}" + saveFileType
+        file_path_template = files_path_start + '{0}' + saveFileType
 
         self.centering_df = pd.read_pickle(
             file_path_template.format('_centering_dataframe')
@@ -424,8 +425,24 @@ class wanderer(object):
         for key in self.save_dict.keys():
             exec("self." + key + " = self.save_dict['" + key + "']")
 
+    def save_collection(self, file_path_template):
+        dump_dict = {
+            '_centering_dataframe': self.centering_df,
+            '_background_dataframe': self.background_df,
+            '_flux_TSO_dataframe': self.flux_TSO_df,
+            '_image_cube_array': self.imageCube,
+            '_noise_cube_array': self.noiseCube,
+            '_time_cube_array': self.timeCube,
+            '_image_bad_pix_cube_array': self.imageBadPixMasks,
+            '_save_dict': self.save_dict,
+        }
+
+        for filename_, df_ in dump_dict.items():
+            joblib.dump(df_, file_path_template.format(filename_))
+
     def save_data_to_save_files(
-            self, savefiledir=None, saveFileNameHeader=None, saveFileType='.joblib.save', SaveMaster=True, SaveTime=True):
+            self, savefiledir=None, saveFileNameHeader=None,
+            saveFileType='.joblib.save', SaveMaster=True, SaveTime=True):
         """Class methods are similar to regular functions.
 
         Note:
@@ -441,8 +458,10 @@ class wanderer(object):
         """
 
         if saveFileNameHeader is None:
-            raise Exception(
-                '`saveFileNameHeader` should be the beginning of each save file name')
+            raise ValueError(
+                '`saveFileNameHeader` should be the beginning '
+                'of each save file name'
+            )
 
         if savefiledir is None:
             savefiledir = './'
@@ -471,14 +490,8 @@ class wanderer(object):
             f'{str(hour)}h{str(minute)}m{str(sec)}s'
         )
 
-        # date_string = '_' + str(year) + '-' + str(month) + '-' + str(day) \
-        #     + '_' + str(hour) + 'h' + str(minute) + 'm' + str(sec) + 's'
-
         saveFileTypeBak = date_string + saveFileType
-
         self.initiate_save_dict()
-
-        # self.save_dict = self.__dict__
 
         if SaveMaster:
             print('\nSaving to Master File -- Overwriting Previous Master')
@@ -486,134 +499,16 @@ class wanderer(object):
             files_path_start = os.path.join(savefiledir, saveFileNameHeader)
             file_path_template = files_path_start + "{0}" + saveFileType
 
-            # self.centering_df.to_pickle(
-            #    file_path_template.format('_centering_dataframe' )
-            #   )
-            # self.background_df.to_pickle(file_path_template.format('_background_dataframe')
-            #   )
-            # self.flux_TSO_df.to_pickle(file_path_template.format('_flux_TSO_dataframe'  )
-            #   )
-
-            dump_dict = {
-                '_centering_dataframe': self.centering_df,
-                '_background_dataframe': self.background_df,
-                '_flux_TSO_dataframe': self.flux_TSO_df,
-                '_image_cube_array': self.imageCube,
-                '_noise_cube_array': self.noiseCube,
-                '_time_cube_array': self.timeCube,
-                '_image_bad_pix_cube_array': self.imageBadPixMasks,
-                '_save_dict': self.save_dict,
-            }
-
-            for filename_, df_ in dump_dict.items():
-                joblib.dump(df_, file_path_template.format(filename_))
-
-            """
-            joblib.dump(
-                self.,
-                file_path_template.format('')
-            )
-            joblib.dump(
-                self.,
-                file_path_template.format('')
-            )
-
-            joblib.dump(
-                self.,
-                file_path_template.format('')
-            )
-            joblib.dump(
-                self.,
-                file_path_template.format('')
-            )
-            joblib.dump(
-                self.,
-                file_path_template.format('')
-            )
-
-            joblib.dump(
-                self.,
-                file_path_template.format('')
-            )
-
-            joblib.dump(
-                self.,
-                file_path_template.format('')
-            )
-            """
+            self.save_collection(file_path_template)
 
         if SaveTime:
             print('Saving to New TimeStamped File -- These Tend to Pile Up!')
-            # self.centering_df.to_pickle(
-            #   savefiledir + 'TimeStamped/' + saveFileNameHeader +
-            #   '_centering_dataframe'  + saveFileTypeBak)
-            # self.background_df.to_pickle(
-            #   savefiledir + 'TimeStamped/' + saveFileNameHeader +
-            #   '_background_dataframe' + saveFileTypeBak)
-            # self.flux_TSO_df.to_pickle(
-            #   savefiledir + 'TimeStamped/' + saveFileNameHeader +
-            #   '_flux_TSO_dataframe'   + saveFileTypeBak)
 
             file_path_base = os.path.join(
                 savefiledir, 'TimeStamped', saveFileNameHeader
             )
             file_path_template = file_path_base + '{0}' + saveFileTypeBak
-
-            dump_dict = {
-                '_centering_dataframe': self.centering_df,
-                '_background_dataframe': self.background_df,
-                '_flux_TSO_dataframe': self.flux_TSO_df,
-                '_image_cube_array': self.imageCube,
-                '_noise_cube_array': self.noiseCube,
-                '_time_cube_array': self.timeCube,
-                '_image_bad_pix_cube_array': self.imageBadPixMasks,
-                '_save_dict': self.save_dict,
-            }
-
-            for filename_, df_ in dump_dict.items():
-                joblib.dump(df_, file_path_template.format(filename_))
-
-            """
-            joblib.dump(
-                self.centering_df,
-                filepath_template.format('')
-            )
-
-            joblib.dump(
-                self.background_df,
-                filepath_template.format('')
-            )
-
-            joblib.dump(
-                self.flux_TSO_df,
-                filepath_template.format('')
-            )
-
-            joblib.dump(
-                self.imageCube,
-                filepath_template.format('')
-            )
-
-            joblib.dump(
-                self.noiseCube,
-                filepath_template.format('')
-            )
-
-            joblib.dump(
-                self.timeCube,
-                filepath_template.format('')
-            )
-
-            joblib.dump(
-                self.imageBadPixMasks,
-                filepath_template.format('')
-            )
-
-            joblib.dump(
-                self.save_dict,
-                filepath_template.format('')
-            )
-            """
+            self.save_collection(file_path_template)
 
     def initiate_save_dict(self, dummy=None):
         """Class methods are similar to regular functions.
@@ -984,7 +879,7 @@ class wanderer(object):
         yy = yy0[ylower:yupper, xlower:xupper]
         xx = xx0[ylower:yupper, xlower:xupper]
 
-        pool = Pool(nCores)
+        # pool = Pool(nCores)
 
         func = partial(
             lmfit_one_center,
@@ -999,10 +894,10 @@ class wanderer(object):
             method=method
         )
 
-        gaussian_centers = pool.starmap(func, zip(self.imageCube))
+        gaussian_centers = pool_run_func(func, zip(self.imageCube))
 
-        pool.close()
-        pool.join()
+        # pool.close()
+        # pool.join()
 
         print(
             'Finished with Fitting Centers. Now assigning to instance values.'
@@ -1158,7 +1053,7 @@ class wanderer(object):
 
         # Gaussian fit centering
         # This starts the multiprocessing call to arms
-        pool = Pool(self.nCores)
+        # pool = Pool(self.nCores)
 
         func = partial(
             fit_one_center,
@@ -1171,10 +1066,10 @@ class wanderer(object):
         )
 
         # the order is very important
-        gaussian_centers = pool.starmap(func, zip(self.imageCube))
+        gaussian_centers = pool_run_func(func, zip(self.imageCube))
 
-        pool.close()
-        pool.join()
+        # pool.close()
+        # pool.join()
 
         print('Finished with Fitting Centers. Now assigning to instance values.')
         for kf, gaussP in enumerate(gaussian_centers):
@@ -1290,16 +1185,24 @@ class wanderer(object):
         # self.centering_FluxWeight = np.zeros((self.nFrames, nFWCParams))
 
         # This starts the multiprocessing call to arms
-        pool = Pool(self.nCores)
+        # pool = Pool(self.nCores)
 
-        func = partial(fit_one_center, n_sig=n_sig, method='fwc', ylower=ylower,
-                       yupper=yupper, xlower=xlower, xupper=xupper, bSize=7)
+        func = partial(
+            fit_one_center,
+            n_sig=n_sig,
+            method='fwc',
+            ylower=ylower,
+            yupper=yupper,
+            xlower=xlower,
+            xupper=xupper,
+            bSize=7
+        )
 
         # the order is very important
-        fwc_centers = pool.starmap(func, zip(self.imageCube))
+        fwc_centers = pool_run_func(func, zip(self.imageCube))
 
-        pool.close()
-        pool.join()
+        # pool.close()
+        # pool.join()
 
         self.centering_FluxWeight = np.array(fwc_centers)
 
@@ -1470,7 +1373,7 @@ class wanderer(object):
         # self.centering_LeastAsym = np.zeros((self.nFrames, nAsymParams))
         # for kf in self.tqdm(range(self.nFrames), desc='Asym', leave = False, total=self.nFrames):
         # This starts the multiprocessing call to arms
-        pool = Pool(self.nCores)
+        # pool = Pool(self.nCores)
 
         func = partial(
             actr,
@@ -1483,11 +1386,11 @@ class wanderer(object):
             weights=False
         )
 
-        self.centering_LeastAsym = pool.starmap(func, zip(
+        self.centering_LeastAsym = pool_run_func(func, zip(
             self.imageCube, [[yguess, xguess]]*self.nframes))  # the order is very important
 
-        pool.close()
-        pool.join()
+        # pool.close()
+        # pool.join()
 
         self.centering_LeastAsym = np.array(self.centering_LeastAsym[0])
 
@@ -1616,7 +1519,7 @@ class wanderer(object):
             centers = self.centering_FluxWeight
 
         # This starts the multiprocessing call to arms
-        pool = Pool(self.nCores)
+        # pool = Pool(self.nCores)
 
         func = partial(
             measure_one_circle_bg,
@@ -1625,13 +1528,12 @@ class wanderer(object):
             apMethod='exact'
         )
 
-        self.background_CircleMask = pool.starmap(
-            func,
-            zip(self.imageCube, centers)
+        self.background_CircleMask = pool_run_func(
+            func, zip(self.imageCube, centers)
         )
 
-        pool.close()
-        pool.join()
+        # pool.close()
+        # pool.join()
 
         self.background_CircleMask = np.array(self.background_CircleMask)
         self.background_df['CircleMask'] = self.background_CircleMask.copy()
@@ -1695,7 +1597,7 @@ class wanderer(object):
             centers = self.centering_FluxWeight
 
         # This starts the multiprocessing call to arms
-        pool = Pool(self.nCores)
+        # pool = Pool(self.nCores)
 
         func = partial(
             measure_one_annular_bg,
@@ -1705,11 +1607,11 @@ class wanderer(object):
             apMethod='exact'
         )
 
-        self.background_Annulus = pool.starmap(
+        self.background_Annulus = pool_run_func(
             func, zip(self.imageCube, centers))  # the order is very important
 
-        pool.close()
-        pool.join()
+        # pool.close()
+        # pool.join()
 
         self.background_Annulus = np.array(self.background_Annulus)
         self.background_df['AnnularMask'] = self.background_Annulus.copy()
@@ -1772,16 +1674,16 @@ class wanderer(object):
             centers = self.centering_FluxWeight
 
         # This starts the multiprocessing call to arms
-        pool = Pool(self.nCores)
+        # pool = Pool(self.nCores)
 
         func = partial(measure_one_median_bg, aperRad=aperRad,
                        apMethod='exact', metric=self.metric, n_sig=n_sig)
 
-        self.background_MedianMask = pool.starmap(
+        self.background_MedianMask = pool_run_func(
             func, zip(self.imageCube, centers))
 
-        pool.close()
-        pool.join()
+        # pool.close()
+        # pool.join()
 
         self.background_MedianMask = np.array(self.background_MedianMask)
         self.background_df['MedianMask'] = self.background_MedianMask
@@ -1841,7 +1743,7 @@ class wanderer(object):
         self.background_KDEUniv = np.zeros(self.nFrames)
 
         # This starts the multiprocessing call to arms
-        pool = Pool(self.nCores)
+        # pool = Pool(self.nCores)
 
         func = partial(
             measure_one_KDE_bg,
@@ -1850,13 +1752,13 @@ class wanderer(object):
             metric=self.metric
         )
 
-        self.background_KDEUniv = pool.starmap(
+        self.background_KDEUniv = pool_run_func(
             func,
             zip(self.imageCube, centers)
         )  # the order is very important
 
-        pool.close()
-        pool.join()
+        # pool.close()
+        # pool.join()
 
         self.background_KDEUniv = np.array(self.background_KDEUniv)
         self.background_df['KDEUnivMask_mp'] = self.background_KDEUniv
@@ -1910,26 +1812,35 @@ class wanderer(object):
         y, x = 0, 1
 
         if background not in self.background_df.columns:
-            raise Exception("`background` must be in",
-                            self.background_df.columns)
+            raise KeyError("`background` must be in",
+                           self.background_df.columns)
 
-        if centering not in ['Gaussian_Fit', 'Gaussian_Mom', 'FluxWeighted', 'LeastAsymmetry']:
-            raise Exception(
+        centering_options = [
+            'Gaussian_Fit',
+            'Gaussian_Mom',
+            'FluxWeighted',
+            'LeastAsymmetry'
+        ]
+        if centering not in centering_options:
+            raise ValueError(
                 "`centering` must be either 'Gaussian_Fit', 'Gaussian_Mom', 'FluxWeighted', or 'LeastAsymmetry'")
 
         if aperRad is None:
+            staticRad = 70 if 'wlp' in self.fitsFilenames[0].lower() else 3
+            """
             if 'wlp' in self.fitsFilenames[0].lower():
                 staticRad = 70
             else:
                 staticRad = 3
+            """
 
-        centering_Use = np.transpose([self.centering_df[centering + '_Y_Centers'],
-                                      self.centering_df[centering + '_X_Centers']])
+        y_centers = self.centering_df[centering + '_Y_Centers']
+        x_centers = self.centering_df[centering + '_X_Centers']
+        centering_Use = np.transpose([y_centers, x_centers])
 
         background_Use = self.background_df[background]
 
-        flux_key_now = centering + '_' + background + \
-            '_' + 'rad' + '_' + str(aperRad)
+        flux_key_now = f"{centering}_{background}_rad_{aperRad}"
 
         if flux_key_now not in self.flux_TSO_df.keys() or useTheForce:
             flux_TSO_now = np.zeros(self.nFrames)
@@ -1942,8 +1853,9 @@ class wanderer(object):
                 noiseNow = np.copy(self.noiseCube[kf])**2.
                 noiseNow[np.isnan(noiseNow)] = np.nanmedian(noiseNow)
 
-                aperture = CircularAperture(
-                    [centering_Use[kf][self.x], centering_Use[kf][self.y]], r=aperRad)
+                x_center_ = centering_Use[kf][self.x]
+                y_center_ = centering_Use[kf][self.y]
+                aperture = CircularAperture([x_center_, y_center_], r=aperRad)
 
                 flux_TSO_now[kf] = aperture_photometry(
                     frameNow, aperture)['aperture_sum']
@@ -1954,10 +1866,13 @@ class wanderer(object):
             self.noise_TSO_df[flux_key_now] = noise_TSO_now
         else:
             print(
-                flux_key_now + ' exists: if you want to overwrite, then you `useTheForce=True`')
+                f'{flux_key_now} exists: '
+                'if you want to overwrite, then you `useTheForce=True`'
+            )
 
-    def compute_flux_over_time_over_aperRad(self, aperRads=[], centering_choices=[], background_choices=[],
-                                            useTheForce=False, verbose=False):
+    def compute_flux_over_time_over_aperRad(
+            self, aperRads=None, centering_choices=None,
+            background_choices=None, useTheForce=False, verbose=False):
         """Class methods are similar to regular functions.
 
         Note:
@@ -1978,24 +1893,32 @@ class wanderer(object):
             for ctrNow in centering_choices:
                 for aperRad in aperRads:
                     if verbose:
-                        print('Working on Background {} with Centering {} and AperRad {}'.format(
-                            bgNow, ctrNow, aperRad), end=" ")
+                        print(
+                            f'Working on Background {bgNow} '
+                            f'with Centering {ctrNow} and AperRad {aperRad}',
+                            end=" ",
+                        )
 
-                    self.compute_flux_over_time(aperRad=aperRad,
-                                                centering=ctrNow,
-                                                background=bgNow,
-                                                useTheForce=useTheForce)
+                    self.compute_flux_over_time(
+                        aperRad=aperRad,
+                        centering=ctrNow,
+                        background=bgNow,
+                        useTheForce=useTheForce
+                    )
 
-                    flux_key_now = "{}_{}_rad_{}".format(
-                        ctrNow, bgNow, aperRad)
+                    flux_key_now = f"{ctrNow}_{bgNow}_rad_{aperRad}"
 
                     if verbose:
                         flux_now = self.flux_TSO_df[flux_key_now]
-                        print(np.nanstd(flux_now / np.nanmedian(flux_now)) * ppm)
+                        print(
+                            np.nanstd(flux_now / np.nanmedian(flux_now)) * ppm
+                        )
 
         print('Operation took: ', time()-start)
 
-    def mp_compute_flux_over_time(self, aperRad=3.0, centering='GaussianFit', background='AnnularMask', useTheForce=False):
+    def mp_compute_flux_over_time(
+            self, aperRad=3.0, centering='GaussianFit',
+            background='AnnularMask', useTheForce=False):
         """Class methods are similar to regular functions.
 
         Note:
@@ -2013,8 +1936,8 @@ class wanderer(object):
         y, x = 0, 1
 
         if background not in self.background_df.columns:
-            raise Exception("`background` must be in",
-                            self.background_df.columns)
+            raise KeyError("`background` must be in",
+                           self.background_df.columns)
 
         if centering not in ['Gaussian_Fit', 'Gaussian_Mom', 'FluxWeighted', 'LeastAsymmetry']:
             raise Exception(
@@ -2031,15 +1954,16 @@ class wanderer(object):
         if flux_key_now not in self.flux_TSO_df.keys() or useTheForce:
             # for kf in self.tqdm(range(self.nFrames), desc='Flux', leave = False, total=self.nFrames):
 
-            pool = Pool(self.nCores)
+            # pool = Pool(self.nCores)
 
             func = partial(compute_flux_one_frame, aperRad=aperRad)
 
-            fluxNow = pool.starmap(
-                func, zip(self.imageCube, centering_Use, background_Use))
+            fluxNow = pool_run_func(
+                func, zip(self.imageCube, centering_Use, background_Use)
+            )
 
-            pool.close()
-            pool.join()
+            # pool.close()
+            # pool.join()
 
             # fluxNow[~np.isfinite(fluxNow)] = np.nanmedian(fluxNow[np.isfinite(fluxNow)])
             # fluxNow[fluxNow < 0] = np.nanmedian(fluxNow[fluxNow > 0])
@@ -2069,42 +1993,53 @@ class wanderer(object):
         y, x = 0, 1
 
         if background not in self.background_df.columns:
-            raise Exception("`background` must be in",
-                            self.background_df.columns)
+            raise KeyError("`background` must be in",
+                           self.background_df.columns)
 
-        if centering not in ['Gaussian_Fit', 'Gaussian_Mom', 'FluxWeighted', 'LeastAsymmetry']:
-            raise Exception(
-                "`centering` must be either 'Gaussian_Fit', 'Gaussian_Mom', 'FluxWeighted', or 'LeastAsymmetry'")
+        centering_options = [
+            'Gaussian_Fit',
+            'Gaussian_Mom',
+            'FluxWeighted',
+            'LeastAsymmetry'
+        ]
+        if centering not in centering_options:
+            raise KeyError(
+                "`centering` must be either 'Gaussian_Fit', 'Gaussian_Mom', "
+                "'FluxWeighted', or 'LeastAsymmetry'"
+            )
 
-        centering_Use = np.transpose([self.centering_df[centering + '_Y_Centers'],
-                                      self.centering_df[centering + '_X_Centers']])
+        y_center_ = self.centering_df[centering + '_Y_Centers']
+        x_center_ = self.centering_df[centering + '_X_Centers']
+        centering_Use = np.transpose([y_center_, x_center_])
 
         background_Use = self.background_df[background]
 
-        flux_key_now = centering + '_' + background+'_' + \
-            'rad' + '_' + str(staticRad) + '_' + str(varRad)
+        flux_key_now = f'{centering}_{background}_rad_{staticRad}_{varRad}'
 
-        assert (isinstance(staticRad, (float, int)))
+        assert (isinstance(staticRad, (float, int))), (
+            'staticRad must be either a float or an integer'
+        )
 
         if varRad is None or varRad == 0.0:
-            aperRads = [staticRad]*self.nFrames
+            aperRads = [staticRad] * self.nFrames
         else:
-            quad_rad_dist = self.quadrature_widths.copy() - np.nanmedian(self.quadrature_widths)
+            med_quad_rad_dist = np.nanmedian(self.quadrature_widths)
+            quad_rad_dist = self.quadrature_widths.copy() - med_quad_rad_dist
             quad_rad_dist = clipOutlier(quad_rad_dist, n_sig=5)
             aperRads = staticRad + varRad*quad_rad_dist
 
         if flux_key_now not in self.flux_TSO_df.keys() or useTheForce:
             # for kf in self.tqdm(range(self.nFrames), desc='Flux', leave = False, total=self.nFrames):
 
-            pool = Pool(self.nCores)
+            # pool = Pool(self.nCores)
 
             # func = partial(compute_flux_one_frame)
 
-            fluxNow = pool.starmap(compute_flux_one_frame,
-                                   zip(self.imageCube, centering_Use, background_Use, aperRads))
+            fluxNow = pool_run_func(compute_flux_one_frame,
+                                    zip(self.imageCube, centering_Use, background_Use, aperRads))
 
-            pool.close()
-            pool.join()
+            # pool.close()
+            # pool.join()
 
             # fluxNow[~np.isfinite(fluxNow)] = np.nanmedian(fluxNow[np.isfinite(fluxNow)])
             # fluxNow[fluxNow < 0] = np.nanmedian(fluxNow[fluxNow > 0])
@@ -2161,15 +2096,15 @@ class wanderer(object):
                 self.quadrature_widths if useQuad else np.sqrt(
                     self.effective_widths)
 
-            pool = Pool(self.nCores)
+            # pool = Pool(self.nCores)
 
             # func = partial(compute_flux_one_frame)
 
-            fluxNow = pool.starmap(compute_flux_one_frame, zip(
+            fluxNow = pool_run_func(compute_flux_one_frame, zip(
                 self.imageCube, centering_Use, background_Use, aperRads))
 
-            pool.close()
-            pool.join()
+            # pool.close()
+            # pool.join()
 
             # fluxNow[~np.isfinite(fluxNow)] = np.nanmedian(fluxNow[np.isfinite(fluxNow)])
             # fluxNow[fluxNow < 0] = np.nanmedian(fluxNow[fluxNow > 0])
@@ -2298,23 +2233,24 @@ class wanderer(object):
             self.inliers_Phots = {}
 
         # This starts the multiprocessing call to arms
-        pool = Pool(self.nCores)
+        # pool = Pool(self.nCores)
 
         func = partial(DBScan_Flux, ycenters=ycenters,
                        xcenters=xcenters, dbsClean=dbsClean)
 
         # the order is very important
-        inliersMP = pool.starmap(func, zip(self.flux_TSO_df.values.T))
+        inliersMP = pool_run_func(func, zip(self.flux_TSO_df.values.T))
 
-        pool.close()
-        pool.join()
+        # pool.close()
+        # pool.join()
 
         for k_mp, flux_key_now in enumerate(self.flux_TSO_df.keys()):
             self.inliers_Phots[flux_key_now] = inliersMP[k_mp]
 
     def mp_DBScan_PLD_All(self, dbsClean=0):
         raise Exception(
-            'This Function is Not Working; please use lame_`DBScan_PLD_all`')
+            'This Function is Not Working; please use lame_`DBScan_PLD_all`'
+        )
         """Class methods are similar to regular functions.
 
         Note:
@@ -2329,21 +2265,19 @@ class wanderer(object):
 
         """
 
-        try:
-            self.inliers_PLD = self.inliers_PLD
-        except:
+        if not hasattr(self, "inliers_PLD"):
             self.inliers_PLD = np.ones(self.PLD_components.shape, dtype=bool)
 
         # This starts the multiprocessing call to arms
-        pool = Pool(self.nCores)
+        # pool = Pool(self.nCores)
 
         func = partial(DBScan_Segmented_Flux, dbsClean=dbsClean)
 
         # the order is very important
-        inliersMP = pool.starmap(func, zip(self.PLD_components.T))
+        inliersMP = pool_run_func(func, zip(self.PLD_components.T))
 
-        pool.close()
-        pool.join()
+        # pool.close()
+        # pool.join()
 
         for k_mp, inlier in enumerate(inliersMP):
             self.inliers_PLD[k_mp] = inlier
@@ -2363,9 +2297,7 @@ class wanderer(object):
 
         """
 
-        try:
-            self.inliers_PLD = self.inliers_PLD
-        except:
+        if not hasattr(self, "inliers_PLD"):
             self.inliers_PLD = np.ones(self.PLD_components.shape, dtype=bool)
 
         for kPLD, PLDnow in enumerate(self.PLD_components):
