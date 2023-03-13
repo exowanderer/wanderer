@@ -103,35 +103,46 @@ def clipOutlier2D(arr2D, n_sig=10):
 # channel = 'ch2/'
 
 
-dataSub = fits_format+'/'
+dataSub = f'{fits_format}/'
 
 if data_dir == '':
-    data_dir = environ['HOME'] + planetDirectory + \
-        planetName + data_sub_dir + channel + data_tail_dir
-print('Current Data Dir: {}'.format(data_dir))
+    data_dir = os.path.join(
+        os.environ['HOME'],
+        planetDirectory,
+        planetName,
+        data_sub_dir,
+        channel,
+        data_tail_dir
+    )
 
-fileExt = '*{}.fits'.format(fits_format)
-uncsExt = '*{}.fits'.format(unc_format)
+print(f'Current Data Dir: {data_dir}')
+
+fileExt = f'*{fits_format}.fits'
+uncsExt = f'*{unc_format}.fits'
 
 loadfitsdir = data_dir + aor_dir + '/' + channel + '/' + dataSub
 
-print('Directory to load fits files from: {}'.format(loadfitsdir))
+print(f'Directory to load fits files from: {loadfitsdir}')
 
 nCores = cpu_count()
-print('Found {} cores to process'.format(nCores))
+print(f'Found {nCores} cores to process')
 
 fitsFilenames = glob(loadfitsdir + fileExt)
 uncsFilenames = glob(loadfitsdir + uncsExt)
 
-print('Found {} {}.fits files'.format(len(fitsFilenames), fits_format))
-print('Found {} unc.fits files'.format(len(uncsFilenames)))
+n_fitsfiles = len(fitsFilenames)
+n_uncfiles = len(uncsFilenames)
+print(f'Found {n_fitsfiles} {fits_format}.fits files')
+print(f'Found {n_uncfiles} unc.fits files')
 
 if len(fitsFilenames) == 0:
-    raise ValueError('There are NO `{}.fits` files in the directory {}'.format(
-        fits_format, loadfitsdir))
+    raise ValueError(
+        'There are NO `{fits_format}.fits` files in the directory {loadfitsdir}'
+    )
 if len(uncsFilenames) == 0:
-    raise ValueError('There are NO `{}.fits` files in the directory {}'.format(
-        unc_format, loadfitsdir))
+    raise ValueError(
+        'There are NO `{unc_format}.fits` files in the directory {loadfitsdir}'
+    )
 
 do_db_scan = False  # len(fitsFilenames*64) < 6e4
 if do_db_scan:
@@ -140,8 +151,11 @@ else:
     print('There are too many images for a DB-Scan; i.e. >1e5 images')
 
 header_test = fits.getheader(fitsFilenames[0])
-print('\n\nAORLABEL:\t{}\nNum Fits Files:\t{}\nNum Unc Files:\t{}\n\n'.format(
-    header_test['AORLABEL'], len(fitsFilenames), len(uncsFilenames)))
+print(
+    f'\n\nAORLABEL:\t{header_test["AORLABEL"]}'+'\n'
+    f'Num Fits Files:\t{len(fitsFilenames)}'+'\n'
+    f'Num Unc Files:\t{len(uncsFilenames)}\n\n'
+)
 
 if verbose:
     print(fitsFilenames)
@@ -154,7 +168,7 @@ y, x = 0, 1
 
 yguess, xguess = 15., 15.   # Specific to Spitzer circa 2010 and beyond
 # Specific to Spitzer Basic Calibrated Data
-filetype = '{}.fits'.format(fits_format)
+filetype = f'{fits_format}.fits'
 
 print('Initialize an instance of `wanderer` as `example_wanderer_median`\n')
 example_wanderer_median = wanderer(
@@ -205,7 +219,6 @@ print(
 
 if do_db_scan:
     print('DBScanning Gaussian Fit Centers')
-    from sklearn.cluster import DBSCAN
 
     dbs = DBSCAN(n_jobs=-1, eps=0.2, leaf_size=10)
     dbsPred = dbs.fit_predict(example_wanderer_median.centering_GaussianFit)
@@ -221,7 +234,7 @@ else:
 #       example_wanderer_median.centering_GaussianFit - medGaussCenters
 #   ) > 4*sclGaussCenterAvg
 # )[0]
-# print('There are {} outliers remaining'.format(len(stillOutliers)))
+# print(f'There are {len(stillOutliers)} outliers remaining')
 
 if do_db_scan:
     dbsClean = 0
@@ -230,19 +243,19 @@ if do_db_scan:
 # nCores = example_wanderer_median.nCores
 start = time()
 example_wanderer_median.mp_measure_background_circle_masked()
-print('CircleBG took {} seconds with {} cores'.format(time() - start, nCores))
+print(f'CircleBG took {time() - start} seconds with {nCores} cores')
 
 start = time()
 example_wanderer_median.mp_measure_background_annular_mask()
-print('AnnularBG took {} seconds with {} cores'.format(time() - start, nCores))
+print(f'AnnularBG took {time() - start} seconds with {nCores} cores')
 
 start = time()
 example_wanderer_median.mp_measure_background_KDE_Mode()
-print('KDEUnivBG took {} seconds with {} cores'.format(time() - start, nCores))
+print(f'KDEUnivBG took {time() - start} seconds with {nCores} cores')
 
 start = time()
 example_wanderer_median.mp_measure_background_median_masked()
-print('MedianBG took {} seconds with {} cores'.format(time() - start, nCores))
+print(f'MedianBG took {time() - start} seconds with {nCores} cores')
 
 example_wanderer_median.measure_effective_width()
 print(
@@ -250,14 +263,18 @@ print(
     np.sqrt(example_wanderer_median.effective_widths).mean()
 )
 
-print('Pipeline took {} seconds thus far'.format(time() - startFull))
+print(f'Pipeline took {time() - startFull} seconds thus far')
 
-print('Iterating over Background Techniques, Centering Techniques, Aperture Radii' + '\n')
+print(
+    'Iterating over Background Techniques, Centering Techniques, '
+    'Aperture Radii' + '\n'
+)
 # , 'Gaussian_Mom', 'FluxWeighted']#, 'LeastAsymmetry']
 centering_choices = ['Gaussian_Fit']
+
 # example_wanderer_median.background_df.columns
 background_choices = ['AnnularMask']
-staticRads = np.arange(1, 6, 0.5)  # [1.0 ]# aperRads = np.arange(1, 6,0.5)
+staticRads = np.arange(1, 6, 0.5)  # [1.0 ]  # aperRads = np.arange(1, 6,0.5)
 varRads = [0.0, 0.25, 0.50, 0.75, 1.0, 1.25, 1.50]  # [None]#
 
 med_quad_widths = np.nanmedian(example_wanderer_median.quadrature_widths)
@@ -280,7 +297,7 @@ print('**Create Beta Variable Radius**')
 # Gaussian_Fit_AnnularMask_rad_betaRad_0.0_0.0
 example_wanderer_median.mp_compute_flux_over_time_betaRad()
 
-print('Entire Pipeline took {} seconds'.format(time() - startFull))
+print(f'Entire Pipeline took {time() - startFull} seconds')
 
 if do_db_scan:
     print('DB_Scanning All Flux Vectors')
@@ -297,7 +314,10 @@ if do_db_scan:
     print('Running DBScan on the PLD Components')
     example_wanderer_median.mp_DBScan_PLD_All()
 
-print('Saving `example_wanderer_median` to a set of pickles for various Image Cubes and the Storage Dictionary')
+print(
+    'Saving `example_wanderer_median` to a set of pickles for various '
+    'Image Cubes and the Storage Dictionary'
+)
 
 savefiledir_parts = [
     os.environ['HOME'] + planetDirectory,
@@ -313,9 +333,10 @@ for sfpart in savefiledir_parts:
     if not os.path.exists(savefiledir):
         os.mkdir(savefiledir)
 
-# savefiledir         = environ['HOME']+planetDirectory+planetName+'/' + save_sub_dir + '/' + channel + '/' + aor_dir + '/'
+# savefiledir = environ['HOME']+planetDirectory+planetName+'/'
+#   + save_sub_dir + '/' + channel + '/' + aor_dir + '/'
 
-saveFileNameHeader = planetName+'_' + aor_dir + '_Median'
+saveFileNameHeader = f'{planetName}_{aor_dir}_Median'
 saveFileType = '.joblib.save'
 
 path_to_files = os.path.join(
