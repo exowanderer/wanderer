@@ -577,79 +577,7 @@ class wanderer(object):
                     print('The following do not yet exist:')
                     notYet = False
 
-                print("\tself."+thing)  # +" does not yet exist")
-
-        # for thing in _stored_variables:
-        #     exec("try: self.save_dict['"+thing+"'] = self."+thing+"\nexcept: print('self."+thing+" does not yet exist')")
-        #
-        # try:self.save_dict['background_Annulus'] = self.background_Annulus
-        # except: pass
-        #
-        # try:self.save_dict['background_CircleMask'] = self.background_CircleMask
-        # except: pass
-        #
-        # try:self.save_dict['background_GaussianFit'] = self.background_GaussianFit
-        # except: pass
-        #
-        # try:self.save_dict['background_KDEUniv'] = self.background_KDEUniv
-        # except: pass
-        #
-        # try:self.save_dict['background_MedianMask'] = self.background_MedianMask
-        # except: pass
-        #
-        # try:self.save_dict['centering_FluxWeight'] = self.centering_FluxWeight
-        # except: pass
-        #
-        # try:self.save_dict['centering_GaussianFit'] = self.centering_GaussianFit
-        # except: pass
-        #
-        # try:self.save_dict['centering_LeastAsym'] = self.centering_LeastAsym
-        # except: pass
-        #
-        # try:self.save_dict['effective_widths'] = self.effective_widths
-        # except: pass
-        #
-        # try:self.save_dict['fitsFileDir'] = self.fitsFileDir
-        # except: pass
-        #
-        # try:self.save_dict['fitsFilenames'] = self.fitsFilenames
-        # except: pass
-        #
-        # try:self.save_dict['heights_GaussianFit'] = self.heights_GaussianFit
-        # except: pass
-        #
-        # try:self.save_dict['inliers_Phots'] = self.inliers_Phots
-        # except: pass
-        #
-        # try:self.save_dict['inliersPLD'] = self.inliers_PLD
-        # except: pass
-        #
-        # try:self.save_dict['method'] = self.method
-        # except: pass
-        #
-        # try:self.save_dict['pix_rad'] = self.pix_rad
-        # except: pass
-        #
-        # try:self.save_dict['nFrames'] = self.nFrames
-        # except: pass
-        #
-        # try:self.save_dict['PLD_components'] = self.PLD_components
-        # except: pass
-        #
-        # try:self.save_dict['PLD_norm'] = self.PLD_norm
-        # except: pass
-        #
-        # try:self.save_dict['quadrature_widths'] = self.quadrature_widths
-        # except: pass
-        #
-        # try:self.save_dict['yguess'] = self.yguess
-        # except: pass
-        #
-        # try:self.save_dict['xguess'] = self.xguess
-        # except: pass
-        #
-        # try:self.save_dict['widths_GaussianFit'] = self.widths_GaussianFit
-        # except: pass
+                print("\tself." + thing)  # +" does not yet exist")
 
     def copy_instance(self):
         """Class methods are similar to regular functions.
@@ -816,7 +744,9 @@ class wanderer(object):
         self.centering_df['Gaussian_Fit_Offset'] = self.background_GaussianFit
 
     def mp_lmfit_gaussian_centering(
-            self, yguess=15, xguess=15, subArraySize=10, init_params=None, useMoments=False, nCores=cpu_count(), center_range=None, width_range=None, n_sig=6.1, method='leastsq', recheckMethod=None,
+            self, yguess=15, xguess=15, subArraySize=10, init_params=None,
+            useMoments=False, nCores=cpu_count(), center_range=None,
+            width_range=None, n_sig=6.1, method='leastsq', recheckMethod=None,
             median_crop=False, verbose=False):
         """Class methods are similar to regular functions.
 
@@ -986,7 +916,8 @@ class wanderer(object):
 
         try:
             self.centering_df = self.centering_df  # check if it exists
-        except:
+        except Exception as err:
+            print(f"Option X Fit Failed as {err}")
             self.centering_df = pd.DataFrame()       # create it if it does not exist
 
         self.centering_df['Gaussian_Fit_Y_Centers'] = self.centering_GaussianFit.T[self.y]
@@ -1085,14 +1016,19 @@ class wanderer(object):
             self.background_GaussianFit[kf] = gaussP[5]
             """
 
-        self.centering_df = pd.DataFrame()
-        self.centering_df['Gaussian_Fit_Y_Centers'] = self.centering_GaussianFit.T[y]
-        self.centering_df['Gaussian_Fit_X_Centers'] = self.centering_GaussianFit.T[x]
-        self.centering_df['Gaussian_Mom_Y_Centers'] = self.centering_GaussianFit.T[y]
-        self.centering_df['Gaussian_Mom_X_Centers'] = self.centering_GaussianFit.T[x]
+        y_center = self.centering_GaussianFit.T[y]
+        x_center = self.centering_GaussianFit.T[x]
 
-        self.centering_df['Gaussian_Fit_Y_Widths'] = self.widths_GaussianFit.T[y]
-        self.centering_df['Gaussian_Fit_X_Widths'] = self.widths_GaussianFit.T[x]
+        y_width = self.widths_GaussianFit.T[y]
+        x_width = self.widths_GaussianFit.T[x]
+        self.centering_df = pd.DataFrame()
+        self.centering_df['Gaussian_Fit_Y_Centers'] = y_center
+        self.centering_df['Gaussian_Fit_X_Centers'] = x_center
+        self.centering_df['Gaussian_Mom_Y_Centers'] = y_center
+        self.centering_df['Gaussian_Mom_X_Centers'] = x_center
+
+        self.centering_df['Gaussian_Fit_Y_Widths'] = y_width
+        self.centering_df['Gaussian_Fit_X_Widths'] = x_width
 
         self.centering_df['Gaussian_Fit_Heights'] = self.heights_GaussianFit
         self.centering_df['Gaussian_Fit_Offset'] = self.background_GaussianFit
@@ -1116,18 +1052,15 @@ class wanderer(object):
 
         y, x = 0, 1
 
-        yinds0, xinds0 = np.indices(self.imageCube[0].shape)
+        # yinds0, xinds0 = np.indices(self.imageCube[0].shape)
 
-        ylower = self.yguess - self.pix_rad
-        yupper = self.yguess + self.pix_rad
-        xlower = self.xguess - self.pix_rad
-        xupper = self.xguess + self.pix_rad
+        ylower = np.int32(self.yguess - self.pix_rad)
+        yupper = np.int32(self.yguess + self.pix_rad)
+        xlower = np.int32(self.xguess - self.pix_rad)
+        xupper = np.int32(self.xguess + self.pix_rad)
 
-        ylower, xlower, yupper, xupper = np.int32(
-            [ylower, xlower, yupper, xupper])
-
-        yinds = yinds0[ylower:yupper, xlower:xupper]
-        xinds = xinds0[ylower:yupper, xlower:xupper]
+        # yinds = yinds0[ylower:yupper, xlower:xupper]
+        # xinds = xinds0[ylower:yupper, xlower:xupper]
 
         nFWCParams = 2  # Xc, Yc
         self.centering_FluxWeight = np.zeros((self.nFrames, nFWCParams))
@@ -1141,17 +1074,21 @@ class wanderer(object):
                 self.imageCube[kf],
                 self.yguess,
                 self.xguess,
-                bSize=7
+                b_size=7
             )
             self.centering_FluxWeight[kf] = self.centering_FluxWeight[kf][::-1]
 
         self.centering_FluxWeight[:, 0] = clipOutlier(
-            self.centering_FluxWeight.T[0])
+            self.centering_FluxWeight.T[0]
+        )
         self.centering_FluxWeight[:, 1] = clipOutlier(
-            self.centering_FluxWeight.T[1])
+            self.centering_FluxWeight.T[1]
+        )
 
-        self.centering_df['FluxWeighted_Y_Centers'] = self.centering_FluxWeight.T[self.y]
-        self.centering_df['FluxWeighted_X_Centers'] = self.centering_FluxWeight.T[self.x]
+        y_center_ = self.centering_FluxWeight.T[self.y]
+        x_center_ = self.centering_FluxWeight.T[self.x]
+        self.centering_df['FluxWeighted_Y_Centers'] = y_center_
+        self.centering_df['FluxWeighted_X_Centers'] = x_center_
 
     def mp_fit_flux_weighted_centering(self, n_sig=False):
         """Class methods are similar to regular functions.
@@ -1168,20 +1105,20 @@ class wanderer(object):
 
         """
 
-        yinds0, xinds0 = np.indices(self.imageCube[0].shape)
+        # yinds0, xinds0 = np.indices(self.imageCube[0].shape)
 
-        ylower = self.yguess - self.pix_rad
-        yupper = self.yguess + self.pix_rad
-        xlower = self.xguess - self.pix_rad
-        xupper = self.xguess + self.pix_rad
+        ylower = np.int32(self.yguess - self.pix_rad)
+        yupper = np.int32(self.yguess + self.pix_rad)
+        xlower = np.int32(self.xguess - self.pix_rad)
+        xupper = np.int32(self.xguess + self.pix_rad)
 
-        ylower, xlower, yupper, xupper = np.int32(
-            [ylower, xlower, yupper, xupper])
+        # ylower, xlower, yupper, xupper = np.int32(
+        #     [ylower, xlower, yupper, xupper])
 
-        yinds = yinds0[ylower:yupper, xlower:xupper]
-        xinds = xinds0[ylower:yupper, xlower:xupper]
+        # yinds = yinds0[ylower:yupper, xlower:xupper]
+        # xinds = xinds0[ylower:yupper, xlower:xupper]
 
-        nFWCParams = 2  # Xc, Yc
+        # nFWCParams = 2  # Xc, Yc
         # self.centering_FluxWeight = np.zeros((self.nFrames, nFWCParams))
 
         # This starts the multiprocessing call to arms
@@ -1195,7 +1132,7 @@ class wanderer(object):
             yupper=yupper,
             xlower=xlower,
             xupper=xupper,
-            bSize=7
+            b_size=7
         )
 
         # the order is very important
@@ -1206,8 +1143,10 @@ class wanderer(object):
 
         self.centering_FluxWeight = np.array(fwc_centers)
 
-        self.centering_df['FluxWeighted_Y_Centers'] = self.centering_FluxWeight.T[self.y]
-        self.centering_df['FluxWeighted_X_Centers'] = self.centering_FluxWeight.T[self.x]
+        y_center_ = self.centering_FluxWeight.T[self.y]
+        x_center_ = self.centering_FluxWeight.T[self.x]
+        self.centering_df['FluxWeighted_Y_Centers'] = y_center_
+        self.centering_df['FluxWeighted_X_Centers'] = x_center_
 
     def fit_least_asymmetry_centering(self):
         """Class methods are similar to regular functions.
@@ -1226,38 +1165,51 @@ class wanderer(object):
 
         y, x = 0, 1
 
-        yinds0, xinds0 = np.indices(self.imageCube[0].shape)
+        # yinds0, xinds0 = np.indices(self.imageCube[0].shape)
 
-        ylower = self.yguess - self.pix_rad
-        yupper = self.yguess + self.pix_rad
-        xlower = self.xguess - self.pix_rad
-        xupper = self.xguess + self.pix_rad
+        ylower = np.int32(self.yguess - self.pix_rad)
+        yupper = np.int32(self.yguess + self.pix_rad)
+        xlower = np.int32(self.xguess - self.pix_rad)
+        xupper = np.int32(self.xguess + self.pix_rad)
 
-        ylower, xlower, yupper, xupper = np.int32(
-            [ylower, xlower, yupper, xupper])
+        # ylower, xlower, yupper, xupper = np.int32(
+        #     [ylower, xlower, yupper, xupper])
 
-        yinds = yinds0[ylower:yupper+1, xlower:xupper+1]
-        xinds = xinds0[ylower:yupper+1, xlower:xupper+1]
+        # yinds = yinds0[ylower:yupper+1, xlower:xupper+1]
+        # xinds = xinds0[ylower:yupper+1, xlower:xupper+1]
 
         nAsymParams = 2  # Xc, Yc
         self.centering_LeastAsym = np.zeros((self.nFrames, nAsymParams))
 
-        for kf in self.tqdm(range(self.nFrames), desc='Asym', leave=False, total=self.nFrames):
-            # The following is a sequence of error handling and reattempts to center fit
-            #   using the least_asymmetry algorithm
-            #
-            # The least_asymmetry algorithm returns a RunError if the center is not found in the image
-            # Our experience shows that these failures are strongly correlated with the existence of a
-            #   cosmic ray hit nearby the PSF.
-            #
-            # Option 1: We run `actr` with default settings -- developed for Spitzer exoplanet lightcurves
-            # Option 2: We assume that there is a deformation in the PSF and square the image array (preserving signs)
-            # Option 3: We assume that there is a cosmic ray hit nearby the PSF and shrink the asym_rad by half
-            # Option 4: We assume that there is a deformation in the PSF AND (or caused by) a cosmic ray hit
-            #   nearby the PSF; so we square the image array (preserving signs) AND shrink the asym_rad by half
-            # Option 5: We assume that there is a deformation in the PSF AND (or caused by) a cosmic ray hit
-            #   nearby the PSF; so we square the image array (preserving signs) AND shrink the asym_rad by half
-            #   BUT this time we have to get crazy and shrink the asym_size to 2 (reduces accuracy dramatically)
+        progress_frame = self.tqdm(
+            range(self.nFrames),
+            desc='Asym',
+            leave=False,
+            total=self.nFrames
+        )
+        for kf in progress_frame:
+            """
+            The following is a sequence of error handling and reattempts to center fit using the least_asymmetry algorithm
+
+            The least_asymmetry algorithm returns a RunError if the center is not found in the image
+            Our experience shows that these failures are strongly correlated with the existence of a cosmic ray hit nearby the PSF.
+
+            Option 1: We run `actr` with default settings 
+                -- developed for Spitzer exoplanet lightcurves
+            Option 2: We assume that there is a deformation in the PSF 
+                and square the image array (preserving signs)
+            Option 3: We assume that there is a cosmic ray hit nearby 
+                the PSF and shrink the asym_rad by half
+            Option 4: We assume that there is a deformation in the PSF AND 
+                (or caused by) a cosmic ray hit nearby the PSF; so we square 
+                the image array (preserving signs) 
+                AND shrink the asym_rad by half
+            Option 5: We assume that there is a deformation in the PSF AND 
+                (or caused by) a cosmic ray hit nearby the PSF; so we square 
+                the image array (preserving signs) AND shrink the asym_rad by 
+                half BUT this time we have to get crazy and shrink the 
+                asym_size to 2 (reduces accuracy dramatically)
+            """
 
             fitFailed = False  # "Benefit of the Doubt"
 
@@ -1265,58 +1217,99 @@ class wanderer(object):
             kf, yguess, xguess = np.int32([kf, self.yguess, self.xguess])
 
             try:
-                center_asym = actr(self.imageCube[kf], [yguess, xguess],
-                                   asym_rad=8, asym_size=5, maxcounts=2, method='gaus',
-                                   half_pix=False, resize=False, weights=False)[0]
-            except:
+                center_asym = actr(
+                    self.imageCube[kf],
+                    [yguess, xguess],
+                    asym_rad=8,
+                    asym_size=5,
+                    maxcounts=2,
+                    method='gaus',
+                    half_pix=False,
+                    resize=False,
+                    weights=False)[0]
+            except Exception as err:
+                print(f"Option 1 Fit Failed as {err}")
                 fitFailed = True
 
             # Option 2: We assume that there is a deformation in the PSF and square the image array
             #  (preserving signs)
             if fitFailed:
                 try:
-                    center_asym = actr(np.sign(self.imageCube[kf])*self.imageCube[kf]**2,
-                                       [yguess, xguess],
-                                       asym_rad=8, asym_size=5, maxcounts=2, method='gaus',
-                                       half_pix=False, resize=False, weights=False)[0]
+                    center_asym = actr(
+                        np.sign(self.imageCube[kf])*self.imageCube[kf]**2,
+                        [yguess, xguess],
+                        asym_rad=8,
+                        asym_size=5,
+                        maxcounts=2,
+                        method='gaus',
+                        half_pix=False,
+                        resize=False,
+                        weights=False
+                    )[0]
                     fitFailed = False
-                except:
-                    pass
+                except Exception as err:
+                    print(f"Option 2 Fit Failed as {err}")
 
             # Option 3: We assume that there is a cosmic ray hit nearby the PSF and shrink the asym_rad by half
             if fitFailed:
                 try:
-                    center_asym = actr(self.imageCube[kf], [yguess, xguess],
-                                       asym_rad=4, asym_size=5, maxcounts=2, method='gaus',
-                                       half_pix=False, resize=False, weights=False)[0]
+                    center_asym = actr(
+                        self.imageCube[kf],
+                        [yguess, xguess],
+                        asym_rad=4,
+                        asym_size=5,
+                        maxcounts=2,
+                        method='gaus',
+                        half_pix=False,
+                        resize=False,
+                        weights=False
+                    )[0]
                     fitFailed = False
-                except:
-                    pass
+                except Exception as err:
+                    print(f"Option 3 Fit Failed as {err}")
 
-            # Option 4: We assume that there is a deformation in the PSF AND (or caused by) a cosmic ray hit
-            #   nearby the PSF; so we square the image array (preserving signs) AND shrink the asym_rad by half
+            """
+            Option 4: We assume that there is a deformation in the PSF AND 
+                (or caused by) a cosmic ray hit nearby the PSF; so we square 
+                the image array (preserving signs) AND shrink the asym_rad by 
+                half
+            """
             if fitFailed:
                 try:
-                    center_asym = actr(np.sign(self.imageCube[kf])*self.imageCube[kf]**2,
-                                       [yguess, xguess],
-                                       asym_rad=4, asym_size=5, maxcounts=2, method='gaus',
-                                       half_pix=False, resize=False, weights=False)[0]
+                    center_asym = actr(
+                        np.sign(self.imageCube[kf])*self.imageCube[kf]**2,
+                        [yguess, xguess],
+                        asym_rad=4,
+                        asym_size=5,
+                        maxcounts=2,
+                        method='gaus',
+                        half_pix=False,
+                        resize=False,
+                        weights=False
+                    )[0]
                     fitFailed = False
-                except:
-                    pass
+                except Exception as err:
+                    print(f"Option 4 Fit Failed as {err}")
 
             # Option 5: We assume that there is a deformation in the PSF AND (or caused by) a cosmic ray hit
             #   nearby the PSF; so we square the image array (preserving signs) AND shrink the asym_rad by half
             #   BUT this time we have to get crazy and shrink the asym_size to 3 (reduces accuracy dramatically)
             if fitFailed:
                 try:
-                    center_asym = actr(np.sign(self.imageCube[kf])*self.imageCube[kf]**2,
-                                       [yguess, xguess],
-                                       asym_rad=4, asym_size=3, maxcounts=2, method='gaus',
-                                       half_pix=False, resize=False, weights=False)[0]
+                    center_asym = actr(
+                        np.sign(self.imageCube[kf])*self.imageCube[kf]**2,
+                        [yguess, xguess],
+                        asym_rad=4,
+                        asym_size=3,
+                        maxcounts=2,
+                        method='gaus',
+                        half_pix=False,
+                        resize=False,
+                        weights=False
+                    )[0]
                     fitFailed = False
-                except:
-                    pass
+                except Exception as err:
+                    print(f"Option X Fit Failed as {err}")
 
             if fitFailed:
                 # I ran out of options -- literally
@@ -1325,17 +1318,23 @@ class wanderer(object):
             try:
                 # This will work if the fit was successful
                 self.centering_LeastAsym[kf] = center_asym[::-1]
-            except:
+            except Exception as err:
+                print(f"Option X Fit Failed as {err}")
                 print('Least Asymmetry FAILED: and returned `NaN`')
                 fitFailed = True
 
             if fitFailed:
-                print('Least Asymmetry FAILED: Setting self.centering_LeastAsym[%s] to Initial Guess: [%s,%s]'
-                      % (kf, self.yguess, self.xguess))
+                print(
+                    f'Least Asymmetry FAILED: Setting self.centering_LeastAsym'f
+                    f'[{kf}] to Initial Guess: [{self.yguess},{self.xguess}]'
+                )
+
                 self.centering_LeastAsym[kf] = np.array([yguess, xguess])
 
-        self.centering_df['LeastAsymmetry_Y_Centers'] = self.centering_LeastAsym.T[self.y]
-        self.centering_df['LeastAsymmetry_X_Centers'] = self.centering_LeastAsym.T[self.x]
+        y_center_ = self.centering_LeastAsym.T[self.y]
+        x_center_ = self.centering_LeastAsym.T[self.x]
+        self.centering_df['LeastAsymmetry_Y_Centers'] = y_center_
+        self.centering_df['LeastAsymmetry_X_Centers'] = x_center_
 
     def mp_fit_least_asymmetry_centering(self):
         """Class methods are similar to regular functions.
@@ -1354,22 +1353,22 @@ class wanderer(object):
 
         y, x = 0, 1
 
-        yinds0, xinds0 = np.indices(self.imageCube[0].shape)
+        # yinds0, xinds0 = np.indices(self.imageCube[0].shape)
 
-        ylower = self.yguess - self.pix_rad
-        yupper = self.yguess + self.pix_rad
-        xlower = self.xguess - self.pix_rad
-        xupper = self.xguess + self.pix_rad
+        ylower = np.int32(self.yguess - self.pix_rad)
+        yupper = np.int32(self.yguess + self.pix_rad)
+        xlower = np.int32(self.xguess - self.pix_rad)
+        xupper = np.int32(self.xguess + self.pix_rad)
 
-        ylower, xlower, yupper, xupper = np.int32(
-            [ylower, xlower, yupper, xupper])
+        # ylower, xlower, yupper, xupper = np.int32(
+        #     [ylower, xlower, yupper, xupper])
 
         yguess, xguess = np.int32([self.yguess, self.xguess])
 
-        yinds = yinds0[ylower:yupper+1, xlower:xupper+1]
-        xinds = xinds0[ylower:yupper+1, xlower:xupper+1]
+        # yinds = yinds0[ylower:yupper+1, xlower:xupper+1]
+        # xinds = xinds0[ylower:yupper+1, xlower:xupper+1]
 
-        nAsymParams = 2  # Xc, Yc
+        # nAsymParams = 2  # Xc, Yc
         # self.centering_LeastAsym = np.zeros((self.nFrames, nAsymParams))
         # for kf in self.tqdm(range(self.nFrames), desc='Asym', leave = False, total=self.nFrames):
         # This starts the multiprocessing call to arms
@@ -1386,16 +1385,24 @@ class wanderer(object):
             weights=False
         )
 
-        self.centering_LeastAsym = pool_run_func(func, zip(
-            self.imageCube, [[yguess, xguess]]*self.nframes))  # the order is very important
+        # the order is very important
+        self.centering_LeastAsym = pool_run_func(
+            func,
+            zip(
+                self.imageCube,
+                [[yguess, xguess]]*self.nframes
+            )
+        )
 
         # pool.close()
         # pool.join()
 
         self.centering_LeastAsym = np.array(self.centering_LeastAsym[0])
 
-        self.centering_df['LeastAsymmetry_Y_Centers'] = self.centering_LeastAsym.T[self.y]
-        self.centering_df['LeastAsymmetry_X_Centers'] = self.centering_LeastAsym.T[self.x]
+        y_center_ = self.centering_LeastAsym.T[self.y]
+        x_center_ = self.centering_LeastAsym.T[self.x]
+        self.centering_df['LeastAsymmetry_Y_Centers'] = y_center_
+        self.centering_df['LeastAsymmetry_X_Centers'] = x_center_
 
     def fit_all_centering(self):
         """Class methods are similar to regular functions.
@@ -1421,6 +1428,17 @@ class wanderer(object):
         print('Fit for Least Asymmetry Centers\n')
         self.fit_least_asymmetry_centering()
 
+    def measure_effective_width_subframe(self):
+        midFrame = self.imageCube.shape[1]//2
+        lower = midFrame - self.pix_rad
+        upper = midFrame + self.pix_rad
+
+        image_view = self.imageCube[:, lower:upper, lower:upper]
+
+        image_sum_sq = image_view.sum(axis=(1, 2))**2.
+        image_sq_sum = (image_view**2).sum(axis=(1, 2))
+        self.effective_widths = image_sum_sq / image_sq_sum
+
     def measure_effective_width(self, subFrame=False):
         """Class methods are similar to regular functions.
 
@@ -1437,16 +1455,22 @@ class wanderer(object):
         """
 
         if subFrame:
+            self.measure_effective_width_subframe()
+            """
             midFrame = self.imageCube.shape[1]//2
             lower = midFrame - self.pix_rad
             upper = midFrame + self.pix_rad
 
             image_view = self.imageCube[:, lower:upper, lower:upper]
-            self.effective_widths = image_view.sum(
-                axis=(1, 2))**2. / (image_view**2).sum(axis=(1, 2))
+
+            image_sum_sq = image_view.sum(axis=(1, 2))**2.
+            image_sq_sum = (image_view**2).sum(axis=(1, 2))
+            self.effective_widths = image_sum_sq / image_sq_sum
+            """
         else:
-            self.effective_widths = self.imageCube.sum(
-                axis=(1, 2))**2. / ((self.imageCube)**2).sum(axis=(1, 2))
+            image_sum_sq = self.imageCube.sum(axis=(1, 2))**2.
+            image_sq_sum = (self.imageCube**2).sum(axis=(1, 2))
+            self.effective_widths = image_sum_sq / image_sq_sum
 
         self.centering_df['Effective_Widths'] = self.effective_widths
 
@@ -1456,7 +1480,8 @@ class wanderer(object):
         self.quadrature_widths = np.sqrt(x_widths**2 + y_widths**2)
         self.centering_df['Quadrature_Widths'] = self.quadrature_widths
 
-    def measure_background_circle_masked(self, aperRad=10, centering='FluxWeight'):
+    def measure_background_circle_masked(
+            self, aperRad=10, centering='FluxWeight'):
         """Class methods are similar to regular functions.
 
         Note:
@@ -1477,23 +1502,34 @@ class wanderer(object):
         """
 
         self.background_CircleMask = np.zeros(self.nFrames)
-        for kf in self.tqdm(range(self.nFrames), desc='CircleBG', leave=False, total=self.nFrames):
+
+        progress_frame = self.tqdm(
+            range(self.nFrames),
+            desc='CircleBG',
+            leave=False,
+            total=self.nFrames
+        )
+        for kf in progress_frame:
             aperture = CircularAperture(self.centering_FluxWeight[kf], aperRad)
 
             # list of ApertureMask objects (one for each position)
             aper_mask = aperture.to_mask(method='exact')[0]
 
-            # backgroundMask = abs(aperture.get_fractions(np.ones(self.imageCube[0].shape))-1)
-            backgroundMask = aper_mask.to_image(
-                self.imageCube[0].shape).astype(bool)
-            backgroundMask = ~backgroundMask  # [backgroundMask == 0] = False
+            # backgroundMask = abs(aperture.get_fractions(
+            #   np.ones(self.imageCube[0].shape))-1)
+            backgroundMask = ~aper_mask.to_image(
+                self.imageCube[0].shape
+            ).astype(bool)
+            # backgroundMask = ~backgroundMask  # [backgroundMask == 0] = False
 
             self.background_CircleMask[kf] = self.metric(
-                self.imageCube[kf][backgroundMask])
+                self.imageCube[kf][backgroundMask]
+            )
 
         self.background_df['CircleMask'] = self.background_CircleMask.copy()
 
-    def mp_measure_background_circle_masked(self, aperRad=10, centering='Gauss'):
+    def mp_measure_background_circle_masked(
+            self, aperRad=10, centering='Gauss'):
         """Class methods are similar to regular functions.
 
         Note:
@@ -1515,7 +1551,7 @@ class wanderer(object):
 
         if centering == 'Gauss':
             centers = self.centering_GaussianFit
-        if centering == 'FluxWeight':
+        elif centering == 'FluxWeight':
             centers = self.centering_FluxWeight
 
         # This starts the multiprocessing call to arms
@@ -1555,24 +1591,37 @@ class wanderer(object):
 
         self.background_Annulus = np.zeros(self.nFrames)
 
-        for kf in self.tqdm(range(self.nFrames), desc='AnnularBG', leave=False, total=self.nFrames):
+        progress_frame = self.tqdm(
+            range(self.nFrames),
+            desc='AnnularBG',
+            leave=False,
+            total=self.nFrames
+        )
+        for kf in progress_frame:
             innerAperture = CircularAperture(
-                self.centering_FluxWeight[kf], innerRad)
+                self.centering_FluxWeight[kf],
+                innerRad
+            )
             outerAperture = CircularAperture(
-                self.centering_FluxWeight[kf], outerRad)
+                self.centering_FluxWeight[kf],
+                outerRad
+            )
 
             inner_aper_mask = innerAperture.to_mask(method='exact')[0]
             inner_aper_mask = inner_aper_mask.to_image(
-                self.imageCube[0].shape).astype(bool)
+                self.imageCube[0].shape
+            ).astype(bool)
 
             outer_aper_mask = outerAperture.to_mask(method='exact')[0]
             outer_aper_mask = outer_aper_mask.to_image(
-                self.imageCube[0].shape).astype(bool)
+                self.imageCube[0].shape
+            ).astype(bool)
 
             backgroundMask = (~inner_aper_mask)*outer_aper_mask
 
             self.background_Annulus[kf] = self.metric(
-                self.imageCube[kf][backgroundMask])
+                self.imageCube[kf][backgroundMask]
+            )
 
         self.background_df['AnnularMask'] = self.background_Annulus.copy()
 
@@ -2189,7 +2238,8 @@ class wanderer(object):
 
         try:
             self.inliers_Phots = self.inliers_Phots
-        except:
+        except Exception as err:
+            print(f"Option X Fit Failed as {err}")
             self.inliers_Phots = {}
 
         for flux_key_now in self.flux_TSO_df.keys():
@@ -2229,7 +2279,8 @@ class wanderer(object):
 
         try:
             self.inliers_Phots = self.inliers_Phots
-        except:
+        except Exception as err:
+            print(f"Option X Fit Failed as {err}")
             self.inliers_Phots = {}
 
         # This starts the multiprocessing call to arms
