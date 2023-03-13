@@ -32,7 +32,7 @@ from time import time, localtime  # , sleep
 from tqdm import tqdm, tqdm_notebook
 
 # from skimage.filters import gaussian as gaussianFilter
-# import everything that `wanderer` needs to operate
+# import everything that `Wanderer` needs to operate
 # from .auxiliary import *
 from .auxiliary import (
     # actr,
@@ -57,7 +57,7 @@ from .auxiliary import (
 )
 
 
-class wanderer(object):
+class Wanderer(object):
     """The summary line for a class docstring should fit on one line.
 
         If the class has public attributes, they may be documented here
@@ -594,7 +594,7 @@ class wanderer(object):
 
         """
 
-        temp = wanderer(
+        temp = Wanderer(
             fitsFileDir=self.fitsFileDir,
             filetype=self.filetype,
             telescope=self.telescope,

@@ -137,11 +137,13 @@ print(f'Found {n_uncfiles} unc.fits files')
 
 if len(fitsFilenames) == 0:
     raise ValueError(
-        'There are NO `{fits_format}.fits` files in the directory {loadfitsdir}'
+        f'There are NO `{fits_format}.fits` files '
+        f'in the directory {loadfitsdir}'
     )
 if len(uncsFilenames) == 0:
     raise ValueError(
-        'There are NO `{unc_format}.fits` files in the directory {loadfitsdir}'
+        f'There are NO `{unc_format}.fits` files '
+        f'in the directory {loadfitsdir}'
     )
 
 do_db_scan = False  # len(fitsFilenames*64) < 6e4
