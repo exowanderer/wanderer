@@ -1,6 +1,12 @@
 #!/usr/bin/env python
 # Licensed under a 3-clause BSD style license - see LICENSE.rst
 
+from astropy_helpers.version_helpers import generate_version_py
+from astropy_helpers.git_helpers import get_git_devstr
+from astropy_helpers.setup_helpers import (register_commands, get_debug_option,
+                                           get_package_info)
+import builtins
+from setuptools import setup
 import glob
 import os
 import sys
@@ -13,7 +19,8 @@ conf.read(['setup.cfg'])
 metadata = dict(conf.items('metadata'))
 
 PACKAGENAME = metadata.get('package_name', 'wanderer')
-DESCRIPTION = metadata.get('description', 'Wanderer: Spitzer Photometric Extraction Package for Optimal Exoplanet & Brown Dwarf Observational Extraction')
+DESCRIPTION = metadata.get(
+    'description', 'Wanderer: Spitzer Photometric Extraction Package for Optimal Exoplanet & Brown Dwarf Observational Extraction')
 AUTHOR = metadata.get('author', 'Jonathan Fraine')
 AUTHOR_EMAIL = metadata.get('author_email', 'jdfraine@gmail.com')
 LICENSE = metadata.get('license', 'unknown')
@@ -23,21 +30,15 @@ __minimum_python_version__ = metadata.get("minimum_python_version", "3.5")
 # Enforce Python version check - this is the same check as in __init__.py but
 # this one has to happen before importing ah_bootstrap.
 if sys.version_info < tuple((int(val) for val in __minimum_python_version__.split('.'))):
-    sys.stderr.write("ERROR: Wanderer requires Python {} or later\n".format(__minimum_python_version__))
+    sys.stderr.write("ERROR: Wanderer requires Python {} or later\n".format(
+        __minimum_python_version__))
     sys.exit(1)
 
 # Import ah_bootstrap after the python version validation
 
 # import ah_bootstrap
-from setuptools import setup
 
-import builtins
 builtins._ASTROPY_SETUP_ = True
-
-from astropy_helpers.setup_helpers import (register_commands, get_debug_option,
-                                           get_package_info)
-from astropy_helpers.git_helpers import get_git_devstr
-from astropy_helpers.version_helpers import generate_version_py
 
 
 # order of priority for long_description:
@@ -129,7 +130,8 @@ setup(name=PACKAGENAME,
       version=VERSION,
       description=DESCRIPTION,
       scripts=scripts,
-      install_requires=[s.strip() for s in metadata.get('install_requires', 'astropy').split(',')],
+      install_requires=[s.strip() for s in metadata.get(
+          'install_requires', 'astropy').split(',')],
       author=AUTHOR,
       author_email=AUTHOR_EMAIL,
       license=LICENSE,
@@ -138,8 +140,8 @@ setup(name=PACKAGENAME,
       cmdclass=cmdclassd,
       zip_safe=False,
       use_2to3=False,
-      #install_requires = ['numpy', 'scipy', 'corner', 'lmfit-py', 'emcee'],
+      # install_requires = ['numpy', 'scipy', 'corner', 'lmfit-py', 'emcee'],
       entry_points=entry_points,
       python_requires='>={}'.format(__minimum_python_version__),
       **package_info
-)
+      )
