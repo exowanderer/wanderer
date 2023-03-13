@@ -173,8 +173,8 @@ yguess, xguess = 15., 15.   # Specific to Spitzer circa 2010 and beyond
 # Specific to Spitzer Basic Calibrated Data
 filetype = f'{fits_format}.fits'
 
-print('Initialize an instance of `wanderer` as `example_wanderer_median`\n')
-example_wanderer_median = wanderer(
+print('Initialize an instance of `Wanderer` as `example_wanderer_median`\n')
+example_wanderer_median = Wanderer(
     fitsFileDir=loadfitsdir,
     filetype=filetype,
     telescope=telescope,

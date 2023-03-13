@@ -247,7 +247,9 @@ class Wanderer(object):
         testfits = fits.open(self.fitsFilenames[0])[0]
         testheader = testfits.header
 
-        bcd_shape = testfits.data[0].shape
+        # bcd_shape = testfits.data[0].shape
+        bcd_shape = testfits.data.shape
+        print(f'{bcd_shape=}')
 
         self.nFrames = self.nSlopeFiles * nFramesPerFile
         self.imageCube = np.zeros((self.nFrames, bcd_shape[0], bcd_shape[1]))
@@ -262,6 +264,9 @@ class Wanderer(object):
         #   1) expTime * gain / fluxConv converts MJ/sr to electrons
         #   2) as2sr * MJ2mJ * testheader['PXSCAL1'] * testheader['PXSCAL2']
         #       converts MJ/sr to muJ/pixel
+
+        for key, val in testheader.items():
+            print(f'{key} = {val}')
 
         if outputUnits == 'electrons':
             fluxConv = testheader['FLUXCONV']
