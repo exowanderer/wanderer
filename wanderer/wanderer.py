@@ -1642,7 +1642,7 @@ class wanderer(object):
 
         if centering == 'Gauss':
             centers = self.centering_GaussianFit
-        if centering == 'FluxWeight':
+        elif centering == 'FluxWeight':
             centers = self.centering_FluxWeight
 
         # This starts the multiprocessing call to arms
@@ -1656,8 +1656,10 @@ class wanderer(object):
             apMethod='exact'
         )
 
+        # the order is very important
         self.background_Annulus = pool_run_func(
-            func, zip(self.imageCube, centers))  # the order is very important
+            func, zip(self.imageCube, centers)
+        )
 
         # pool.close()
         # pool.join()
@@ -1681,8 +1683,14 @@ class wanderer(object):
         """
 
         self.background_MedianMask = np.zeros(self.nFrames)
-
-        for kf in self.tqdm(range(self.nFrames), desc='MedianMaskedBG', leave=False, total=self.nFrames):
+# the order is very important
+        progress_frames = self.tqdm(
+            range(self.nFrames),
+            desc='MedianMaskedBG',
+            leave=False,
+            total=self.nFrames
+        )
+        for kf in progress_frames:
             aperture = CircularAperture(self.centering_FluxWeight[kf], aperRad)
             aperture = aperture.to_mask(method='exact')[0]
             aperture = aperture.to_image(self.imageCube[0].shape).astype(bool)
@@ -1698,11 +1706,13 @@ class wanderer(object):
             # maskComb[maskComb == 0] = False
 
             self.background_MedianMask[kf] = np.nanmedian(
-                self.imageCube[kf][maskComb])
+                self.imageCube[kf][maskComb]
+            )
 
         self.background_df['MedianMask'] = self.background_MedianMask
 
-    def mp_measure_background_median_masked(self, aperRad=10, n_sig=5, centering='Gauss'):
+    def mp_measure_background_median_masked(
+            self, aperRad=10, n_sig=5, centering='Gauss'):
         """Class methods are similar to regular functions.
 
         Note:
@@ -1719,17 +1729,23 @@ class wanderer(object):
 
         if centering == 'Gauss':
             centers = self.centering_GaussianFit
-        if centering == 'FluxWeight':
+        elif centering == 'FluxWeight':
             centers = self.centering_FluxWeight
 
         # This starts the multiprocessing call to arms
         # pool = Pool(self.nCores)
 
-        func = partial(measure_one_median_bg, aperRad=aperRad,
-                       apMethod='exact', metric=self.metric, n_sig=n_sig)
+        func = partial(
+            measure_one_median_bg,
+            aperRad=aperRad,
+            apMethod='exact',
+            metric=self.metric,
+            n_sig=n_sig
+        )
 
         self.background_MedianMask = pool_run_func(
-            func, zip(self.imageCube, centers))
+            func, zip(self.imageCube, centers)
+        )
 
         # pool.close()
         # pool.join()
@@ -1749,23 +1765,29 @@ class wanderer(object):
 
         Returns:
             True if successful, False otherwise.
-
         """
 
         self.background_KDEUniv = np.zeros(self.nFrames)
 
-        for kf in self.tqdm(range(self.nFrames), desc='KDE_BG', leave=False, total=self.nFrames):
+        progress_frames = self.tqdm(
+            range(self.nFrames),
+            desc='KDE_BG',
+            leave=False,
+            total=self.nFrames
+        )
+        for kf in progress_frames:
             aperture = CircularAperture(self.centering_FluxWeight[kf], aperRad)
             aperture = aperture.to_mask(method='exact')[0]
             aperture = aperture.to_image(self.imageCube[0].shape).astype(bool)
             backgroundMask = ~aperture
 
             kdeFrame = kde.KDEUnivariate(
-                self.imageCube[kf][backgroundMask].ravel())
+                self.imageCube[kf][backgroundMask].ravel()
+            )
             kdeFrame.fit()
 
-            self.background_KDEUniv[kf] = kdeFrame.support[kdeFrame.density.argmax(
-            )]
+            density_argmax = kdeFrame.density.argmax()
+            self.background_KDEUniv[kf] = kdeFrame.support[density_argmax]
 
         self.background_df['KDEUnivMask'] = self.background_KDEUniv
 
@@ -1786,7 +1808,7 @@ class wanderer(object):
 
         if centering == 'Gauss':
             centers = self.centering_GaussianFit
-        if centering == 'FluxWeight':
+        elif centering == 'FluxWeight':
             centers = self.centering_FluxWeight
 
         self.background_KDEUniv = np.zeros(self.nFrames)
@@ -1843,7 +1865,9 @@ class wanderer(object):
         print('Measuring Background Using KDE Mode with Multiprocessing')
         self.mp_measure_background_KDE_Mode(aperRad=aperRad)
 
-    def compute_flux_over_time(self, aperRad=None, centering='GaussianFit', background='AnnularMask', useTheForce=False):
+    def compute_flux_over_time(
+            self, aperRad=None, centering='GaussianFit',
+            background='AnnularMask', useTheForce=False):
         """Class methods are similar to regular functions.
 
         Note:
@@ -1861,8 +1885,9 @@ class wanderer(object):
         y, x = 0, 1
 
         if background not in self.background_df.columns:
-            raise KeyError("`background` must be in",
-                           self.background_df.columns)
+            raise KeyError(
+                f"`background` must be in {self.background_df.columns}",
+            )
 
         centering_options = [
             'Gaussian_Fit',
@@ -1872,7 +1897,9 @@ class wanderer(object):
         ]
         if centering not in centering_options:
             raise ValueError(
-                "`centering` must be either 'Gaussian_Fit', 'Gaussian_Mom', 'FluxWeighted', or 'LeastAsymmetry'")
+                "`centering` must be either 'Gaussian_Fit', "
+                "'Gaussian_Mom', 'FluxWeighted', or 'LeastAsymmetry'"
+            )
 
         if aperRad is None:
             staticRad = 70 if 'wlp' in self.fitsFilenames[0].lower() else 3
@@ -1895,7 +1922,13 @@ class wanderer(object):
             flux_TSO_now = np.zeros(self.nFrames)
             noise_TSO_now = np.zeros(self.nFrames)
 
-            for kf in self.tqdm(range(self.nFrames), desc='Flux', leave=False, total=self.nFrames):
+            progress_frames = self.tqdm(
+                range(self.nFrames),
+                desc='Flux',
+                leave=False,
+                total=self.nFrames
+            )
+            for kf in progress_frames:
                 frameNow = np.copy(self.imageCube[kf]) - background_Use[kf]
                 frameNow[np.isnan(frameNow)] = np.nanmedian(frameNow)
 
@@ -1907,9 +1940,14 @@ class wanderer(object):
                 aperture = CircularAperture([x_center_, y_center_], r=aperRad)
 
                 flux_TSO_now[kf] = aperture_photometry(
-                    frameNow, aperture)['aperture_sum']
-                noise_TSO_now[kf] = np.sqrt(aperture_photometry(
-                    noiseNow, aperture)['aperture_sum'])
+                    frameNow, aperture
+                )['aperture_sum']
+                noise_TSO_now[kf] = np.sqrt(
+                    aperture_photometry(
+                        noiseNow,
+                        aperture
+                    )['aperture_sum']
+                )
 
             self.flux_TSO_df[flux_key_now] = flux_TSO_now
             self.noise_TSO_df[flux_key_now] = noise_TSO_now
@@ -1985,20 +2023,26 @@ class wanderer(object):
         y, x = 0, 1
 
         if background not in self.background_df.columns:
-            raise KeyError("`background` must be in",
-                           self.background_df.columns)
+            raise KeyError(
+                f"`background` must be in {self.background_df.columns}"
+            )
 
-        if centering not in ['Gaussian_Fit', 'Gaussian_Mom', 'FluxWeighted', 'LeastAsymmetry']:
-            raise Exception(
-                "`centering` must be either 'Gaussian_Fit', 'Gaussian_Mom', 'FluxWeighted', or 'LeastAsymmetry'")
+        centering_options = [
+            'Gaussian_Fit', 'Gaussian_Mom', 'FluxWeighted', 'LeastAsymmetry'
+        ]
+        if centering not in centering_options:
+            raise ValueError(
+                "`centering` must be either 'Gaussian_Fit', 'Gaussian_Mom', "
+                "'FluxWeighted', or 'LeastAsymmetry'"
+            )
 
-        centering_Use = np.transpose([self.centering_df[centering + '_Y_Centers'],
-                                      self.centering_df[centering + '_X_Centers']])
+        y_center_ = self.centering_df[centering + '_Y_Centers']
+        x_center_ = self.centering_df[centering + '_X_Centers']
+        centering_Use = np.transpose([y_center_, x_center_])
 
         background_Use = self.background_df[background]
 
-        flux_key_now = centering + '_' + background + \
-            '_' + 'rad' + '_' + str(aperRad)
+        flux_key_now = f"{centering}_{background}_rad_{aperRad}"
 
         if flux_key_now not in self.flux_TSO_df.keys() or useTheForce:
             # for kf in self.tqdm(range(self.nFrames), desc='Flux', leave = False, total=self.nFrames):
@@ -2022,7 +2066,9 @@ class wanderer(object):
 
         else:
             print(
-                flux_key_now + ' exists: if you want to overwrite, then you `useTheForce=True`')
+                f'{flux_key_now} exists: '
+                'if you want to overwrite, then you `useTheForce=True`'
+            )
 
     def mp_compute_flux_over_time_varRad(self, staticRad, varRad=None, centering='Gaussian_Fit', background='AnnularMask', useTheForce=False):
         """Class methods are similar to regular functions.
@@ -2042,8 +2088,9 @@ class wanderer(object):
         y, x = 0, 1
 
         if background not in self.background_df.columns:
-            raise KeyError("`background` must be in",
-                           self.background_df.columns)
+            raise KeyError(
+                f"`background` must be in {self.background_df.columns}"
+            )
 
         centering_options = [
             'Gaussian_Fit',
@@ -2098,12 +2145,13 @@ class wanderer(object):
 
         else:
             print(
-                flux_key_now + ' exists: if you want to overwrite, then you `useTheForce=True`')
+                f'{flux_key_now} exists: '
+                'if you want to overwrite, then you `useTheForce=True`'
+            )
 
-    def mp_compute_flux_over_time_betaRad(self, centering='Gaussian_Fit',
-                                          background='AnnularMask',
-                                          useQuad=False,
-                                          useTheForce=False):
+    def mp_compute_flux_over_time_betaRad(
+            self, centering='Gaussian_Fit', background='AnnularMask',
+            useQuad=False, useTheForce=False):
         """Class methods are similar to regular functions.
 
         Note:
@@ -2121,15 +2169,22 @@ class wanderer(object):
         y, x = 0, 1
 
         if background not in self.background_df.columns:
-            raise Exception("`background` must be in",
-                            self.background_df.columns)
-
-        if centering not in ['Gaussian_Fit', 'Gaussian_Mom', 'FluxWeighted', 'LeastAsymmetry']:
             raise Exception(
-                "`centering` must be either 'Gaussian_Fit', 'Gaussian_Mom', 'FluxWeighted', or 'LeastAsymmetry'")
+                f"`background` must be in {self.background_df.columns}"
+            )
 
-        centering_Use = np.transpose([self.centering_df[centering + '_Y_Centers'],
-                                      self.centering_df[centering + '_X_Centers']])
+        centering_options = [
+            'Gaussian_Fit', 'Gaussian_Mom', 'FluxWeighted', 'LeastAsymmetry'
+        ]
+        if centering not in centering_options:
+            raise ValueError(
+                "`centering` must be either 'Gaussian_Fit', 'Gaussian_Mom', "
+                "'FluxWeighted', or 'LeastAsymmetry'"
+            )
+
+        y_center_ = self.centering_df[centering + '_Y_Centers']
+        x_center_ = self.centering_df[centering + '_X_Centers']
+        centering_Use = np.transpose([y_center_, x_center_])
 
         background_Use = self.background_df[background]
 
@@ -2140,17 +2195,21 @@ class wanderer(object):
 
         if flux_key_now not in self.flux_TSO_df.keys() or useTheForce:
             # for kf in self.tqdm(range(self.nFrames), desc='Flux', leave = False, total=self.nFrames):
-            sig2FW = 2*np.sqrt(2*log(2))
-            aperRads = sig2FW * \
-                self.quadrature_widths if useQuad else np.sqrt(
-                    self.effective_widths)
+            sig2FW = 2*np.sqrt(2*np.log(2))
+
+            aperRads = np.sqrt(self.effective_widths)
+
+            if useQuad:
+                aperRads = sig2FW * self.quadrature_widths
 
             # pool = Pool(self.nCores)
 
             # func = partial(compute_flux_one_frame)
 
-            fluxNow = pool_run_func(compute_flux_one_frame, zip(
-                self.imageCube, centering_Use, background_Use, aperRads))
+            fluxNow = pool_run_func(
+                compute_flux_one_frame,
+                zip(self.imageCube, centering_Use, background_Use, aperRads)
+            )
 
             # pool.close()
             # pool.join()
@@ -2163,9 +2222,12 @@ class wanderer(object):
 
         else:
             print(
-                flux_key_now + ' exists: if you want to overwrite, then you `useTheForce=True`')
+                f'{flux_key_now} exists: '
+                'if you want to overwrite, then you `useTheForce=True`'
+            )
 
-    def extract_PLD_components(self, ycenter=None, xcenter=None, nCols=3, nRows=3, order=1):
+    def extract_PLD_components(
+            self, ycenter=None, xcenter=None, nCols=3, nRows=3, order=1):
         """Class methods are similar to regular functions.
 
         Note:
@@ -2186,19 +2248,25 @@ class wanderer(object):
         # nRows = nRows // 2 #   and moves +\- nRows/2 and nCols/2, respectively
 
         # nominally 15
-        ycenter = int(
-            ycenter) if ycenter is not None else self.imageCube.shape[1]//2-1
+        if ycenter is not None:
+            ycenter = int(ycenter)
+        else:
+            ycenter = self.imageCube.shape[1] // 2 - 1
+
         # nominally 15
-        xcenter = int(
-            xcenter) if xcenter is not None else self.imageCube.shape[2]//2-1
+        if xcenter is not None:
+            xcenter = int(xcenter)
+        else:
+            xcenter = self.imageCube.shape[2] // 2 - 1
 
         ylower = ycenter - nRows // 2     # nominally 14
         yupper = ycenter + nRows // 2 + 1  # nominally 17 (to include 16)
         xlower = xcenter - nCols // 2     # nominally 14
         xupper = xcenter + nCols // 2 + 1  # nominally 17 (to include 16)
 
-        PLD_comps_local = self.imageCube[:, ylower:yupper, xlower:xupper].reshape(
-            (self.imageCube.shape[0], nPLDComp)).T
+        imageSubCube = self.imageCube[:, ylower:yupper, xlower:xupper]
+        new_shape = self.imageCube.shape[0], nPLDComp
+        PLD_comps_local = imageSubCube.reshape(new_shape).T
 
         PLD_norm = sum(PLD_comps_local, axis=0)
         PLD_comps_local = PLD_comps_local / PLD_norm
@@ -2207,11 +2275,13 @@ class wanderer(object):
         self.PLD_norm = PLD_norm
 
         if order > 1:
-            for o in range(2, order+1):
-                self.PLD_components = vstack(
-                    [self.PLD_components, PLD_comps_local**o])
+            for ord_ in range(2, order+1):
+                self.PLD_components = np.vstack(
+                    [self.PLD_components, PLD_comps_local**ord_]
+                )
 
-    def DBScan_Flux_All(self, centering='gaussian', dbsClean=0):
+    def DBScan_Flux_All(
+            self, centering='gaussian', dbsClean=0, useTheForce=False):
         """Class methods are similar to regular functions.
 
         Note:
@@ -2227,19 +2297,21 @@ class wanderer(object):
         """
         y, x = 0, 1
 
-        if centering == 'gaussian':
-            ycenters = self.centering_GaussianFit.T[y]
-            xcenters = self.centering_GaussianFit.T[x]
-        else:
+        if centering != 'gaussian':
+            # ycenters = self.centering_GaussianFit.T[y]
+            # xcenters = self.centering_GaussianFit.T[x]
             print('Only Gaussian Centering is supported at the moment')
             print('Continuting with Gaussian Centering')
-            ycenters = self.centering_GaussianFit.T[y]
-            xcenters = self.centering_GaussianFit.T[x]
+        # else:
+        #     print('Only Gaussian Centering is supported at the moment')
+        #     print('Continuting with Gaussian Centering')
+        #     ycenters = self.centering_GaussianFit.T[y]
+        #     xcenters = self.centering_GaussianFit.T[x]
 
-        try:
-            self.inliers_Phots = self.inliers_Phots
-        except Exception as err:
-            print(f"Option X Fit Failed as {err}")
+        ycenters = self.centering_GaussianFit.T[y]
+        xcenters = self.centering_GaussianFit.T[x]
+
+        if not hasattr(self, 'inliers_Phots'):
             self.inliers_Phots = {}
 
         for flux_key_now in self.flux_TSO_df.keys():
@@ -2251,7 +2323,9 @@ class wanderer(object):
                     phots, ycenters, xcenters, dbsClean=dbsClean)
             else:
                 print(
-                    flux_key_now + ' exists: if you want to overwrite, then you `useTheForce=True`')
+                    f'{flux_key_now} exists: '
+                    'if you want to overwrite, then you `useTheForce=True`'
+                )
 
     def mp_DBScan_Flux_All(self, centering='gaussian', dbsClean=0):
         """Class methods are similar to regular functions.
@@ -2268,26 +2342,32 @@ class wanderer(object):
 
         """
 
-        if centering == 'gaussian':
-            ycenters = self.centering_GaussianFit.T[y]
-            xcenters = self.centering_GaussianFit.T[x]
-        else:
+        if centering != 'gaussian':
             print('Only Gaussian Centering is supported at the moment')
             print('Continuting with Gaussian Centering')
-            ycenters = self.centering_GaussianFit.T[y]
-            xcenters = self.centering_GaussianFit.T[x]
+        #     ycenters = self.centering_GaussianFit.T[y]
+        #     xcenters = self.centering_GaussianFit.T[x]
+        # else:
+        #     print('Only Gaussian Centering is supported at the moment')
+        #     print('Continuting with Gaussian Centering')
+        #     ycenters = self.centering_GaussianFit.T[y]
+        #     xcenters = self.centering_GaussianFit.T[x]
 
-        try:
-            self.inliers_Phots = self.inliers_Phots
-        except Exception as err:
-            print(f"Option X Fit Failed as {err}")
+        ycenters = self.centering_GaussianFit.T[self.y]
+        xcenters = self.centering_GaussianFit.T[self.x]
+
+        if not hasattr(self, 'inliers_Phots'):
             self.inliers_Phots = {}
 
         # This starts the multiprocessing call to arms
         # pool = Pool(self.nCores)
 
-        func = partial(DBScan_Flux, ycenters=ycenters,
-                       xcenters=xcenters, dbsClean=dbsClean)
+        func = partial(
+            DBScan_Flux,
+            ycenters=ycenters,
+            xcenters=xcenters,
+            dbsClean=dbsClean
+        )
 
         # the order is very important
         inliersMP = pool_run_func(func, zip(self.flux_TSO_df.values.T))
@@ -2299,7 +2379,7 @@ class wanderer(object):
             self.inliers_Phots[flux_key_now] = inliersMP[k_mp]
 
     def mp_DBScan_PLD_All(self, dbsClean=0):
-        raise Exception(
+        raise NotImplementedError(
             'This Function is Not Working; please use lame_`DBScan_PLD_all`'
         )
         """Class methods are similar to regular functions.
