@@ -710,7 +710,7 @@ def create_aper_mask(centering, aperRad, image_shape, method='exact'):
     aperture = CircularAperture(centering, aperRad)
     aperture = aperture.to_mask(method=method)
 
-    if isinstance(aperture, (list, tuple, np.array)):
+    if isinstance(aperture, (list, tuple, np.ndarray)):
         aperture = aperture[0]
 
     return aperture.to_image(image_shape).astype(bool)

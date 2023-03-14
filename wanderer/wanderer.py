@@ -1748,7 +1748,7 @@ class Wanderer(object):
             aperture = CircularAperture(self.centering_FluxWeight[kf], aperRad)
             aperture = aperture.to_mask(method='exact')
 
-            if isinstance(aperture, (list, tuple, np.array)):
+            if isinstance(aperture, (list, tuple, np.ndarray)):
                 aperture = aperture[0]
 
             aperture = aperture.to_image(self.imageCube[0].shape).astype(bool)
@@ -1845,7 +1845,7 @@ class Wanderer(object):
             aperture = CircularAperture(self.centering_FluxWeight[kf], aperRad)
             aperture = aperture.to_mask(method='exact')
 
-            if isinstance(aperture, (list, tuple, np.array)):
+            if isinstance(aperture, (list, tuple, np.ndarray)):
                 aperture = aperture[0]
 
             aperture = aperture.to_image(self.imageCube[0].shape).astype(bool)
