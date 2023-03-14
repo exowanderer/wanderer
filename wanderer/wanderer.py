@@ -556,7 +556,7 @@ class Wanderer(object):
             'xguess',
             'widths_GaussianFit',
             'AOR',
-            'planetName',
+            'planet_name',
             'channel'
         ]
 
