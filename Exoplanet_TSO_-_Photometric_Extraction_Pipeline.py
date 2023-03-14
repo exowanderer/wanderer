@@ -19,10 +19,12 @@ ap.add_argument('-c', '--channel', required=True, type=str,
                 help='Channel number string (i.e. ch1 or ch2).')
 ap.add_argument('-ad', '--aor_dir', required=True, type=str,
                 help='AOR director (i.e. r59217921).')
-ap.add_argument('-sd', '--save_sub_dir', type=str, default='ExtracedData',
+ap.add_argument('-sd', '--save_sub_dir', type=str, default='ExtractedData',
                 help='Subdirectory inside Planet_Directory to store extracted outputs.')
+ap.add_argument('-bd', '--base_dir', type=str, default='./',
+                help='Location of base directory for image data and save files')
 ap.add_argument('-pd', '--planets_dir', type=str,
-                default='/Research/Planets/', help='Location of planet directory name from $HOME.')
+                default='$HOME/Research/Planets/', help='Location of planet directory name.')
 ap.add_argument('-ds', '--data_sub_dir', type=str, default='/data/raw/',
                 help='Sub directory structure from $HOME/Planet_Name/THIS/aor_dir/..')
 ap.add_argument('-dt', '--data_tail_dir', required=False,
@@ -47,6 +49,7 @@ args = vars(ap.parse_args())
 planetName = args['planet_name']
 channel = args['channel']
 aor_dir = args['aor_dir']
+base_dir = args['base_dir']
 planetDirectory = args['planets_dir']
 save_sub_dir = args['save_sub_dir']
 data_sub_dir = args['data_sub_dir']
@@ -76,7 +79,7 @@ print(
 )
 
 
-def clipOutlier2D(arr2D, n_sig=10):
+def clipOutlier2D(arr2D, n_sig=5):
     arr2D = arr2D.copy()
     medArr2D = np.nanmedian(arr2D, axis=0)
     sclArr2D = np.sqrt(((scale.mad(arr2D)**2.).sum()))
@@ -108,7 +111,7 @@ dataSub = f'{fits_format}/'
 
 if data_dir == '':
     data_dir = os.path.join(
-        os.environ['HOME'],
+        base_dir,
         planetDirectory,
         planetName,
         data_sub_dir,
@@ -283,7 +286,8 @@ varRads = [0.0, 0.25, 0.50, 0.75, 1.0, 1.25, 1.50]  # [None]#
 med_quad_widths = np.nanmedian(example_wanderer_median.quadrature_widths)
 vrad_dist = example_wanderer_median.quadrature_widths - med_quad_widths
 
-vrad_dist = clipOutlier2D(vrad_dist, n_sig=5)
+n_sig = 5
+vrad_dist = clipOutlier2D(vrad_dist, n_sig=n_sig)
 
 for staticRad in tqdm(staticRads, total=len(staticRads), desc='Static'):
     for varRad in tqdm(varRads, total=len(varRads), desc='Variable'):
@@ -322,8 +326,9 @@ print(
     'Image Cubes and the Storage Dictionary'
 )
 
+
 savefiledir_parts = [
-    os.environ['HOME'] + planetDirectory,
+    base_dir + planetDirectory,
     planetName+'/',
     save_sub_dir + '/',
     channel + '/',
@@ -336,14 +341,14 @@ for sfpart in savefiledir_parts:
     if not os.path.exists(savefiledir):
         os.mkdir(savefiledir)
 
-# savefiledir = environ['HOME']+planetDirectory+planetName+'/'
+# savefiledir = base_dir+planetDirectory+planetName+'/'
 #   + save_sub_dir + '/' + channel + '/' + aor_dir + '/'
 
 saveFileNameHeader = f'{planetName}_{aor_dir}_Median'
 saveFileType = '.joblib.save'
 
 path_to_files = os.path.join(
-    os.environ['HOME'],
+    base_dir,
     planetDirectory,
     planetName,
     save_sub_dir

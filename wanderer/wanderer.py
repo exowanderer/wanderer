@@ -922,14 +922,18 @@ class Wanderer(object):
         try:
             self.centering_df = self.centering_df  # check if it exists
         except Exception as err:
-            print(f"Option X Fit Failed as {err}")
+            print(f"Option X2 Fit Failed as {err}")
             self.centering_df = pd.DataFrame()       # create it if it does not exist
 
-        self.centering_df['Gaussian_Fit_Y_Centers'] = self.centering_GaussianFit.T[self.y]
-        self.centering_df['Gaussian_Fit_X_Centers'] = self.centering_GaussianFit.T[self.x]
+        y_center = self.centering_GaussianFit.T[self.y]
+        x_center = self.centering_GaussianFit.T[self.x]
+        self.centering_df['Gaussian_Fit_Y_Centers'] = y_center
+        self.centering_df['Gaussian_Fit_X_Centers'] = x_center
 
-        self.centering_df['Gaussian_Fit_Y_Widths'] = self.widths_GaussianFit.T[self.y]
-        self.centering_df['Gaussian_Fit_X_Widths'] = self.widths_GaussianFit.T[self.x]
+        y_width = self.widths_GaussianFit.T[self.y]
+        x_width = self.widths_GaussianFit.T[self.x]
+        self.centering_df['Gaussian_Fit_Y_Widths'] = y_width
+        self.centering_df['Gaussian_Fit_X_Widths'] = x_width
 
         self.centering_df['Gaussian_Fit_Heights'] = self.heights_GaussianFit
         self.centering_df['Gaussian_Fit_Offset'] = self.background_GaussianFit
@@ -946,7 +950,9 @@ class Wanderer(object):
         self.heights_GaussianFit[kf] = gaussP[0]
         self.background_GaussianFit[kf] = gaussP[5]
 
-    def mp_fit_gaussian_centering(self, n_sig=False, method='la', initc='fw', subArray=False, print_compare=False):
+    def mp_fit_gaussian_centering(
+            self, n_sig=False, method='la', initc='fw',
+            subArray=False, print_compare=False):
         """Class methods are similar to regular functions.
 
         Note:
@@ -1007,7 +1013,9 @@ class Wanderer(object):
         # pool.close()
         # pool.join()
 
-        print('Finished with Fitting Centers. Now assigning to instance values.')
+        print(
+            'Finished with Fitting Centers. Now assigning to instance values.'
+        )
         for kf, gaussP in enumerate(gaussian_centers):
             self.assign_gaussian_centering(self, gaussP, xlower, kf, ylower)
             """ # TODO: confirm this is correct
@@ -1069,8 +1077,15 @@ class Wanderer(object):
 
         nFWCParams = 2  # Xc, Yc
         self.centering_FluxWeight = np.zeros((self.nFrames, nFWCParams))
-        print(self.imageCube.shape)
-        for kf in self.tqdm(range(self.nFrames), desc='FWC', leave=False, total=self.nFrames):
+        # print(self.imageCube.shape)
+        progress_flux_wght_center = self.tqdm(
+            range(self.nFrames),
+            desc='Flux Weighted Centering',
+            leave=False,
+            total=self.nFrames
+        )
+
+        for kf in progress_flux_wght_center:
             subFrameNow = self.imageCube[kf][ylower:yupper, xlower:xupper]
             subFrameNow[np.isnan(subFrameNow)] = np.nanmedian(
                 ~np.isnan(subFrameNow))
@@ -1196,31 +1211,35 @@ class Wanderer(object):
         )
         for kf in progress_frame:
             """
-            The following is a sequence of error handling and reattempts to center fit using the least_asymmetry algorithm
+            The following is a sequence of error handling and reattempts to
+                center fit using the least_asymmetry algorithm
 
-            The least_asymmetry algorithm returns a RunError if the center is not found in the image
-            Our experience shows that these failures are strongly correlated with the existence of a cosmic ray hit nearby the PSF.
+            The least_asymmetry algorithm returns a RunError if the center
+                is not found in the image
+            Our experience shows that these failures are strongly correlated
+                with the existence of a cosmic ray hit nearby the PSF.
 
-            Option 1: We run `actr` with default settings 
+            Option 1: We run `actr` with default settings
                 -- developed for Spitzer exoplanet lightcurves
-            Option 2: We assume that there is a deformation in the PSF 
+            Option 2: We assume that there is a deformation in the PSF
                 and square the image array (preserving signs)
-            Option 3: We assume that there is a cosmic ray hit nearby 
+            Option 3: We assume that there is a cosmic ray hit nearby
                 the PSF and shrink the asym_rad by half
-            Option 4: We assume that there is a deformation in the PSF AND 
-                (or caused by) a cosmic ray hit nearby the PSF; so we square 
-                the image array (preserving signs) 
+            Option 4: We assume that there is a deformation in the PSF AND
+                (or caused by) a cosmic ray hit nearby the PSF; so we square
+                the image array (preserving signs)
                 AND shrink the asym_rad by half
-            Option 5: We assume that there is a deformation in the PSF AND 
-                (or caused by) a cosmic ray hit nearby the PSF; so we square 
-                the image array (preserving signs) AND shrink the asym_rad by 
-                half BUT this time we have to get crazy and shrink the 
+            Option 5: We assume that there is a deformation in the PSF AND
+                (or caused by) a cosmic ray hit nearby the PSF; so we square
+                the image array (preserving signs) AND shrink the asym_rad by
+                half BUT this time we have to get crazy and shrink the
                 asym_size to 2 (reduces accuracy dramatically)
             """
 
             fitFailed = False  # "Benefit of the Doubt"
 
-            # Option 1: We run `actr` with default settings that were developed for Spitzer exoplanet lightcurves
+            # Option 1: We run `actr` with default settings
+            #   that were developed for Spitzer exoplanet lightcurves
             kf, yguess, xguess = np.int32([kf, self.yguess, self.xguess])
 
             try:
@@ -1238,8 +1257,8 @@ class Wanderer(object):
                 print(f"Option 1 Fit Failed as {err}")
                 fitFailed = True
 
-            # Option 2: We assume that there is a deformation in the PSF and square the image array
-            #  (preserving signs)
+            # Option 2: We assume that there is a deformation in the PSF
+            #   and square the image array (preserving signs)
             if fitFailed:
                 try:
                     center_asym = actr(
@@ -1257,7 +1276,8 @@ class Wanderer(object):
                 except Exception as err:
                     print(f"Option 2 Fit Failed as {err}")
 
-            # Option 3: We assume that there is a cosmic ray hit nearby the PSF and shrink the asym_rad by half
+            # Option 3: We assume that there is a cosmic ray hit
+            #   nearby the PSF and shrink the asym_rad by half
             if fitFailed:
                 try:
                     center_asym = actr(
@@ -1276,9 +1296,9 @@ class Wanderer(object):
                     print(f"Option 3 Fit Failed as {err}")
 
             """
-            Option 4: We assume that there is a deformation in the PSF AND 
-                (or caused by) a cosmic ray hit nearby the PSF; so we square 
-                the image array (preserving signs) AND shrink the asym_rad by 
+            Option 4: We assume that there is a deformation in the PSF AND
+                (or caused by) a cosmic ray hit nearby the PSF; so we square
+                the image array (preserving signs) AND shrink the asym_rad by
                 half
             """
             if fitFailed:
@@ -1298,9 +1318,12 @@ class Wanderer(object):
                 except Exception as err:
                     print(f"Option 4 Fit Failed as {err}")
 
-            # Option 5: We assume that there is a deformation in the PSF AND (or caused by) a cosmic ray hit
-            #   nearby the PSF; so we square the image array (preserving signs) AND shrink the asym_rad by half
-            #   BUT this time we have to get crazy and shrink the asym_size to 3 (reduces accuracy dramatically)
+            # Option 5: We assume that there is a deformation in the PSF
+            #   AND (or caused by) a cosmic ray hit nearby the PSF; so we
+            #       square the image array (preserving signs) AND shrink
+            #       the asym_rad by half
+            #   BUT this time we have to get crazy and shrink the asym_size
+            #       to 3 (reduces accuracy dramatically)
             if fitFailed:
                 try:
                     center_asym = actr(
@@ -1316,7 +1339,7 @@ class Wanderer(object):
                     )[0]
                     fitFailed = False
                 except Exception as err:
-                    print(f"Option X Fit Failed as {err}")
+                    print(f"Option 5 Fit Failed as {err}")
 
             if fitFailed:
                 # I ran out of options -- literally
@@ -1326,7 +1349,7 @@ class Wanderer(object):
                 # This will work if the fit was successful
                 self.centering_LeastAsym[kf] = center_asym[::-1]
             except Exception as err:
-                print(f"Option X Fit Failed as {err}")
+                print(f"Option X1 Fit Failed as {err}")
                 print('Least Asymmetry FAILED: and returned `NaN`')
                 fitFailed = True
 
@@ -1377,7 +1400,8 @@ class Wanderer(object):
 
         # nAsymParams = 2  # Xc, Yc
         # self.centering_LeastAsym = np.zeros((self.nFrames, nAsymParams))
-        # for kf in self.tqdm(range(self.nFrames), desc='Asym', leave = False, total=self.nFrames):
+        # for kf in self.tqdm(range(self.nFrames), desc='Asym',
+        #   leave = False, total=self.nFrames):
         # This starts the multiprocessing call to arms
         # pool = Pool(self.nCores)
 
@@ -1505,8 +1529,9 @@ class Wanderer(object):
         """
 
         """
-            Assigning all np.zeros in the mask to NaNs because the `mean` and `median`
-                functions are set to `nanmean` functions, which will skip all NaNs
+            Assigning all np.zeros in the mask to NaNs because the
+                `mean` and `median` functions are set to `nanmean` functions,
+                which will skip all NaNs
         """
 
         self.background_CircleMask = np.zeros(self.nFrames)
@@ -1568,8 +1593,9 @@ class Wanderer(object):
         """
 
         """
-            Assigning all np.zeros in the mask to NaNs because the `mean` and `median`
-                functions are set to `nanmean` functions, which will skip all NaNs
+            Assigning all np.zeros in the mask to NaNs because the
+                `mean` and `median` functions are set to `nanmean` functions,
+                which will skip all NaNs
         """
 
         if centering == 'Gauss':
@@ -1672,7 +1698,8 @@ class Wanderer(object):
 
         self.background_df['AnnularMask'] = self.background_Annulus.copy()
 
-    def mp_measure_background_annular_mask(self, innerRad=8, outerRad=13, method='exact', centering='Gauss'):
+    def mp_measure_background_annular_mask(
+            self, innerRad=8, outerRad=13, method='exact', centering='Gauss'):
         """Class methods are similar to regular functions.
 
         Note:
@@ -1937,6 +1964,37 @@ class Wanderer(object):
         print('Measuring Background Using KDE Mode with Multiprocessing')
         self.mp_measure_background_KDE_Mode(aperRad=aperRad)
 
+    def helper_flux_over_time(self, aperRad, flux_key, centers, backgrounds):
+        flux_TSO_now = np.zeros(self.nFrames)
+        noise_TSO_now = np.zeros(self.nFrames)
+
+        progress_frames = self.tqdm(
+            range(self.nFrames),
+            desc='Flux',
+            leave=False,
+            total=self.nFrames
+        )
+
+        for kf in progress_frames:
+            frameNow = np.copy(self.imageCube[kf]) - backgrounds[kf]
+            frameNow[np.isnan(frameNow)] = np.nanmedian(frameNow)
+
+            noiseNow = np.copy(self.noiseCube[kf])**2.
+            noiseNow[np.isnan(noiseNow)] = np.nanmedian(noiseNow)
+
+            x_center_ = centers[kf][self.x]
+            y_center_ = centers[kf][self.y]
+            aperture = CircularAperture([x_center_, y_center_], r=aperRad)
+
+            flux_TSO_now[kf] = aperture_photometry(frameNow, aperture)
+            flux_TSO_now[kf] = flux_TSO_now[kf]['aperture_sum']
+
+            noise_TSO_now[kf] = aperture_photometry(noiseNow, aperture)
+            noise_TSO_now[kf] = np.sqrt(noise_TSO_now[kf]['aperture_sum'])
+
+        self.flux_TSO_df[flux_key] = flux_TSO_now
+        self.noise_TSO_df[flux_key] = noise_TSO_now
+
     def compute_flux_over_time(
             self, aperRad=None, centering='GaussianFit',
             background='AnnularMask', useTheForce=False):
@@ -1991,6 +2049,13 @@ class Wanderer(object):
         flux_key_now = f"{centering}_{background}_rad_{aperRad}"
 
         if flux_key_now not in self.flux_TSO_df.keys() or useTheForce:
+            self.helper_flux_over_time(
+                aperRad=aperRad,
+                flux_key=flux_key_now,
+                centers=centering_Use,
+                backgrounds=background_Use
+            )
+            """
             flux_TSO_now = np.zeros(self.nFrames)
             noise_TSO_now = np.zeros(self.nFrames)
 
@@ -2023,6 +2088,7 @@ class Wanderer(object):
 
             self.flux_TSO_df[flux_key_now] = flux_TSO_now
             self.noise_TSO_df[flux_key_now] = noise_TSO_now
+            """
         else:
             print(
                 f'{flux_key_now} exists: '
