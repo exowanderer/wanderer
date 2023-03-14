@@ -224,7 +224,7 @@ class Wanderer(object):
 
             del fitsNow
 
-    def spitzer_load_fits_file(self, outputUnits='electrons', remove_nans=True):
+    def spitzer_load_fits_file(self, output_units='electrons', remove_nans=True):
         """Class methods are similar to regular functions.
 
         Note:
@@ -268,13 +268,13 @@ class Wanderer(object):
         # for key, val in testheader.items():
         #     print(f'{key} = {val}')
 
-        if outputUnits == 'electrons':
+        if output_units == 'electrons':
             fluxConv = testheader['FLUXCONV']
             expTime = testheader['EXPTIME']
             gain = testheader['GAIN']
             fluxConversion = expTime*gain / fluxConv
 
-        elif outputUnits == 'muJ_per_Pixel':
+        elif output_units == 'muJ_per_Pixel':
             as2sr = arcsec**2.0  # steradians per square arcsecond
             MJ2mJ = 1e12  # mircro-Janskeys per Mega-Jansky
             # converts MJ
@@ -283,7 +283,7 @@ class Wanderer(object):
             )
         else:
             raise ValueError(
-                "`outputUnits` must be either 'electrons' or 'muJ_per_Pixel'"
+                "`output_units` must be either 'electrons' or 'muJ_per_Pixel'"
             )
 
         print('Loading Spitzer Data')

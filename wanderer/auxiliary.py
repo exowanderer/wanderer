@@ -4,6 +4,7 @@ import scipy as sp
 
 from astropy.io import fits
 from astropy.modeling import models, fitting
+from dataclasses import dataclass
 from functools import partial
 from glob import glob
 from lmfit import Model, Parameters
@@ -26,6 +27,85 @@ from skimage.filters import gaussian as gaussianFilter
 y, x = 0, 1
 
 '''Start: From least_asymmetry.asym by N.Lust (github.com/natelust/least_asymmetry) and modified (reversed XY -> YX)'''
+
+
+@dataclass
+class WandererCLI:
+    planet_name: str = 'planetname'
+    channel: str = None
+    aor_dir: str = None
+    planets_dir: str = './'
+    save_sub_dir: str = 'ExtracedData'
+    data_sub_dir: str = '/data/raw/'
+    data_tail_dir: str = 'big'
+    fits_format: str = 'bcd'
+    unc_format: str = 'bunc'
+    method: str = 'median'
+    telescope: str = 'Spitzer'
+    output_units: str = 'electrons'
+    data_dir: str = ''
+    num_cores: int = 1
+    verbose: bool = False
+
+
+def command_line_inputs():
+    ap = ArgumentParser()
+    ap.add_argument('-pn', '--planet_name', type=str, default='planetname',
+                    help='Directory Name for the Planet (i.e. hd209458b).')
+    ap.add_argument('-c', '--channel', type=str, default=None,
+                    help='Channel number string (i.e. ch1 or ch2).')
+    ap.add_argument('-ad', '--aor_dir', type=str, default=None,
+                    help='AOR director (i.e. r11235813).')
+    ap.add_argument('-pd', '--planets_dir', type=str, default='./',
+                    help='Location of planet directory name from $HOME.')
+    ap.add_argument('-sd', '--save_sub_dir', type=str, default='ExtracedData',
+                    help='Subdirectory inside Planet_Directory to '
+                    'store extracted outputs.'
+                    )
+    ap.add_argument('-ds', '--data_sub_dir', type=str, default='/data/raw/',
+                    help='Sub directory structure from $HOME/Planet_Name/THIS/aor_dir/..')
+    ap.add_argument('-dt', '--data_tail_dir', required=False,
+                    type=str, default='/big/', help='String inside AOR DIR.')
+    ap.add_argument('-ff', '--fits_format', type=str,
+                    default='bcd', help='Format of the fits files (i.e. bcd).')
+    ap.add_argument('-uf', '--unc_format', type=str,
+                    default='bunc', help='Format of the photometric noise files (i.e. bcd).')
+    ap.add_argument('-m', '--method', type=str, default='median',
+                    help='method for photmetric extraction (i.e. median).')
+    ap.add_argument('-t', '--telescope', type=str,
+                    default='Spitzer', help='Telescope: [Spitzer, Hubble, JWST].')
+    ap.add_argument('-ou', '--output_units', type=str, default='electrons',
+                    help='Units for the extracted photometry [electrons, muJ_per_Pixel, etc].')
+    ap.add_argument('-d', '--data_dir', type=str, default='',
+                    help='Set location of all `bcd` and `bunc` files: bypass previous setup.')
+    ap.add_argument('-nc', '--num_cores', type=int, default=cpu_count()-1)
+    ap.add_argument('-v', '--verbose', type=bool,
+                    default=False, help='Print out normally irrelevent things.')
+
+    args = vars(ap.parse_args())
+
+    return convert_args_to_dataclass(args)
+
+def convert_args_to_dataclass(args)
+    clargs = WandererCLI()
+    clargs.args_obj = WandererCLI()
+    clargs.planet_name = args['planet_name']
+    clargs.channel = args['channel']
+    clargs.aor_dir = args['aor_dir']
+    clargs.planets_dir = args['planets_dir']
+    clargs.save_sub_dir = args['save_sub_dir']
+    clargs.data_sub_dir = args['data_sub_dir']
+    clargs.data_tail_dir = args['data_tail_dir']
+    clargs.fits_format = args['fits_format']
+    clargs.unc_format = args['unc_format']
+    clargs.method = args['method']
+    clargs.telescope = args['telescope']
+    clargs.output_units = args['output_units']
+    clargs.data_dir = args['data_dir']
+    clargs.num_cores = args['num_cores']
+    clargs.verbose = args['verbose']
+
+    return clargs
 
 
 def pool_run_func(func, zipper, num_cores=cpu_count()-1):

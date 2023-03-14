@@ -13,64 +13,25 @@ from statsmodels.robust import scale
 
 # TODO: make this more direct
 from wanderer.wanderer import Wanderer
+from wanderer.auxiliary import command_line_inputs
 
-ap = ArgumentParser()
-ap.add_argument('-pn', '--planet_name', required=True, type=str,
-                help='Directory Name for the Planet (i.e. GJ1214).')
-ap.add_argument('-c', '--channel', required=True, type=str,
-                help='Channel number string (i.e. ch1 or ch2).')
-ap.add_argument('-ad', '--aor_dir', required=True, type=str,
-                help='AOR director (i.e. r59217921).')
-ap.add_argument('-sd', '--save_sub_dir', type=str, default='ExtracedData',
-                help='Subdirectory inside Planet_Directory to store extracted outputs.')
-ap.add_argument('-pd', '--planets_dir', type=str, default='./',
-                help='Location of planet directory name from $HOME.')
-ap.add_argument('-ds', '--data_sub_dir', type=str, default='/data/raw/',
-                help='Sub directory structure from $HOME/Planet_Name/THIS/aor_dir/..')
-ap.add_argument('-dt', '--data_tail_dir', required=False,
-                type=str, default='/big/', help='String inside AOR DIR.')
-ap.add_argument('-ff', '--fits_format', type=str,
-                default='bcd', help='Format of the fits files (i.e. bcd).')
-ap.add_argument('-uf', '--unc_format', type=str,
-                default='bunc', help='Format of the photometric noise files (i.e. bcd).')
-ap.add_argument('-m', '--method', type=str, default='median',
-                help='method for photmetric extraction (i.e. median).')
-ap.add_argument('-t', '--telescope', type=str,
-                default='Spitzer', help='Telescope: [Spitzer, Hubble, JWST].')
-ap.add_argument('-ou', '--outputUnits', type=str, default='electrons',
-                help='Units for the extracted photometry [electrons, muJ_per_Pixel, etc].')
-ap.add_argument('-d', '--data_dir', type=str, default='',
-                help='Set location of all `bcd` and `bunc` files: bypass previous setup.')
-ap.add_argument('-nc', '--num_cores', type=int, default=cpu_count()-1)
-ap.add_argument('-v', '--verbose', type=bool,
-                default=False, help='Print out normally irrelevent things.')
+clargs = command_line_inputs()
 
-args = vars(ap.parse_args())
-
-planet_name = args['planet_name']
-channel = args['channel']
-aor_dir = args['aor_dir']
-planets_dir = args['planets_dir']
-save_sub_dir = args['save_sub_dir']
-data_sub_dir = args['data_sub_dir']
-data_tail_dir = args['data_tail_dir']
-fits_format = args['fits_format']
-unc_format = args['unc_format']
-method = args['method']
-telescope = args['telescope']
-outputUnits = args['outputUnits']
-data_dir = args['data_dir']
-num_cores = args['num_cores']
-verbose = args['verbose']
-
-# from astroML.plotting          import hist
-# from image_registration        import cross_correlation_shifts
-# from matplotlib.ticker         import MaxNLocator
-# from matplotlib                import style
-# from least_asymmetry.asym      import actr, moments, fitgaussian
-# from pylab                     import gcf, ion, figure, plot, imshow, scatter, legend, rcParams
-# from seaborn                   import *
-
+planet_name = clargs.planet_name
+channel = clargs.channel
+aor_dir = clargs.aor_dir
+planets_dir = clargs.planets_dir
+save_sub_dir = clargs.save_sub_dir
+data_sub_dir = clargs.data_sub_dir
+data_tail_dir = clargs.data_tail_dir
+fits_format = clargs.fits_format
+unc_format = clargs.unc_format
+method = clargs.method
+telescope = clargs.telescope
+output_units = clargs.output_units
+data_dir = clargs.data_dir
+num_cores = clargs.num_cores
+verbose = clargs.verbose
 
 startFull = time()
 savefiledir_parts = [
@@ -105,7 +66,7 @@ def clipOutlier2D(arr2D, n_sig=10):
 
 # As an example, Spitzer data is expected to be store in the directory structure:
 #
-# `$HOME/PLANET_DIRECTORY/PLANETNAME/data/raw/AORDIR/CHANNEL/bcd/`
+# `PLANET_DIRECTORY/data/raw/AORDIR/CHANNEL/bcd/`
 #
 # EXAMPLE:
 #
@@ -117,10 +78,7 @@ def clipOutlier2D(arr2D, n_sig=10):
 # 6. In CH2 (4.5 microns)
 #
 # The `loadfitsdir` should read as:
-#   `/home/tempuser/Research/Planets/HAPPY5/data/raw/r11235813/ch2/bcd/`
-
-# channel = 'ch2/'
-
+#   `./Research/Planets/HAPPY5/data/raw/r11235813/ch2/bcd/`
 
 dataSub = f'{fits_format}/'
 
@@ -204,8 +162,8 @@ planetname_wanderer_median.AOR = aor_dir
 planetname_wanderer_median.planet_name = planet_name
 planetname_wanderer_median.channel = channel
 
-print('Load Data From Fits Files in ' + loadfitsdir + '\n')
-planetname_wanderer_median.spitzer_load_fits_file(outputUnits=outputUnits)
+print(f'Load Data From Fits Files in {loadfitsdir}')
+planetname_wanderer_median.spitzer_load_fits_file(output_units=output_units)
 
 print('**Double check for NaNs**')
 is_nan_ = np.isnan(planetname_wanderer_median.imageCube)
@@ -213,7 +171,7 @@ med_image_cube = np.nanmedian(planetname_wanderer_median.imageCube)
 planetname_wanderer_median.imageCube[is_nan_] = med_image_cube
 
 print('**Identifier Strong Outliers**')
-print('Find, flag, and NaN the "Bad Pixels" Outliers' + '\n')
+print('Find, flag, and NaN the "Bad Pixels" Outliers')
 planetname_wanderer_median.find_bad_pixels()
 
 print(
@@ -337,8 +295,8 @@ print(
     'Image Cubes and the Storage Dictionary'
 )
 
-saveFileNameHeader = f'{planet_name}_{aor_dir}_Median'
-saveFileType = '.joblib.save'
+save_name_header = f'{planet_name}_{aor_dir}_Median'
+save_file_type = '.joblib.save'
 
 path_to_files = os.path.join(
     planets_dir,
@@ -352,15 +310,19 @@ if not os.path.exists(savefiledir):
     print(f'Creating {savefiledir}')
     os.mkdir(savefiledir)
 
-save_path = os.path.join(savefiledir, saveFileNameHeader, saveFileType)
+save_path = os.path.join(
+    savefiledir,
+    f'{save_name_header}_STRUCTURE_{save_file_type}'
+)
+
 print()
 print(f'Saving to {save_path}')
 print()
 
 planetname_wanderer_median.save_data_to_save_files(
     savefiledir=savefiledir,
-    saveFileNameHeader=saveFileNameHeader,
-    saveFileType=saveFileType
+    save_name_header=save_name_header,
+    save_file_type=save_file_type
 )
 
 print('Entire Pipeline took {time() - startFull} seconds')
