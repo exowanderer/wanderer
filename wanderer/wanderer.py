@@ -651,9 +651,9 @@ class Wanderer(object):
             self.imageCube - self.imageCubeMedian) > n_sig*self.imageCubeMAD
 
         # print(
-        #   "There are " + str(sum(self.imageBadPixMasks)) + " 'Hot' Pixels"
+        #   "There are " + str(np.sum(self.imageBadPixMasks)) + " 'Hot' Pixels"
         # )
-        print(f"There are {str(sum(self.imageBadPixMasks))} 'Hot' Pixels")
+        print(f"There are {str(np.sum(self.imageBadPixMasks))} 'Hot' Pixels")
 
         # self.imageCube[self.imageBadPixMasks] = nan
 
@@ -1435,10 +1435,11 @@ class Wanderer(object):
         print('Fit for Least Asymmetry Centers\n')
         self.fit_least_asymmetry_centering()
 
-    def measure_effective_width_subframe(self):
+    def measure_effective_width_subframe(self, pix_rad=None):
+        pix_rad = self.pix_rad if pix_rad is None else pix_rad
         midFrame = self.imageCube.shape[1]//2
-        lower = midFrame - self.pix_rad
-        upper = midFrame + self.pix_rad
+        lower = midFrame - pix_rad
+        upper = midFrame + pix_rad
 
         image_view = self.imageCube[:, lower:upper, lower:upper]
 
@@ -1462,7 +1463,7 @@ class Wanderer(object):
         """
 
         if subFrame:
-            self.measure_effective_width_subframe()
+            self.measure_effective_width_subframe(pix_rad=self.pix_rad)
             """
             midFrame = self.imageCube.shape[1]//2
             lower = midFrame - self.pix_rad
@@ -2318,18 +2319,24 @@ class Wanderer(object):
         # nCols = nCols // 2 # User input assumes matrix structure, which starts at y- and x-center
         # nRows = nRows // 2 #   and moves +\- nRows/2 and nCols/2, respectively
 
+        img_shape = self.imageCube.shape[1:]
         # nominally 15
+        ycenter = int(ycenter) if ycenter is not None else img_shape[0]//2-1
+        """
         if ycenter is not None:
             ycenter = int(ycenter)
         else:
-            ycenter = self.imageCube.shape[1] // 2 - 1
+            ycenter = img_shape[0] // 2 - 1
+        """
 
         # nominally 15
+        xcenter = int(xcenter) if xcenter is not None else img_shape[1]//2-1
+        """
         if xcenter is not None:
             xcenter = int(xcenter)
         else:
-            xcenter = self.imageCube.shape[2] // 2 - 1
-
+            xcenter = img_shape[1] // 2 - 1
+        """
         ylower = ycenter - nRows // 2     # nominally 14
         yupper = ycenter + nRows // 2 + 1  # nominally 17 (to include 16)
         xlower = xcenter - nCols // 2     # nominally 14
@@ -2339,7 +2346,7 @@ class Wanderer(object):
         new_shape = self.imageCube.shape[0], nPLDComp
         PLD_comps_local = imageSubCube.reshape(new_shape).T
 
-        PLD_norm = sum(PLD_comps_local, axis=0)
+        PLD_norm = np.sum(PLD_comps_local, axis=0)
         PLD_comps_local = PLD_comps_local / PLD_norm
 
         self.PLD_components = PLD_comps_local
