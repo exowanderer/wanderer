@@ -78,7 +78,7 @@ class Wanderer(object):
 
     def __init__(
             self, fitsFileDir='./', filetype='slp.fits', telescope=None,
-            yguess=None, xguess=None, pix_rad=5, method='mean', nCores=None,
+            yguess=None, xguess=None, pix_rad=5, method='mean', num_cores=None,
             jupyter=False):
         """Example of docstring on the __init__ method.
 
@@ -162,7 +162,7 @@ class Wanderer(object):
             self.xguess = self.imageCube.shape[self.x]//2
 
         self.pix_rad = pix_rad
-        self.nCores = cpu_count()//2 if nCores is None else int(nCores)
+        self.num_cores = cpu_count()//2 if num_cores is None else int(num_cores)
 
         tm_year, tm_mon, tm_mday, tm_hour, tm_min, tm_sec, tm_wday, tm_yday, tm_isdst = localtime()
         print(
@@ -607,7 +607,7 @@ class Wanderer(object):
             xguess=self.xguess,
             pix_rad=self.pix_rad,
             method=self.method,
-            nCores=self.nCores
+            num_cores=self.num_cores
         )
 
         temp.centering_df = self.centering_df
@@ -750,7 +750,7 @@ class Wanderer(object):
 
     def mp_lmfit_gaussian_centering(
             self, yguess=15, xguess=15, subArraySize=10, init_params=None,
-            useMoments=False, nCores=cpu_count(), center_range=None,
+            useMoments=False, num_cores=cpu_count(), center_range=None,
             width_range=None, n_sig=6.1, method='leastsq', recheckMethod=None,
             median_crop=False, verbose=False):
         """Class methods are similar to regular functions.
@@ -814,7 +814,7 @@ class Wanderer(object):
         yy = yy0[ylower:yupper, xlower:xupper]
         xx = xx0[ylower:yupper, xlower:xupper]
 
-        # pool = Pool(nCores)
+        # pool = Pool(num_cores)
 
         func = partial(
             lmfit_one_center,
@@ -995,7 +995,7 @@ class Wanderer(object):
 
         # Gaussian fit centering
         # This starts the multiprocessing call to arms
-        # pool = Pool(self.nCores)
+        # pool = Pool(self.num_cores)
 
         func = partial(
             fit_one_center,
@@ -1142,7 +1142,7 @@ class Wanderer(object):
         # self.centering_FluxWeight = np.zeros((self.nFrames, nFWCParams))
 
         # This starts the multiprocessing call to arms
-        # pool = Pool(self.nCores)
+        # pool = Pool(self.num_cores)
 
         func = partial(
             fit_one_center,
@@ -1403,7 +1403,7 @@ class Wanderer(object):
         # for kf in self.tqdm(range(self.nFrames), desc='Asym',
         #   leave = False, total=self.nFrames):
         # This starts the multiprocessing call to arms
-        # pool = Pool(self.nCores)
+        # pool = Pool(self.num_cores)
 
         func = partial(
             actr,
@@ -1604,7 +1604,7 @@ class Wanderer(object):
             centers = self.centering_FluxWeight
 
         # This starts the multiprocessing call to arms
-        # pool = Pool(self.nCores)
+        # pool = Pool(self.num_cores)
 
         func = partial(
             measure_one_circle_bg,
@@ -1720,7 +1720,7 @@ class Wanderer(object):
             centers = self.centering_FluxWeight
 
         # This starts the multiprocessing call to arms
-        # pool = Pool(self.nCores)
+        # pool = Pool(self.num_cores)
 
         func = partial(
             measure_one_annular_bg,
@@ -1820,7 +1820,7 @@ class Wanderer(object):
             centers = self.centering_FluxWeight
 
         # This starts the multiprocessing call to arms
-        # pool = Pool(self.nCores)
+        # pool = Pool(self.num_cores)
 
         func = partial(
             measure_one_median_bg,
@@ -1913,7 +1913,7 @@ class Wanderer(object):
         self.background_KDEUniv = np.zeros(self.nFrames)
 
         # This starts the multiprocessing call to arms
-        # pool = Pool(self.nCores)
+        # pool = Pool(self.num_cores)
 
         func = partial(
             measure_one_KDE_bg,
@@ -2185,7 +2185,7 @@ class Wanderer(object):
         if flux_key_now not in self.flux_TSO_df.keys() or useTheForce:
             # for kf in self.tqdm(range(self.nFrames), desc='Flux', leave = False, total=self.nFrames):
 
-            # pool = Pool(self.nCores)
+            # pool = Pool(self.num_cores)
 
             func = partial(compute_flux_one_frame, aperRad=aperRad)
 
@@ -2265,7 +2265,7 @@ class Wanderer(object):
         if flux_key_now not in self.flux_TSO_df.keys() or useTheForce:
             # for kf in self.tqdm(range(self.nFrames), desc='Flux', leave = False, total=self.nFrames):
 
-            # pool = Pool(self.nCores)
+            # pool = Pool(self.num_cores)
 
             # func = partial(compute_flux_one_frame)
 
@@ -2340,7 +2340,7 @@ class Wanderer(object):
             if useQuad:
                 aperRads = sig2FW * self.quadrature_widths
 
-            # pool = Pool(self.nCores)
+            # pool = Pool(self.num_cores)
 
             # func = partial(compute_flux_one_frame)
 
@@ -2504,7 +2504,7 @@ class Wanderer(object):
             self.inliers_Phots = {}
 
         # This starts the multiprocessing call to arms
-        # pool = Pool(self.nCores)
+        # pool = Pool(self.num_cores)
 
         func = partial(
             DBScan_Flux,
@@ -2544,7 +2544,7 @@ class Wanderer(object):
             self.inliers_PLD = np.ones(self.PLD_components.shape, dtype=bool)
 
         # This starts the multiprocessing call to arms
-        # pool = Pool(self.nCores)
+        # pool = Pool(self.num_cores)
 
         func = partial(DBScan_Segmented_Flux, dbsClean=dbsClean)
 

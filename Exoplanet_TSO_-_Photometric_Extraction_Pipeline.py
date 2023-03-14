@@ -23,6 +23,8 @@ ap.add_argument('-ad', '--aor_dir', required=True, type=str,
                 help='AOR director (i.e. r59217921).')
 ap.add_argument('-sd', '--save_sub_dir', type=str, default='ExtracedData',
                 help='Subdirectory inside Planet_Directory to store extracted outputs.')
+ap.add_argument('-bd', '--base_dir', type=str, default='./',
+                help='Location of base directory for image data and save files')
 ap.add_argument('-pd', '--planets_dir', type=str,
                 default='/Research/Planets/', help='Location of planet directory name from $HOME.')
 ap.add_argument('-ds', '--data_sub_dir', type=str, default='/data/raw/',
@@ -49,6 +51,7 @@ args = vars(ap.parse_args())
 planetName = args['planet_name']
 channel = args['channel']
 aor_dir = args['aor_dir']
+base_dir = args['base_dir']
 planetDirectory = args['planets_dir']
 save_sub_dir = args['save_sub_dir']
 data_sub_dir = args['data_sub_dir']
@@ -110,7 +113,7 @@ dataSub = f'{fits_format}/'
 
 if data_dir == '':
     data_dir = os.path.join(
-        os.environ['HOME'],
+        base_dir,
         planetDirectory,
         planetName,
         data_sub_dir,
@@ -175,8 +178,8 @@ yguess, xguess = 15., 15.   # Specific to Spitzer circa 2010 and beyond
 # Specific to Spitzer Basic Calibrated Data
 filetype = f'{fits_format}.fits'
 
-print('Initialize an instance of `Wanderer` as `example_wanderer_median`\n')
-example_wanderer_median = Wanderer(
+print('Initialize an instance of `Wanderer` as `hatp26b_wanderer_median`\n')
+hatp26b_wanderer_median = Wanderer(
     fitsFileDir=loadfitsdir,
     filetype=filetype,
     telescope=telescope,
@@ -186,47 +189,46 @@ example_wanderer_median = Wanderer(
     nCores=nCores
 )
 
-example_wanderer_median.AOR = aor_dir
-example_wanderer_median.planetName = planetName
-example_wanderer_median.channel = channel
+hatp26b_wanderer_median.AOR = aor_dir
+hatp26b_wanderer_median.planetName = planetName
+hatp26b_wanderer_median.channel = channel
 
 print('Load Data From Fits Files in ' + loadfitsdir + '\n')
-example_wanderer_median.spitzer_load_fits_file(outputUnits=outputUnits)
+hatp26b_wanderer_median.spitzer_load_fits_file(outputUnits=outputUnits)
 
 print('**Double check for NaNs**')
-is_nan_ = np.isnan(example_wanderer_median.imageCube)
-med_image_cube = np.nanmedian(example_wanderer_median.imageCube)
-example_wanderer_median.imageCube[is_nan_] = med_image_cube
+is_nan_ = np.isnan(hatp26b_wanderer_median.imageCube)
+med_image_cube = np.nanmedian(hatp26b_wanderer_median.imageCube)
+hatp26b_wanderer_median.imageCube[is_nan_] = med_image_cube
 
 print('**Identifier Strong Outliers**')
 print('Find, flag, and NaN the "Bad Pixels" Outliers' + '\n')
-example_wanderer_median.find_bad_pixels()
+hatp26b_wanderer_median.find_bad_pixels()
 
 print(
     'Fit for All Centers: Flux Weighted, Gaussian Fitting, '
     'Gaussian Moments, Least Asymmetry\n'
 )
 
-# example_wanderer_median.fit_gaussian_centering()
-example_wanderer_median.fit_flux_weighted_centering()
-# example_wanderer_median.fit_least_asymmetry_centering()
-# example_wanderer_median.fit_all_centering() # calling this calls least_asymmetry, which does not work :(
+# hatp26b_wanderer_median.fit_gaussian_centering()
+hatp26b_wanderer_median.fit_flux_weighted_centering()
+# hatp26b_wanderer_median.fit_least_asymmetry_centering()
+# hatp26b_wanderer_median.fit_all_centering() # calling this calls least_asymmetry, which does not work :(
 
 start = time()
-example_wanderer_median.mp_lmfit_gaussian_centering(
+hatp26b_wanderer_median.mp_lmfit_gaussian_centering(
     subArraySize=6,
     recheckMethod=None,
     median_crop=False
 )
 
-print(
-    f'Operation took {time()-start} seconds with {nCores} cores')
+print(f'Operation took {time()-start} seconds with {nCores} cores')
 
 if do_db_scan:
     print('DBScanning Gaussian Fit Centers')
 
     dbs = DBSCAN(n_jobs=-1, eps=0.2, leaf_size=10)
-    dbsPred = dbs.fit_predict(example_wanderer_median.centering_GaussianFit)
+    dbsPred = dbs.fit_predict(hatp26b_wanderer_median.centering_GaussianFit)
 
     dbs_options = [k for k in range(-1, 100) if (dbsPred == k).sum()]
 else:
@@ -236,7 +238,7 @@ else:
 # n_pix = 3
 # stillOutliers = np.where(
 #   abs(
-#       example_wanderer_median.centering_GaussianFit - medGaussCenters
+#       hatp26b_wanderer_median.centering_GaussianFit - medGaussCenters
 #   ) > 4*sclGaussCenterAvg
 # )[0]
 # print(f'There are {len(stillOutliers)} outliers remaining')
@@ -245,27 +247,27 @@ if do_db_scan:
     dbsClean = 0
     dbsKeep = (dbsPred == dbsClean)
 
-# nCores = example_wanderer_median.nCores
+# nCores = hatp26b_wanderer_median.nCores
 start = time()
-example_wanderer_median.mp_measure_background_circle_masked()
+hatp26b_wanderer_median.mp_measure_background_circle_masked()
 print(f'CircleBG took {time() - start} seconds with {nCores} cores')
 
 start = time()
-example_wanderer_median.mp_measure_background_annular_mask()
+hatp26b_wanderer_median.mp_measure_background_annular_mask()
 print(f'AnnularBG took {time() - start} seconds with {nCores} cores')
 
 start = time()
-example_wanderer_median.mp_measure_background_KDE_Mode()
+hatp26b_wanderer_median.mp_measure_background_KDE_Mode()
 print(f'KDEUnivBG took {time() - start} seconds with {nCores} cores')
 
 start = time()
-example_wanderer_median.mp_measure_background_median_masked()
+hatp26b_wanderer_median.mp_measure_background_median_masked()
 print(f'MedianBG took {time() - start} seconds with {nCores} cores')
 
-example_wanderer_median.measure_effective_width()
+hatp26b_wanderer_median.measure_effective_width()
 print(
-    example_wanderer_median.effective_widths.mean(),
-    np.sqrt(example_wanderer_median.effective_widths).mean()
+    f"{hatp26b_wanderer_median.effective_widths.mean()}",
+    f"{np.sqrt(hatp26b_wanderer_median.effective_widths).mean()}"
 )
 
 print(f'Pipeline took {time() - startFull} seconds thus far')
@@ -277,20 +279,20 @@ print(
 # , 'Gaussian_Mom', 'FluxWeighted']#, 'LeastAsymmetry']
 centering_choices = ['Gaussian_Fit']
 
-# example_wanderer_median.background_df.columns
+# hatp26b_wanderer_median.background_df.columns
 background_choices = ['AnnularMask']
 staticRads = np.arange(1, 6, 0.5)  # [1.0 ]  # aperRads = np.arange(1, 6,0.5)
 varRads = [0.0, 0.25, 0.50, 0.75, 1.0, 1.25, 1.50]  # [None]#
 
-med_quad_widths = np.nanmedian(example_wanderer_median.quadrature_widths)
-vrad_dist = example_wanderer_median.quadrature_widths - med_quad_widths
+med_quad_widths = np.nanmedian(hatp26b_wanderer_median.quadrature_widths)
+vrad_dist = hatp26b_wanderer_median.quadrature_widths - med_quad_widths
 
 vrad_dist = clipOutlier2D(vrad_dist, n_sig=5)
 
 for staticRad in tqdm(staticRads, total=len(staticRads), desc='Static'):
     for varRad in tqdm(varRads, total=len(varRads), desc='Variable'):
         startMPFlux = time()
-        example_wanderer_median.mp_compute_flux_over_time_varRad(
+        hatp26b_wanderer_median.mp_compute_flux_over_time_varRad(
             staticRad,
             varRad,
             centering_choices[0],
@@ -300,32 +302,32 @@ for staticRad in tqdm(staticRads, total=len(staticRads), desc='Static'):
 
 print('**Create Beta Variable Radius**')
 # Gaussian_Fit_AnnularMask_rad_betaRad_0.0_0.0
-example_wanderer_median.mp_compute_flux_over_time_betaRad()
+hatp26b_wanderer_median.mp_compute_flux_over_time_betaRad()
 
 print(f'Entire Pipeline took {time() - startFull} seconds')
 
 if do_db_scan:
     print('DB_Scanning All Flux Vectors')
-    example_wanderer_median.mp_DBScan_Flux_All()
+    hatp26b_wanderer_median.mp_DBScan_Flux_All()
 
 print('Creating master Inliers Array')
-# inlier_master = example_wanderer_median.inliers_Phots.values()
+# inlier_master = hatp26b_wanderer_median.inliers_Phots.values()
 # inlier_master = array(list(inlier_master)).mean(axis=0) == 1.0
 
 print('Extracting PLD Components')
-example_wanderer_median.extract_PLD_components()
+hatp26b_wanderer_median.extract_PLD_components()
 
 if do_db_scan:
     print('Running DBScan on the PLD Components')
-    example_wanderer_median.mp_DBScan_PLD_All()
+    hatp26b_wanderer_median.mp_DBScan_PLD_All()
 
 print(
-    'Saving `example_wanderer_median` to a set of pickles for various '
+    'Saving `hatp26b_wanderer_median` to a set of pickles for various '
     'Image Cubes and the Storage Dictionary'
 )
 
 savefiledir_parts = [
-    os.environ['HOME'] + planetDirectory,
+    base_dir + planetDirectory,
     f'{planetName}/',
     f'{save_sub_dir}/',
     f'{channel}/',
@@ -338,14 +340,14 @@ for sfpart in savefiledir_parts:
     if not os.path.exists(savefiledir):
         os.mkdir(savefiledir)
 
-# savefiledir = environ['HOME']+planetDirectory+planetName+'/'
+# savefiledir = base_dir+planetDirectory+planetName+'/'
 #   + save_sub_dir + '/' + channel + '/' + aor_dir + '/'
 
 saveFileNameHeader = f'{planetName}_{aor_dir}_Median'
 saveFileType = '.joblib.save'
 
 path_to_files = os.path.join(
-    os.environ['HOME'],
+    base_dir,
     planetDirectory,
     planetName,
     save_sub_dir
@@ -362,7 +364,7 @@ print()
 print(f'Saving to {save_path}')
 print()
 
-example_wanderer_median.save_data_to_save_files(
+hatp26b_wanderer_median.save_data_to_save_files(
     savefiledir=savefiledir,
     saveFileNameHeader=saveFileNameHeader,
     saveFileType=saveFileType

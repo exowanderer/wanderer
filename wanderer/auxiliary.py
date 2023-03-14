@@ -28,8 +28,8 @@ y, x = 0, 1
 '''Start: From least_asymmetry.asym by N.Lust (github.com/natelust/least_asymmetry) and modified (reversed XY -> YX)'''
 
 
-def pool_run_func(func, zipper, nCores=cpu_count()):
-    with Pool(nCores) as pool:
+def pool_run_func(func, zipper, num_cores=cpu_count()-1):
+    with Pool(num_cores) as pool:
         return pool.starmap(func, zipper)
 
 
