@@ -1,13 +1,15 @@
 import numpy as np
-from tqdm import tqdm
-from time import time
-from sys import exit
-from statsmodels.robust import scale
 import os
-from multiprocessing import cpu_count
-from glob import glob
-from astropy.io import fits
+
 from argparse import ArgumentParser
+from astropy.io import fits
+from glob import glob
+from multiprocessing import cpu_count
+from time import time
+from tqdm import tqdm
+from sklearn.cluster import DBSCAN
+from statsmodels.robust import scale
+from sys import exit
 
 # TODO: make this more direct
 from wanderer.wanderer import Wanderer
@@ -19,12 +21,10 @@ ap.add_argument('-c', '--channel', required=True, type=str,
                 help='Channel number string (i.e. ch1 or ch2).')
 ap.add_argument('-ad', '--aor_dir', required=True, type=str,
                 help='AOR director (i.e. r59217921).')
-ap.add_argument('-sd', '--save_sub_dir', type=str, default='ExtractedData',
+ap.add_argument('-sd', '--save_sub_dir', type=str, default='ExtracedData',
                 help='Subdirectory inside Planet_Directory to store extracted outputs.')
-ap.add_argument('-bd', '--base_dir', type=str, default='./',
-                help='Location of base directory for image data and save files')
 ap.add_argument('-pd', '--planets_dir', type=str,
-                default='$HOME/Research/Planets/', help='Location of planet directory name.')
+                default='/Research/Planets/', help='Location of planet directory name from $HOME.')
 ap.add_argument('-ds', '--data_sub_dir', type=str, default='/data/raw/',
                 help='Sub directory structure from $HOME/Planet_Name/THIS/aor_dir/..')
 ap.add_argument('-dt', '--data_tail_dir', required=False,
@@ -49,7 +49,6 @@ args = vars(ap.parse_args())
 planetName = args['planet_name']
 channel = args['channel']
 aor_dir = args['aor_dir']
-base_dir = args['base_dir']
 planetDirectory = args['planets_dir']
 save_sub_dir = args['save_sub_dir']
 data_sub_dir = args['data_sub_dir']
@@ -79,7 +78,7 @@ print(
 )
 
 
-def clipOutlier2D(arr2D, n_sig=5):
+def clipOutlier2D(arr2D, n_sig=10):
     arr2D = arr2D.copy()
     medArr2D = np.nanmedian(arr2D, axis=0)
     sclArr2D = np.sqrt(((scale.mad(arr2D)**2.).sum()))
@@ -111,7 +110,7 @@ dataSub = f'{fits_format}/'
 
 if data_dir == '':
     data_dir = os.path.join(
-        base_dir,
+        os.environ['HOME'],
         planetDirectory,
         planetName,
         data_sub_dir,
@@ -139,6 +138,7 @@ n_uncfiles = len(uncsFilenames)
 print(f'Found {n_fitsfiles} {fits_format}.fits files')
 print(f'Found {n_uncfiles} unc.fits files')
 
+
 if len(fitsFilenames) == 0:
     raise ValueError(
         f'There are NO `{fits_format}.fits` files '
@@ -150,10 +150,9 @@ if len(uncsFilenames) == 0:
         f'in the directory {loadfitsdir}'
     )
 
+
 do_db_scan = False  # len(fitsFilenames*64) < 6e4
-if do_db_scan:
-    pass
-else:
+if not do_db_scan:
     print('There are too many images for a DB-Scan; i.e. >1e5 images')
 
 header_test = fits.getheader(fitsFilenames[0])
@@ -286,8 +285,7 @@ varRads = [0.0, 0.25, 0.50, 0.75, 1.0, 1.25, 1.50]  # [None]#
 med_quad_widths = np.nanmedian(example_wanderer_median.quadrature_widths)
 vrad_dist = example_wanderer_median.quadrature_widths - med_quad_widths
 
-n_sig = 5
-vrad_dist = clipOutlier2D(vrad_dist, n_sig=n_sig)
+vrad_dist = clipOutlier2D(vrad_dist, n_sig=5)
 
 for staticRad in tqdm(staticRads, total=len(staticRads), desc='Static'):
     for varRad in tqdm(varRads, total=len(varRads), desc='Variable'):
@@ -326,13 +324,12 @@ print(
     'Image Cubes and the Storage Dictionary'
 )
 
-
 savefiledir_parts = [
-    base_dir + planetDirectory,
-    planetName+'/',
-    save_sub_dir + '/',
-    channel + '/',
-    aor_dir + '/'
+    os.environ['HOME'] + planetDirectory,
+    f'{planetName}/',
+    f'{save_sub_dir}/',
+    f'{channel}/',
+    f'{aor_dir}/'
 ]
 
 savefiledir = ''
@@ -341,14 +338,14 @@ for sfpart in savefiledir_parts:
     if not os.path.exists(savefiledir):
         os.mkdir(savefiledir)
 
-# savefiledir = base_dir+planetDirectory+planetName+'/'
+# savefiledir = environ['HOME']+planetDirectory+planetName+'/'
 #   + save_sub_dir + '/' + channel + '/' + aor_dir + '/'
 
 saveFileNameHeader = f'{planetName}_{aor_dir}_Median'
 saveFileType = '.joblib.save'
 
 path_to_files = os.path.join(
-    base_dir,
+    os.environ['HOME'],
     planetDirectory,
     planetName,
     save_sub_dir
