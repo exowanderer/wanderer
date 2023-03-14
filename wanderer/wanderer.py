@@ -38,6 +38,7 @@ from .auxiliary import (
     # actr,
     clipOutlier,
     compute_flux_one_frame,
+    create_aper_mask,
     DBScan_Flux,
     DBScan_PLD,
     DBScan_Segmented_Flux,
@@ -247,9 +248,8 @@ class Wanderer(object):
         testfits = fits.open(self.fitsFilenames[0])[0]
         testheader = testfits.header
 
-        # bcd_shape = testfits.data[0].shape
-        bcd_shape = testfits.data.shape
-        print(f'{bcd_shape=}')
+        bcd_shape = testfits.data[0].shape
+        # bcd_shape = testfits.data.shape
 
         self.nFrames = self.nSlopeFiles * nFramesPerFile
         self.imageCube = np.zeros((self.nFrames, bcd_shape[0], bcd_shape[1]))
@@ -265,8 +265,8 @@ class Wanderer(object):
         #   2) as2sr * MJ2mJ * testheader['PXSCAL1'] * testheader['PXSCAL2']
         #       converts MJ/sr to muJ/pixel
 
-        for key, val in testheader.items():
-            print(f'{key} = {val}')
+        # for key, val in testheader.items():
+        #     print(f'{key} = {val}')
 
         if outputUnits == 'electrons':
             fluxConv = testheader['FLUXCONV']
@@ -1517,18 +1517,33 @@ class Wanderer(object):
             total=self.nFrames
         )
         for kf in progress_frame:
+            aperture = create_aper_mask(
+                centering=self.centering_FluxWeight[kf],
+                aperRad=aperRad,
+                image_shape=self.imageCube[0].shape,
+                method='exact'
+            )
+
+            backgroundMask = ~aperture
+
+            """
             aperture = CircularAperture(self.centering_FluxWeight[kf], aperRad)
 
             # list of ApertureMask objects (one for each position)
-            aper_mask = aperture.to_mask(method='exact')[0]
+            aper_mask = aperture.to_mask(method='exact')
+
+            if isinstance(aper_mask, (list, tuple, np.array)):
+                aper_mask = aper_mask[0]
 
             # backgroundMask = abs(aperture.get_fractions(
             #   np.ones(self.imageCube[0].shape))-1)
-            backgroundMask = ~aper_mask.to_image(
-                self.imageCube[0].shape
-            ).astype(bool)
-            # backgroundMask = ~backgroundMask  # [backgroundMask == 0] = False
+            # backgroundMask = ~aperture
+            # backgroundMask = ~aper_mask.to_image(
+            #     self.imageCube[0].shape
+            # ).astype(bool)
 
+            # backgroundMask = ~backgroundMask  # [backgroundMask == 0] = False
+            """
             self.background_CircleMask[kf] = self.metric(
                 self.imageCube[kf][backgroundMask]
             )
@@ -1605,25 +1620,49 @@ class Wanderer(object):
             total=self.nFrames
         )
         for kf in progress_frame:
+            inner_aper_mask = create_aper_mask(
+                centering=self.centering_FluxWeight[kf],
+                aperRad=innerRad,
+                image_shape=self.imageCube[0].shape,
+                method='exact'
+            )
+
+            outer_aper_mask = create_aper_mask(
+                centering=self.centering_FluxWeight[kf],
+                aperRad=outerRad,
+                image_shape=self.imageCube[0].shape,
+                method='exact'
+            )
+            """
             innerAperture = CircularAperture(
                 self.centering_FluxWeight[kf],
                 innerRad
             )
+
+            inner_aper_mask = innerAperture.to_mask(method='exact')
+
+            if isinstance(inner_aper_mask, (list, tuple, np.array)):
+                inner_aper_mask = inner_aper_mask[0]
+
+            inner_aper_mask = inner_aper_mask.to_image(
+                self.imageCube[0].shape
+            ).astype(bool)
+            """
+            """
             outerAperture = CircularAperture(
                 self.centering_FluxWeight[kf],
                 outerRad
             )
 
-            inner_aper_mask = innerAperture.to_mask(method='exact')[0]
-            inner_aper_mask = inner_aper_mask.to_image(
-                self.imageCube[0].shape
-            ).astype(bool)
+            outer_aper_mask = outerAperture.to_mask(method='exact')
 
-            outer_aper_mask = outerAperture.to_mask(method='exact')[0]
+            if isinstance(outer_aper_mask, (list, tuple, np.array)):
+                outer_aper_mask = outer_aper_mask[0]
+
             outer_aper_mask = outer_aper_mask.to_image(
                 self.imageCube[0].shape
             ).astype(bool)
-
+            """
             backgroundMask = (~inner_aper_mask)*outer_aper_mask
 
             self.background_Annulus[kf] = self.metric(
@@ -1699,9 +1738,21 @@ class Wanderer(object):
             total=self.nFrames
         )
         for kf in progress_frames:
+            aperture = create_aper_mask(
+                centering=self.centering_FluxWeight[kf],
+                aperRad=aperRad,
+                image_shape=self.imageCube[0].shape,
+                method='exact'
+            )
+            """
             aperture = CircularAperture(self.centering_FluxWeight[kf], aperRad)
-            aperture = aperture.to_mask(method='exact')[0]
+            aperture = aperture.to_mask(method='exact')
+
+            if isinstance(aperture, (list, tuple, np.array)):
+                aperture = aperture[0]
+
             aperture = aperture.to_image(self.imageCube[0].shape).astype(bool)
+            """
             backgroundMask = ~aperture
 
             medFrame = np.nanmedian(self.imageCube[kf][backgroundMask])
@@ -1784,9 +1835,21 @@ class Wanderer(object):
             total=self.nFrames
         )
         for kf in progress_frames:
+            aperture = create_aper_mask(
+                centering=self.centering_FluxWeight[kf],
+                aperRad=aperRad,
+                image_shape=self.imageCube[0].shape,
+                method='exact'
+            )
+            """
             aperture = CircularAperture(self.centering_FluxWeight[kf], aperRad)
-            aperture = aperture.to_mask(method='exact')[0]
+            aperture = aperture.to_mask(method='exact')
+
+            if isinstance(aperture, (list, tuple, np.array)):
+                aperture = aperture[0]
+
             aperture = aperture.to_image(self.imageCube[0].shape).astype(bool)
+            """
             backgroundMask = ~aperture
 
             kdeFrame = kde.KDEUnivariate(

@@ -706,6 +706,16 @@ def fit_one_center(
         )[::-1]
 
 
+def create_aper_mask(centering, aperRad, image_shape, method='exact'):
+    aperture = CircularAperture(centering, aperRad)
+    aperture = aperture.to_mask(method=method)
+
+    if isinstance(aperture, (list, tuple, np.array)):
+        aperture = aperture[0]
+
+    return aperture.to_image(image_shape).astype(bool)
+
+
 def compute_flux_one_frame(image, center, background, aperRad=3.0):
     """Class methods are similar to regular functions.
 
@@ -743,14 +753,25 @@ def measure_one_circle_bg(image, center, aperRad, metric, apMethod='exact'):
         True if successful, False otherwise.
 
     """
-
+    aper_mask = create_aper_mask(
+        centering=center,
+        aperRad=aperRad,
+        image_shape=image.shape,
+        method=apMethod
+    )
+    """
     aperture = CircularAperture(center, aperRad)
     # list of ApertureMask objects (one for each position)
-    aper_mask = aperture.to_mask(method=apMethod)[0]
 
-    # backgroundMask = abs(aperture.get_fractions(np.ones(self.imageCube[0].shape))-1)
+    aper_mask = aperture.to_mask(method=apMethod)
+    aper_mask = aper_mask[0]
+
+    # backgroundMask = abs(
+    #   aperture.get_fractions(np.ones(image.shape)) - 1
+    # )
     backgroundMask = aper_mask.to_image(image.shape).astype(bool)
-    backgroundMask = ~backgroundMask  # [backgroundMask == 0] = False
+    """
+    backgroundMask = ~aper_mask  # [backgroundMask == 0] = False
 
     return metric(image[backgroundMask])
 
@@ -771,6 +792,21 @@ def measure_one_annular_bg(
 
     """
 
+    inner_aper_mask = create_aper_mask(
+        centering=center,
+        aperRad=innerRad,
+        image_shape=image.shape,
+        method=apMethod
+    )
+
+    outer_aper_mask = create_aper_mask(
+        centering=center,
+        aperRad=outerRad,
+        image_shape=image.shape,
+        method=apMethod
+    )
+
+    """
     innerAperture = CircularAperture(center, innerRad)
     outerAperture = CircularAperture(center, outerRad)
 
@@ -779,7 +815,11 @@ def measure_one_annular_bg(
 
     outer_aper_mask = outerAperture.to_mask(method=apMethod)[0]
     outer_aper_mask = outer_aper_mask.to_image(image.shape).astype(bool)
+    """
 
+    # Make an annulus by inverting a cirle and multiplying by a larger circle
+    # This makes the inner circle 0 (annular hole), as well as
+    #   outside the outer circle is zero
     backgroundMask = (~inner_aper_mask)*outer_aper_mask
 
     return metric(image[backgroundMask])
@@ -800,10 +840,17 @@ def measure_one_median_bg(
         True if successful, False otherwise.
 
     """
-
+    aperture = create_aper_mask(
+        centering=center,
+        aperRad=aperRad,
+        image_shape=image.shape,
+        method=apMethod
+    )
+    """
     aperture = CircularAperture(center, aperRad)
     aperture = aperture.to_mask(method=apMethod)[0]
     aperture = aperture.to_image(image.shape).astype(bool)
+    """
     backgroundMask = ~aperture
 
     medFrame = np.nanmedian(image[backgroundMask])
@@ -830,10 +877,17 @@ def measure_one_KDE_bg(image, center, aperRad, metric, apMethod='exact'):
         True if successful, False otherwise.
 
     """
-
+    aperture = create_aper_mask(
+        centering=center,
+        aperRad=aperRad,
+        image_shape=image.shape,
+        method=apMethod
+    )
+    """
     aperture = CircularAperture(center, aperRad)
     aperture = aperture.to_mask(method=apMethod)[0]
     aperture = aperture.to_image(image.shape).astype(bool)
+    """
     backgroundMask = ~aperture
 
     kdeFrame = kde.KDEUnivariate(image[backgroundMask])
@@ -847,6 +901,20 @@ def compute_annular_mask(
 
     innerRad, outerRad = aperRad
 
+    inner_aper_mask = create_aper_mask(
+        centering=center,
+        aperRad=innerRad,
+        image_shape=image.shape,
+        method=method
+    )
+
+    outer_aper_mask = create_aper_mask(
+        centering=center,
+        aperRad=outerRad,
+        image_shape=image.shape,
+        method=method
+    )
+    """
     innerAperture = CircularAperture(center, innerRad)
     outerAperture = CircularAperture(center, outerRad)
 
@@ -855,7 +923,11 @@ def compute_annular_mask(
 
     outer_aper_mask = outerAperture.to_mask(method=method)[0]
     outer_aper_mask = outer_aper_mask.to_image(image.shape).astype(bool)
+    """
 
+    # Make an annulus by inverting a cirle and multiplying by a larger circle
+    # This makes the inner circle 0 (annular hole), as well as
+    #   outside the outer circle is zero
     return (~inner_aper_mask)*outer_aper_mask
 
 
@@ -880,12 +952,21 @@ def measure_one_background(
         aperture = compute_annular_mask(
             aperRad, center, image, method=apMethod)
     else:
+        aperture = create_aper_mask(
+            centering=center,
+            aperRad=aperRad,
+            image_shape=image.shape,
+            method=apMethod
+        )
+        """
         aperture = CircularAperture(center, aperRad)
         # list of ApertureMask objects (one for each position)
         aperture = aperture.to_mask(method=apMethod)[0]
 
         # inverse to keep 'outside' aperture
         aperture = ~aperture.to_image(image).astype(bool)
+        """
+        aperture = ~aperture
 
     if bgMethod == 'median':
         medFrame = np.nanmedian(image[aperture])
