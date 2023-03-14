@@ -361,8 +361,8 @@ class Wanderer(object):
             self.hst_load_fits_file()
 
     def load_data_from_save_files(
-            self, savefiledir=None, saveFileNameHeader=None,
-            saveFileType='.pickle.save'):
+            self, savefiledir=None, save_name_header=None,
+            save_file_type='.pickle.save'):
         """Class methods are similar to regular functions.
 
         Note:
@@ -377,9 +377,9 @@ class Wanderer(object):
 
         """
 
-        if saveFileNameHeader is None:
+        if save_name_header is None:
             raise ValueError(
-                '`saveFileNameHeader` should be the beginning '
+                '`save_name_header` should be the beginning '
                 'of each save file name'
             )
 
@@ -387,8 +387,8 @@ class Wanderer(object):
             savefiledir = './'
 
         print('Loading from Master Files')
-        files_path_start = os.path.join(savefiledir, saveFileNameHeader)
-        file_path_template = files_path_start + '{0}' + saveFileType
+        files_path_start = os.path.join(savefiledir, save_name_header)
+        file_path_template = files_path_start + '{0}' + save_file_type
 
         self.centering_df = pd.read_pickle(
             file_path_template.format('_centering_dataframe')
@@ -446,8 +446,8 @@ class Wanderer(object):
             joblib.dump(df_, file_path_template.format(filename_))
 
     def save_data_to_save_files(
-            self, savefiledir=None, saveFileNameHeader=None,
-            saveFileType='.joblib.save', SaveMaster=True, SaveTime=True):
+            self, savefiledir=None, save_name_header=None,
+            save_file_type='.joblib.save', SaveMaster=True, SaveTime=True):
         """Class methods are similar to regular functions.
 
         Note:
@@ -462,9 +462,9 @@ class Wanderer(object):
 
         """
 
-        if saveFileNameHeader is None:
+        if save_name_header is None:
             raise ValueError(
-                '`saveFileNameHeader` should be the beginning '
+                '`save_name_header` should be the beginning '
                 'of each save file name'
             )
 
@@ -495,14 +495,14 @@ class Wanderer(object):
             f'{str(hour)}h{str(minute)}m{str(sec)}s'
         )
 
-        saveFileTypeBak = date_string + saveFileType
+        save_file_type_bak = date_string + save_file_type
         self.initiate_save_dict()
 
         if SaveMaster:
             print('\nSaving to Master File -- Overwriting Previous Master')
 
-            files_path_start = os.path.join(savefiledir, saveFileNameHeader)
-            file_path_template = files_path_start + "{0}" + saveFileType
+            files_path_start = os.path.join(savefiledir, save_name_header)
+            file_path_template = files_path_start + "{0}" + save_file_type
 
             self.save_collection(file_path_template)
 
@@ -510,9 +510,9 @@ class Wanderer(object):
             print('Saving to New TimeStamped File -- These Tend to Pile Up!')
 
             file_path_base = os.path.join(
-                savefiledir, 'TimeStamped', saveFileNameHeader
+                savefiledir, 'TimeStamped', save_name_header
             )
-            file_path_template = file_path_base + '{0}' + saveFileTypeBak
+            file_path_template = file_path_base + '{0}' + save_file_type_bak
             self.save_collection(file_path_template)
 
     def initiate_save_dict(self, dummy=None):
