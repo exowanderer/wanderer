@@ -2,7 +2,6 @@ import numpy as np
 import os
 import sys
 
-from argparse import ArgumentParser
 from astropy.io import fits
 from glob import glob
 from multiprocessing import cpu_count
@@ -13,13 +12,13 @@ from statsmodels.robust import scale
 
 # TODO: make this more direct
 from wanderer.wanderer import Wanderer
-from wanderer.auxiliary import command_line_inputs
+from wanderer.auxiliary import command_line_inputs, clipOutlier2D
 
 clargs = command_line_inputs()
 
-planet_name = clargs.planet_name
-channel = clargs.channel
-aor_dir = clargs.aor_dir
+planet_name = 'hatp26b'  # clargs.planet_name
+channel = clargs.channel or 'ch2'
+aor_dir = clargs.aor_dir or 'r42621184'
 planets_dir = clargs.planets_dir
 save_sub_dir = clargs.save_sub_dir
 data_sub_dir = clargs.data_sub_dir
@@ -55,15 +54,6 @@ print(
 )
 
 
-def clipOutlier2D(arr2D, n_sig=10):
-    arr2D = arr2D.copy()
-    medArr2D = np.nanmedian(arr2D, axis=0)
-    sclArr2D = np.sqrt(((scale.mad(arr2D)**2.).sum()))
-    outliers = abs(arr2D - medArr2D) > n_sig*sclArr2D
-    inliers = abs(arr2D - medArr2D) <= n_sig*sclArr2D
-    arr2D[outliers] = np.nanmedian(arr2D[inliers], axis=0)
-    return arr2D
-
 # As an example, Spitzer data is expected to be store in the directory structure:
 #
 # `PLANET_DIRECTORY/data/raw/AORDIR/CHANNEL/bcd/`
@@ -79,6 +69,7 @@ def clipOutlier2D(arr2D, n_sig=10):
 #
 # The `loadfitsdir` should read as:
 #   `./Research/Planets/HAPPY5/data/raw/r11235813/ch2/bcd/`
+
 
 dataSub = f'{fits_format}/'
 

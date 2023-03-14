@@ -38,7 +38,7 @@ class WandererCLI:
     planets_dir: str = './'
     save_sub_dir: str = 'ExtracedData'
     data_sub_dir: str = '/data/raw/'
-    data_tail_dir: str = 'big'
+    data_tail_dir: str = ''
     fits_format: str = 'bcd'
     unc_format: str = 'bunc'
     method: str = 'median'
@@ -438,6 +438,16 @@ def clipOutlier(oneDarray, n_sig=8):
 
     oneDarray[outliers] = np.nanmedian(oneDarray[~outliers])
     return oneDarray
+
+
+def clipOutlier2D(arr2D, n_sig=10):
+    arr2D = arr2D.copy()
+    medArr2D = np.nanmedian(arr2D, axis=0)
+    sclArr2D = np.sqrt(((scale.mad(arr2D)**2.).sum()))
+    outliers = abs(arr2D - medArr2D) > n_sig*sclArr2D
+    inliers = abs(arr2D - medArr2D) <= n_sig*sclArr2D
+    arr2D[outliers] = np.nanmedian(arr2D[inliers], axis=0)
+    return arr2D
 
 
 def flux_weighted_centroid(image, ypos, xpos, b_size=7):
