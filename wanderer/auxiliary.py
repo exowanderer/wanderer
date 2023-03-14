@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import scipy as sp
 
+from argparse import ArgumentParser
 from astropy.io import fits
 from astropy.modeling import models, fitting
 from dataclasses import dataclass
@@ -86,7 +87,8 @@ def command_line_inputs():
 
     return convert_args_to_dataclass(args)
 
-def convert_args_to_dataclass(args)
+
+def convert_args_to_dataclass(args):
     clargs = WandererCLI()
     clargs.args_obj = WandererCLI()
     clargs.planet_name = args['planet_name']
