@@ -750,7 +750,7 @@ class Wanderer(object):
 
     def mp_lmfit_gaussian_centering(
             self, yguess=15, xguess=15, subArraySize=10, init_params=None,
-            useMoments=False, num_cores=cpu_count(), center_range=None,
+            useMoments=False, num_cores=cpu_count()-1, center_range=None,
             width_range=None, n_sig=6.1, method='leastsq', recheckMethod=None,
             median_crop=False, verbose=False):
         """Class methods are similar to regular functions.
