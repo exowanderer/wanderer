@@ -390,43 +390,61 @@ class Wanderer(object):
         files_path_start = os.path.join(savefiledir, save_name_header)
         file_path_template = files_path_start + '{0}' + save_file_type
 
-        self.centering_df = pd.read_pickle(
+        print(f"Loading {file_path_template.format('_centering_dataframe')}")
+        self.centering_df = joblib.load(
             file_path_template.format('_centering_dataframe')
         )
-        self.background_df = pd.read_pickle(
+
+        print(f"Loading {file_path_template.format('_background_dataframe')}")
+        self.background_df = joblib.load(
             file_path_template.format('_background_dataframe')
         )
-        self.flux_TSO_df = pd.read_pickle(
+
+        print(f"Loading {file_path_template.format('_flux_TSO_dataframe')}")
+        self.flux_TSO_df = joblib.load(
             file_path_template.format('_flux_TSO_dataframe')
         )
 
         noise_file_path = file_path_template.format('_noise_TSO_dataframe')
 
         if os.path.exists(noise_file_path):
-            self.noise_TSO_df = pd.read_pickle(noise_file_path)
+            print(f"Loading {noise_file_path}")
+            self.noise_TSO_df = joblib.load(noise_file_path)
         else:
             self.noise_TSO_df = None
 
+        print(f"Loading {file_path_template.format('_image_cube_array')}")
         self.imageCube = joblib.load(
             file_path_template.format('_image_cube_array')
         )
+
+        print(f"Loading {file_path_template.format('_noise_cube_array')}")
         self.noiseCube = joblib.load(
             file_path_template.format('_noise_cube_array')
         )
+
+        print(f"Loading {file_path_template.format('_time_cube_array')}")
         self.timeCube = joblib.load(
             file_path_template.format('_time_cube_array')
         )
 
+        print(
+            f"Loading {file_path_template.format('_image_bad_pix_cube_array')}"
+        )
         self.imageBadPixMasks = joblib.load(
             file_path_template.format('_image_bad_pix_cube_array')
         )
 
+        print(f"Loading {file_path_template.format('_save_dict')}")
         self.save_dict = joblib.load(
             file_path_template.format('_save_dict')
         )
 
-        print('nFrames', 'nFrame' in self.save_dict.keys())
-        print('Assigning Parts of `self.save_dict` to individual data structures')
+        print('nFrames', 'nFrames' in self.save_dict.keys())
+        print(
+            'Assigning Parts of `self.save_dict` to individual data structures'
+        )
+
         for key in self.save_dict.keys():
             exec("self." + key + " = self.save_dict['" + key + "']")
 

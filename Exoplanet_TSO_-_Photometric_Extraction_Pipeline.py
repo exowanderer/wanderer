@@ -14,11 +14,11 @@ from statsmodels.robust import scale
 from wanderer.wanderer import Wanderer
 from wanderer.auxiliary import command_line_inputs, clipOutlier2D
 
-clargs = command_line_inputs()
+clargs = command_line_inputs(check_defaults=True)
 
-planet_name = 'hatp26b'  # clargs.planet_name
-channel = clargs.channel or 'ch2'
-aor_dir = clargs.aor_dir or 'r42621184'
+planet_name = clargs.planet_name
+channel = clargs.channel
+aor_dir = clargs.aor_dir
 planets_dir = clargs.planets_dir
 save_sub_dir = clargs.save_sub_dir
 data_sub_dir = clargs.data_sub_dir

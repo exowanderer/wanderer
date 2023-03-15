@@ -41,6 +41,7 @@ class WandererCLI:
     data_tail_dir: str = ''
     fits_format: str = 'bcd'
     unc_format: str = 'bunc'
+    save_file_type: str = '.joblib.save'
     method: str = 'median'
     telescope: str = 'Spitzer'
     output_units: str = 'electrons'
@@ -49,7 +50,7 @@ class WandererCLI:
     verbose: bool = False
 
 
-def command_line_inputs():
+def command_line_inputs(check_defaults=True):
     ap = ArgumentParser()
     ap.add_argument('-pn', '--planet_name', type=str, default='planetname',
                     help='Directory Name for the Planet (i.e. hd209458b).')
@@ -64,31 +65,41 @@ def command_line_inputs():
                     'store extracted outputs.'
                     )
     ap.add_argument('-ds', '--data_sub_dir', type=str, default='/data/raw/',
-                    help='Sub directory structure from $HOME/Planet_Name/THIS/aor_dir/..')
+                    help='Sub directory structure from '
+                    '$HOME/Planet_Name/THIS/aor_dir/..'
+                    )
     ap.add_argument('-dt', '--data_tail_dir', required=False,
-                    type=str, default='/big/', help='String inside AOR DIR.')
+                    type=str, default='', help='String inside AOR DIR.')
     ap.add_argument('-ff', '--fits_format', type=str,
                     default='bcd', help='Format of the fits files (i.e. bcd).')
-    ap.add_argument('-uf', '--unc_format', type=str,
-                    default='bunc', help='Format of the photometric noise files (i.e. bcd).')
+    ap.add_argument('-uf', '--unc_format', type=str, default='bunc',
+                    help='Format of the photometric noise files (i.e. bcd).')
+    ap.add_argument('-sft', '--save_file_type', type=str,
+                    default='.joblib.save',
+                    help='file name extension for save files after processing'
+                    )
     ap.add_argument('-m', '--method', type=str, default='median',
                     help='method for photmetric extraction (i.e. median).')
-    ap.add_argument('-t', '--telescope', type=str,
-                    default='Spitzer', help='Telescope: [Spitzer, Hubble, JWST].')
+    ap.add_argument('-t', '--telescope', type=str, default='Spitzer',
+                    help='Telescope: [Spitzer, Hubble, JWST].')
     ap.add_argument('-ou', '--output_units', type=str, default='electrons',
-                    help='Units for the extracted photometry [electrons, muJ_per_Pixel, etc].')
-    ap.add_argument('-d', '--data_dir', type=str, default='',
-                    help='Set location of all `bcd` and `bunc` files: bypass previous setup.')
+                    help='Units for the extracted photometry '
+                    '[electrons, muJ_per_Pixel, etc].'
+                    )
+    ap.add_argument('-d', '--data_dir', type=str, default=None,
+                    help='Set location of all `bcd` and `bunc` files: '
+                    'bypass previous setup.'
+                    )
     ap.add_argument('-nc', '--num_cores', type=int, default=cpu_count()-1)
     ap.add_argument('-v', '--verbose', type=bool,
                     default=False, help='Print out normally irrelevent things.')
 
     args = vars(ap.parse_args())
 
-    return convert_args_to_dataclass(args)
+    return convert_args_to_dataclass(args, check_defaults=check_defaults)
 
 
-def convert_args_to_dataclass(args):
+def convert_args_to_dataclass(args, check_defaults=True):
     clargs = WandererCLI()
     clargs.args_obj = WandererCLI()
     clargs.planet_name = args['planet_name']
@@ -106,6 +117,21 @@ def convert_args_to_dataclass(args):
     clargs.data_dir = args['data_dir']
     clargs.num_cores = args['num_cores']
     clargs.verbose = args['verbose']
+
+    if check_defaults:
+        # Check important defaults directly
+        if clargs.planet_name == 'planetname':
+            print(
+                UserWarning(
+                    '\n[WARNING] User is using default planet_name="planetname"'
+                    '\nPlease call command line with `-pn` or `--planet_name`\n'
+                )
+            )
+
+        assert (clargs.channel is not None), \
+            'Please call command line with `-c` or `--channel`'
+        assert (clargs.aor_dir is not None), \
+            'Please call command line with `-ad` or `--aor_dir`'
 
     return clargs
 
