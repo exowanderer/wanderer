@@ -262,7 +262,7 @@ class Wanderer(object):
         del testfits
 
         # Converts DN/s to microJy per pixel
-        #   1) expTime * gain / flux_conv converts MJ/sr to electrons
+        #   1) exp_time * gain / flux_conv converts MJ/sr to electrons
         #   2) as2sr * MJ2mJ * testheader['PXSCAL1'] * testheader['PXSCAL2']
         #       converts MJ/sr to muJ/pixel
 
@@ -271,9 +271,9 @@ class Wanderer(object):
 
         if output_units == 'electrons':
             flux_conv = testheader['FLUXCONV']
-            expTime = testheader['EXPTIME']
+            exp_time = testheader['EXPTIME']
             gain = testheader['GAIN']
-            flux_conversion = expTime*gain / flux_conv
+            flux_conversion = exp_time*gain / flux_conv
 
         elif output_units == 'muJ_per_Pixel':
             as2sr = arcsec**2.0  # steradians per square arcsecond
@@ -468,7 +468,7 @@ class Wanderer(object):
 
     def save_data_to_save_files(
             self, savefiledir=None, save_name_header=None,
-            save_file_type='.joblib.save', SaveMaster=True, SaveTime=True):
+            save_file_type='.joblib.save', save_master=True, save_time=True):
         """Class methods are similar to regular functions.
 
         Note:
@@ -519,7 +519,7 @@ class Wanderer(object):
         save_file_type_bak = date_string + save_file_type
         self.initiate_save_dict()
 
-        if SaveMaster:
+        if save_master:
             print('\nSaving to Master File -- Overwriting Previous Master')
 
             files_path_start = os.path.join(savefiledir, save_name_header)
@@ -527,7 +527,7 @@ class Wanderer(object):
 
             self.save_collection(file_path_template)
 
-        if SaveTime:
+        if save_time:
             print('Saving to New TimeStamped File -- These Tend to Pile Up!')
 
             file_path_base = os.path.join(
@@ -552,21 +552,21 @@ class Wanderer(object):
         """
 
         _stored_variables = [
-            'background_Annulus',
-            'background_CircleMask',
-            'background_GaussianFit',
-            'background_KDEUniv',
-            'background_MedianMask',
+            'background_annulus',
+            'background_circle_mask',
+            'background_gaussian_fit',
+            'background_kde_univ',
+            'background_median_mask',
             'centering_fluxweight',
-            'centering_GaussianFit',
-            'centering_LeastAsym',
+            'centering_gaussian_fit',
+            'centering_least_asym',
             'effective_widths',
             'fits_file_dir',
             'fits_names',
-            'heights_GaussianFit',
+            'heights_gaussian_fit',
             'inliers_phots',
             'inliers_pld',
-            'inliers_Master',
+            'inliers_master',
             'method',
             'pix_rad',
             'n_frames',
@@ -575,8 +575,8 @@ class Wanderer(object):
             'quadrature_widths',
             'yguess',
             'xguess',
-            'widths_GaussianFit',
-            'AOR',
+            'widths_gaussian_fit',
+            'aor',
             'planet_name',
             'channel'
         ]
@@ -679,7 +679,7 @@ class Wanderer(object):
         # self.image_cube[self.bad_pixel_masks] = nan
 
     def fit_gaussian_centering(
-            self, method='la', initc='fw', subArray=False, print_compare=False):
+            self, method='la', initc='fw', sub_array=False, print_compare=False):
         """Class methods are similar to regular functions.
 
         Note:
@@ -710,12 +710,12 @@ class Wanderer(object):
         yinds = yinds0[ylower:yupper, xlower:xupper]
         xinds = xinds0[ylower:yupper, xlower:xupper]
 
-        self.centering_GaussianFit = np.zeros((self.image_cube.shape[0], 2))
-        self.widths_GaussianFit = np.zeros((self.image_cube.shape[0], 2))
+        self.centering_gaussian_fit = np.zeros((self.image_cube.shape[0], 2))
+        self.widths_gaussian_fit = np.zeros((self.image_cube.shape[0], 2))
 
-        self.heights_GaussianFit = np.zeros(self.image_cube.shape[0])
-        # self.rotation_GaussianFit = np.zeros(self.image_cube.shape[0])
-        self.background_GaussianFit = np.zeros(self.image_cube.shape[0])
+        self.heights_gaussian_fit = np.zeros(self.image_cube.shape[0])
+        # self.rotation_gaussian_fit = np.zeros(self.image_cube.shape[0])
+        self.background_gaussian_fit = np.zeros(self.image_cube.shape[0])
 
         progress_kframe = self.tqdm(
             range(self.n_frames),
@@ -740,39 +740,39 @@ class Wanderer(object):
                     gaussI = np.hstack([cmom[0], cmom[1], cmom[2], cmom[3:]])
 
                 # H, Xc, Yc, Xs, Ys, Th, O
-                gaussP = fit_gauss(subFrame_now, xinds, yinds, gaussI)
+                p_gauss = fit_gauss(subFrame_now, xinds, yinds, gaussI)
 
             if method == 'la':
                 # , xinds, yinds, np.copy(cmom)) # H, Xc, Yc, Xs, Ys, Th, O
-                gaussP = fitgaussian(subFrame_now)
+                p_gauss = fitgaussian(subFrame_now)
 
-            self.centering_GaussianFit[kf][self.x] = gaussP[1] + xlower
-            self.centering_GaussianFit[kf][self.y] = gaussP[2] + ylower
+            self.centering_gaussian_fit[kf][self.x] = p_gauss[1] + xlower
+            self.centering_gaussian_fit[kf][self.y] = p_gauss[2] + ylower
 
-            self.widths_GaussianFit[kf][self.x] = gaussP[3]
-            self.widths_GaussianFit[kf][self.y] = gaussP[4]
+            self.widths_gaussian_fit[kf][self.x] = p_gauss[3]
+            self.widths_gaussian_fit[kf][self.y] = p_gauss[4]
 
-            self.heights_GaussianFit[kf] = gaussP[0]
-            self.background_GaussianFit[kf] = gaussP[5]
+            self.heights_gaussian_fit[kf] = p_gauss[0]
+            self.background_gaussian_fit[kf] = p_gauss[5]
 
-            del gaussP, cmom
+            del p_gauss, cmom
 
         self.centering_df = pd.DataFrame()
-        self.centering_df['gaussian_fit_ycenters'] = self.centering_GaussianFit.T[self.y]
-        self.centering_df['gaussian_fit_xcenters'] = self.centering_GaussianFit.T[self.x]
-        self.centering_df['gaussian_mom_ycenters'] = self.centering_GaussianFit.T[self.y]
-        self.centering_df['gaussian_mom_xcenters'] = self.centering_GaussianFit.T[self.x]
+        self.centering_df['gaussian_fit_ycenters'] = self.centering_gaussian_fit.T[self.y]
+        self.centering_df['gaussian_fit_xcenters'] = self.centering_gaussian_fit.T[self.x]
+        self.centering_df['gaussian_mom_ycenters'] = self.centering_gaussian_fit.T[self.y]
+        self.centering_df['gaussian_mom_xcenters'] = self.centering_gaussian_fit.T[self.x]
 
-        self.centering_df['gaussian_fit_y_Widths'] = self.widths_GaussianFit.T[self.y]
-        self.centering_df['gaussian_fit_x_Widths'] = self.widths_GaussianFit.T[self.x]
+        self.centering_df['gaussian_fit_y_widths'] = self.widths_gaussian_fit.T[self.y]
+        self.centering_df['gaussian_fit_x_widths'] = self.widths_gaussian_fit.T[self.x]
 
-        self.centering_df['gaussian_fit_Heights'] = self.heights_GaussianFit
-        self.centering_df['gaussian_fit_Offset'] = self.background_GaussianFit
+        self.centering_df['gaussian_fit_heights'] = self.heights_gaussian_fit
+        self.centering_df['gaussian_fit_offset'] = self.background_gaussian_fit
 
     def mp_lmfit_gaussian_centering(
-            self, yguess=15, xguess=15, subArraySize=10, init_params=None,
+            self, yguess=15, xguess=15, sub_array_size=10, init_params=None,
             useMoments=False, num_cores=cpu_count()-1, center_range=None,
-            width_range=None, n_sig=6.1, method='leastsq', recheckMethod=None,
+            width_range=None, n_sig=6.1, method='leastsq', recheck_method=None,
             median_crop=False, verbose=False):
         """Class methods are similar to regular functions.
 
@@ -823,7 +823,7 @@ class Wanderer(object):
 
         yy0, xx0 = np.indices(self.image_cube[0].shape)
 
-        pix_rad = subArraySize//2
+        pix_rad = sub_array_size//2
         ylower = self.yguess - self.pix_rad
         yupper = self.yguess + self.pix_rad
         xlower = self.xguess - self.pix_rad
@@ -859,48 +859,48 @@ class Wanderer(object):
             'Finished with Fitting Centers. Now assigning to instance values.'
         )
 
-        self.centering_GaussianFit = np.zeros((self.image_cube.shape[0], 2))
-        self.widths_GaussianFit = np.zeros((self.image_cube.shape[0], 2))
+        self.centering_gaussian_fit = np.zeros((self.image_cube.shape[0], 2))
+        self.widths_gaussian_fit = np.zeros((self.image_cube.shape[0], 2))
 
-        self.heights_GaussianFit = np.zeros(self.image_cube.shape[0])
-        self.background_GaussianFit = np.zeros(self.image_cube.shape[0])
+        self.heights_gaussian_fit = np.zeros(self.image_cube.shape[0])
+        self.background_gaussian_fit = np.zeros(self.image_cube.shape[0])
 
         gaussian_centers = np.array(gaussian_centers)
 
         # ['center_y']
-        self.centering_GaussianFit.T[self.y] = gaussian_centers.T[0]
+        self.centering_gaussian_fit.T[self.y] = gaussian_centers.T[0]
         # ['center_x']
-        self.centering_GaussianFit.T[self.x] = gaussian_centers.T[1]
+        self.centering_gaussian_fit.T[self.x] = gaussian_centers.T[1]
 
         # ['width_y']
-        self.widths_GaussianFit.T[self.y] = gaussian_centers.T[2]
+        self.widths_gaussian_fit.T[self.y] = gaussian_centers.T[2]
         # ['width_x']
-        self.widths_GaussianFit.T[self.x] = gaussian_centers.T[3]
+        self.widths_gaussian_fit.T[self.x] = gaussian_centers.T[3]
 
-        self.heights_GaussianFit[:] = gaussian_centers.T[4]  # ['height']
-        self.background_GaussianFit[:] = gaussian_centers.T[5]  # ['offset']
+        self.heights_gaussian_fit[:] = gaussian_centers.T[4]  # ['height']
+        self.background_gaussian_fit[:] = gaussian_centers.T[5]  # ['offset']
 
         if verbose:
             print('Rechecking corner cases:')
 
-        medY, medX = np.nanmedian(self.centering_GaussianFit, axis=0)
-        stdX, stdY = np.nanstd(self.centering_GaussianFit, axis=0)
+        medY, medX = np.nanmedian(self.centering_gaussian_fit, axis=0)
+        stdX, stdY = np.nanstd(self.centering_gaussian_fit, axis=0)
 
-        outliers = (((self.centering_GaussianFit.T[y] - medY)/stdY)**2 + (
-            (self.centering_GaussianFit.T[x] - medX)/stdX)**2) > n_sig
+        outliers = (((self.centering_gaussian_fit.T[y] - medY)/stdY)**2 + (
+            (self.centering_gaussian_fit.T[x] - medX)/stdX)**2) > n_sig
 
-        if recheckMethod is not None and isinstance(recheckMethod, str):
+        if recheck_method is not None and isinstance(recheck_method, str):
             for kf in np.where(outliers)[0]:
                 if verbose:
                     # print('    Corner Case:\t{}\tPreviousSolution={}'.format(
-                    #     kf, self.centering_GaussianFit[kf]), end="\t")
+                    #     kf, self.centering_gaussian_fit[kf]), end="\t")
                     print(
                         f'    Corner Case:\t{kf}'
-                        f'\tPreviousSolution={self.centering_GaussianFit[kf]}',
+                        f'\tPreviousSolution={self.centering_gaussian_fit[kf]}',
                         end="\t"
                     )
 
-                gaussP = lmfit_one_center(
+                p_gauss = lmfit_one_center(
                     self.image_cube[kf],
                     yy=yy,
                     xx=xx,
@@ -910,70 +910,72 @@ class Wanderer(object):
                     ylower=ylower,
                     xupper=xupper,
                     xlower=xlower,
-                    method=recheckMethod
+                    method=recheck_method
                 )
 
                 # ['center_y']
-                self.centering_GaussianFit[kf][self.y] = gaussP[0]
+                self.centering_gaussian_fit[kf][self.y] = p_gauss[0]
                 # ['center_x']
-                self.centering_GaussianFit[kf][self.x] = gaussP[1]
+                self.centering_gaussian_fit[kf][self.x] = p_gauss[1]
 
-                self.widths_GaussianFit[kf][self.y] = gaussP[2]  # ['width_y']
-                self.widths_GaussianFit[kf][self.x] = gaussP[3]  # ['width_x']
+                # ['width_y']
+                self.widths_gaussian_fit[kf][self.y] = p_gauss[2]
+                # ['width_x']
+                self.widths_gaussian_fit[kf][self.x] = p_gauss[3]
 
-                self.heights_GaussianFit[kf] = gaussP[4]  # ['height']
+                self.heights_gaussian_fit[kf] = p_gauss[4]  # ['height']
 
-                self.background_GaussianFit[kf] = gaussP[5]  # ['offset']
+                self.background_gaussian_fit[kf] = p_gauss[5]  # ['offset']
 
                 if verbose:
-                    print(f'NewSolution={self.centering_GaussianFit[kf]}')
+                    print(f'NewSolution={self.centering_gaussian_fit[kf]}')
 
         elif median_crop:
             print('Setting Gaussian Centerintg Outliers to the Median')
-            y_gaussball = ((self.centering_GaussianFit.T[y] - medY)/stdY)**2
-            x_gaussball = ((self.centering_GaussianFit.T[x] - medX)/stdX)**2
+            y_gaussball = ((self.centering_gaussian_fit.T[y] - medY)/stdY)**2
+            x_gaussball = ((self.centering_gaussian_fit.T[x] - medX)/stdX)**2
 
             inliers = (y_gaussball+x_gaussball) <= n_sig
             medY, medX = np.nanmedian(
-                self.centering_GaussianFit[inliers], axis=0)
+                self.centering_gaussian_fit[inliers], axis=0)
 
-            self.centering_GaussianFit.T[y][outliers] = medY
-            self.centering_GaussianFit.T[x][outliers] = medX
+            self.centering_gaussian_fit.T[y][outliers] = medY
+            self.centering_gaussian_fit.T[x][outliers] = medX
 
         try:
             self.centering_df = self.centering_df  # check if it exists
         except Exception as err:
             print(f"Option X2 Fit Failed as {err}")
-            self.centering_df = pd.DataFrame()       # create it if it does not exist
+            self.centering_df = pd.DataFrame()  # create it if it does not exist
 
-        ycenter = self.centering_GaussianFit.T[self.y]
-        xcenter = self.centering_GaussianFit.T[self.x]
+        ycenter = self.centering_gaussian_fit.T[self.y]
+        xcenter = self.centering_gaussian_fit.T[self.x]
         self.centering_df['gaussian_fit_ycenters'] = ycenter
         self.centering_df['gaussian_fit_xcenters'] = xcenter
 
-        y_width = self.widths_GaussianFit.T[self.y]
-        x_width = self.widths_GaussianFit.T[self.x]
-        self.centering_df['gaussian_fit_y_Widths'] = y_width
-        self.centering_df['gaussian_fit_x_Widths'] = x_width
+        y_width = self.widths_gaussian_fit.T[self.y]
+        x_width = self.widths_gaussian_fit.T[self.x]
+        self.centering_df['gaussian_fit_y_widths'] = y_width
+        self.centering_df['gaussian_fit_x_widths'] = x_width
 
-        self.centering_df['gaussian_fit_Heights'] = self.heights_GaussianFit
-        self.centering_df['gaussian_fit_Offset'] = self.background_GaussianFit
+        self.centering_df['gaussian_fit_heights'] = self.heights_gaussian_fit
+        self.centering_df['gaussian_fit_offset'] = self.background_gaussian_fit
 
-    def assign_gaussian_centering(self, gaussP, xlower, kf, ylower):
+    def assign_gaussian_centering(self, p_gauss, xlower, kf, ylower):
 
         y, x = self.y, self.x
-        self.centering_GaussianFit[kf][x] = gaussP[1] + xlower
-        self.centering_GaussianFit[kf][y] = gaussP[2] + ylower
+        self.centering_gaussian_fit[kf][x] = p_gauss[1] + xlower
+        self.centering_gaussian_fit[kf][y] = p_gauss[2] + ylower
 
-        self.widths_GaussianFit[kf][x] = gaussP[3]
-        self.widths_GaussianFit[kf][y] = gaussP[4]
+        self.widths_gaussian_fit[kf][x] = p_gauss[3]
+        self.widths_gaussian_fit[kf][y] = p_gauss[4]
 
-        self.heights_GaussianFit[kf] = gaussP[0]
-        self.background_GaussianFit[kf] = gaussP[5]
+        self.heights_gaussian_fit[kf] = p_gauss[0]
+        self.background_gaussian_fit[kf] = p_gauss[5]
 
     def mp_fit_gaussian_centering(
             self, n_sig=False, method='la', initc='fw',
-            subArray=False, print_compare=False):
+            sub_array=False, print_compare=False):
         """Class methods are similar to regular functions.
 
         Note:
@@ -994,25 +996,25 @@ class Wanderer(object):
 
         y, x = self.y, self.x
 
-        yinds0, xinds0 = np.indices(self.image_cube[0].shape)
+        # yinds0, xinds0 = np.indices(self.image_cube[0].shape)
 
-        ylower = self.yguess - self.pix_rad
-        yupper = self.yguess + self.pix_rad
-        xlower = self.xguess - self.pix_rad
-        xupper = self.xguess + self.pix_rad
+        ylower = np.int32(self.yguess - self.pix_rad)
+        yupper = np.int32(self.yguess + self.pix_rad)
+        xlower = np.int32(self.xguess - self.pix_rad)
+        xupper = np.int32(self.xguess + self.pix_rad)
 
-        ylower, xlower, yupper, xupper = np.int32(
-            [ylower, xlower, yupper, xupper])
+        # ylower, xlower, yupper, xupper = np.int32(
+        #     [ylower, xlower, yupper, xupper])
 
-        yinds = yinds0[ylower:yupper, xlower:xupper]
-        xinds = xinds0[ylower:yupper, xlower:xupper]
+        # yinds = yinds0[ylower:yupper, xlower:xupper]
+        # xinds = xinds0[ylower:yupper, xlower:xupper]
 
-        self.centering_GaussianFit = np.zeros((self.image_cube.shape[0], 2))
-        self.widths_GaussianFit = np.zeros((self.image_cube.shape[0], 2))
+        self.centering_gaussian_fit = np.zeros((self.image_cube.shape[0], 2))
+        self.widths_gaussian_fit = np.zeros((self.image_cube.shape[0], 2))
 
-        self.heights_GaussianFit = np.zeros(self.image_cube.shape[0])
-        # self.rotation_GaussianFit = np.zeros(self.image_cube.shape[0])
-        self.background_GaussianFit = np.zeros(self.image_cube.shape[0])
+        self.heights_gaussian_fit = np.zeros(self.image_cube.shape[0])
+        # self.rotation_gaussian_fit = np.zeros(self.image_cube.shape[0])
+        self.background_gaussian_fit = np.zeros(self.image_cube.shape[0])
 
         # Gaussian fit centering
         # This starts the multiprocessing call to arms
@@ -1037,37 +1039,37 @@ class Wanderer(object):
         print(
             'Finished with Fitting Centers. Now assigning to instance values.'
         )
-        for kf, gaussP in enumerate(gaussian_centers):
-            self.assign_gaussian_centering(self, gaussP, xlower, kf, ylower)
+        for kf, p_gauss in enumerate(gaussian_centers):
+            self.assign_gaussian_centering(self, p_gauss, xlower, kf, ylower)
             """ # TODO: confirm this is correct
-            self.centering_GaussianFit[kf][self.x] = gaussP[1] + xlower
-            self.centering_GaussianFit[kf][self.y] = gaussP[2] + ylower
+            self.centering_gaussian_fit[kf][self.x] = p_gauss[1] + xlower
+            self.centering_gaussian_fit[kf][self.y] = p_gauss[2] + ylower
 
-            self.widths_GaussianFit[kf][self.x] = gaussP[3]
-            self.widths_GaussianFit[kf][self.y] = gaussP[4]
+            self.widths_gaussian_fit[kf][self.x] = p_gauss[3]
+            self.widths_gaussian_fit[kf][self.y] = p_gauss[4]
 
-            self.heights_GaussianFit[kf] = gaussP[0]
-            self.background_GaussianFit[kf] = gaussP[5]
+            self.heights_gaussian_fit[kf] = p_gauss[0]
+            self.background_gaussian_fit[kf] = p_gauss[5]
             """
 
-        ycenter = self.centering_GaussianFit.T[y]
-        xcenter = self.centering_GaussianFit.T[x]
+        ycenter = self.centering_gaussian_fit.T[y]
+        xcenter = self.centering_gaussian_fit.T[x]
 
-        y_width = self.widths_GaussianFit.T[y]
-        x_width = self.widths_GaussianFit.T[x]
+        y_width = self.widths_gaussian_fit.T[y]
+        x_width = self.widths_gaussian_fit.T[x]
         self.centering_df = pd.DataFrame()
         self.centering_df['gaussian_fit_ycenters'] = ycenter
         self.centering_df['gaussian_fit_xcenters'] = xcenter
         self.centering_df['gaussian_mom_ycenters'] = ycenter
         self.centering_df['gaussian_mom_xcenters'] = xcenter
 
-        self.centering_df['gaussian_fit_y_Widths'] = y_width
-        self.centering_df['gaussian_fit_x_Widths'] = x_width
+        self.centering_df['gaussian_fit_y_widths'] = y_width
+        self.centering_df['gaussian_fit_x_widths'] = x_width
 
-        self.centering_df['gaussian_fit_Heights'] = self.heights_GaussianFit
-        self.centering_df['gaussian_fit_Offset'] = self.background_GaussianFit
+        self.centering_df['gaussian_fit_heights'] = self.heights_gaussian_fit
+        self.centering_df['gaussian_fit_offset'] = self.background_gaussian_fit
 
-        # self.centering_df['gaussian_fit_Rotation'] = self.rotation_GaussianFit
+        # self.centering_df['gaussian_fit_Rotation'] = self.rotation_gaussian_fit
 
     def fit_flux_weighted_centering(self):
         """Class methods are similar to regular functions.
@@ -1222,7 +1224,7 @@ class Wanderer(object):
         # xinds = xinds0[ylower:yupper+1, xlower:xupper+1]
 
         nAsymParams = 2  # Xc, Yc
-        self.centering_LeastAsym = np.zeros((self.n_frames, nAsymParams))
+        self.centering_least_asym = np.zeros((self.n_frames, nAsymParams))
 
         progress_frame = self.tqdm(
             range(self.n_frames),
@@ -1368,7 +1370,7 @@ class Wanderer(object):
 
             try:
                 # This will work if the fit was successful
-                self.centering_LeastAsym[kf] = center_asym[::-1]
+                self.centering_least_asym[kf] = center_asym[::-1]
             except Exception as err:
                 print(f"Option X1 Fit Failed as {err}")
                 print('Least Asymmetry FAILED: and returned `NaN`')
@@ -1376,14 +1378,14 @@ class Wanderer(object):
 
             if fitFailed:
                 print(
-                    f'Least Asymmetry FAILED: Setting self.centering_LeastAsym'
+                    f'Least Asymmetry FAILED: Setting self.centering_least_asym'
                     f'[{kf}] to Initial Guess: [{self.yguess},{self.xguess}]'
                 )
 
-                self.centering_LeastAsym[kf] = np.array([yguess, xguess])
+                self.centering_least_asym[kf] = np.array([yguess, xguess])
 
-        ycenter_ = self.centering_LeastAsym.T[self.y]
-        xcenter_ = self.centering_LeastAsym.T[self.x]
+        ycenter_ = self.centering_least_asym.T[self.y]
+        xcenter_ = self.centering_least_asym.T[self.x]
         self.centering_df['least_asym_ycenters'] = ycenter_
         self.centering_df['least_asym_xcenters'] = xcenter_
 
@@ -1420,7 +1422,7 @@ class Wanderer(object):
         # xinds = xinds0[ylower:yupper+1, xlower:xupper+1]
 
         # nAsymParams = 2  # Xc, Yc
-        # self.centering_LeastAsym = np.zeros((self.n_frames, nAsymParams))
+        # self.centering_least_asym = np.zeros((self.n_frames, nAsymParams))
         # for kf in self.tqdm(range(self.n_frames), desc='Asym',
         #   leave = False, total=self.n_frames):
         # This starts the multiprocessing call to arms
@@ -1438,7 +1440,7 @@ class Wanderer(object):
         )
 
         # the order is very important
-        self.centering_LeastAsym = pool_run_func(
+        self.centering_least_asym = pool_run_func(
             func,
             zip(
                 self.image_cube,
@@ -1449,10 +1451,10 @@ class Wanderer(object):
         # pool.close()
         # pool.join()
 
-        self.centering_LeastAsym = np.array(self.centering_LeastAsym[0])
+        self.centering_least_asym = np.array(self.centering_least_asym[0])
 
-        ycenter_ = self.centering_LeastAsym.T[self.y]
-        xcenter_ = self.centering_LeastAsym.T[self.x]
+        ycenter_ = self.centering_least_asym.T[self.y]
+        xcenter_ = self.centering_least_asym.T[self.x]
         self.centering_df['least_asym_ycenters'] = ycenter_
         self.centering_df['least_asym_xcenters'] = xcenter_
 
@@ -1525,13 +1527,13 @@ class Wanderer(object):
             image_sq_sum = (self.image_cube**2).sum(axis=(1, 2))
             self.effective_widths = image_sum_sq / image_sq_sum
 
-        self.centering_df['Effective_Widths'] = self.effective_widths
+        self.centering_df['Effective_widths'] = self.effective_widths
 
-        x_widths = self.centering_df['gaussian_fit_x_Widths']
-        y_widths = self.centering_df['gaussian_fit_y_Widths']
+        x_widths = self.centering_df['gaussian_fit_x_widths']
+        y_widths = self.centering_df['gaussian_fit_y_widths']
 
         self.quadrature_widths = np.sqrt(x_widths**2 + y_widths**2)
-        self.centering_df['Quadrature_Widths'] = self.quadrature_widths
+        self.centering_df['Quadrature_widths'] = self.quadrature_widths
 
     def measure_background_circle_masked(
             self, aper_rad=10, centering='fluxweight'):
@@ -1555,7 +1557,7 @@ class Wanderer(object):
                 which will skip all NaNs
         """
 
-        self.background_CircleMask = np.zeros(self.n_frames)
+        self.background_circle_mask = np.zeros(self.n_frames)
 
         progress_frame = self.tqdm(
             range(self.n_frames),
@@ -1571,31 +1573,31 @@ class Wanderer(object):
                 method='exact'
             )
 
-            backgroundMask = ~aperture
+            background_mask = ~aperture
 
             """
             aperture = CircularAperture(self.centering_fluxweight[kf], aper_rad)
 
-            # list of ApertureMask objects (one for each position)
+            # list of Aperture_mask objects (one for each position)
             aper_mask = aperture.to_mask(method='exact')
 
             if isinstance(aper_mask, (list, tuple, np.array)):
                 aper_mask = aper_mask[0]
 
-            # backgroundMask = abs(aperture.get_fractions(
+            # background_mask = abs(aperture.get_fractions(
             #   np.ones(self.image_cube[0].shape))-1)
-            # backgroundMask = ~aperture
-            # backgroundMask = ~aper_mask.to_image(
+            # background_mask = ~aperture
+            # background_mask = ~aper_mask.to_image(
             #     self.image_cube[0].shape
             # ).astype(bool)
 
-            # backgroundMask = ~backgroundMask  # [backgroundMask == 0] = False
+            # background_mask = ~background_mask  # [background_mask == 0] = False
             """
-            self.background_CircleMask[kf] = self.metric(
-                self.image_cube[kf][backgroundMask]
+            self.background_circle_mask[kf] = self.metric(
+                self.image_cube[kf][background_mask]
             )
 
-        self.background_df['CircleMask'] = self.background_CircleMask.copy()
+        self.background_df['Circle_mask'] = self.background_circle_mask.copy()
 
     def mp_measure_background_circle_masked(
             self, aper_rad=10, centering='Gauss'):
@@ -1620,7 +1622,7 @@ class Wanderer(object):
         """
 
         if centering == 'Gauss':
-            centers = self.centering_GaussianFit
+            centers = self.centering_gaussian_fit
         elif centering == 'fluxweight':
             centers = self.centering_fluxweight
 
@@ -1634,15 +1636,15 @@ class Wanderer(object):
             apMethod='exact'
         )
 
-        self.background_CircleMask = pool_run_func(
+        self.background_circle_mask = pool_run_func(
             func, zip(self.image_cube, centers)
         )
 
         # pool.close()
         # pool.join()
 
-        self.background_CircleMask = np.array(self.background_CircleMask)
-        self.background_df['CircleMask'] = self.background_CircleMask.copy()
+        self.background_circle_mask = np.array(self.background_circle_mask)
+        self.background_df['Circle_mask'] = self.background_circle_mask.copy()
 
     def measure_background_annular_mask(self, inner_rad=8, outer_rad=13):
         """Class methods are similar to regular functions.
@@ -1659,7 +1661,7 @@ class Wanderer(object):
 
         """
 
-        self.background_Annulus = np.zeros(self.n_frames)
+        self.background_annulus = np.zeros(self.n_frames)
 
         progress_frame = self.tqdm(
             range(self.n_frames),
@@ -1711,13 +1713,13 @@ class Wanderer(object):
                 self.image_cube[0].shape
             ).astype(bool)
             """
-            backgroundMask = (~inner_aper_mask)*outer_aper_mask
+            background_mask = (~inner_aper_mask)*outer_aper_mask
 
-            self.background_Annulus[kf] = self.metric(
-                self.image_cube[kf][backgroundMask]
+            self.background_annulus[kf] = self.metric(
+                self.image_cube[kf][background_mask]
             )
 
-        self.background_df['AnnularMask'] = self.background_Annulus.copy()
+        self.background_df['Annular_mask'] = self.background_annulus.copy()
 
     def mp_measure_background_annular_mask(
             self, inner_rad=8, outer_rad=13, method='exact', centering='Gauss'):
@@ -1736,7 +1738,7 @@ class Wanderer(object):
         """
 
         if centering == 'Gauss':
-            centers = self.centering_GaussianFit
+            centers = self.centering_gaussian_fit
         elif centering == 'fluxweight':
             centers = self.centering_fluxweight
 
@@ -1752,15 +1754,15 @@ class Wanderer(object):
         )
 
         # the order is very important
-        self.background_Annulus = pool_run_func(
+        self.background_annulus = pool_run_func(
             func, zip(self.image_cube, centers)
         )
 
         # pool.close()
         # pool.join()
 
-        self.background_Annulus = np.array(self.background_Annulus)
-        self.background_df['AnnularMask'] = self.background_Annulus.copy()
+        self.background_annulus = np.array(self.background_annulus)
+        self.background_df['Annular_mask'] = self.background_annulus.copy()
 
     def measure_background_median_masked(self, aper_rad=10, n_sig=5):
         """Class methods are similar to regular functions.
@@ -1777,12 +1779,12 @@ class Wanderer(object):
 
         """
 
-        self.background_MedianMask = np.zeros(self.n_frames)
+        self.background_median_mask = np.zeros(self.n_frames)
 
         # the order is very important
         progress_frames = self.tqdm(
             range(self.n_frames),
-            desc='MedianMaskedBG',
+            desc='Median Masked BG',
             leave=False,
             total=self.n_frames
         )
@@ -1802,22 +1804,22 @@ class Wanderer(object):
 
             aperture = aperture.to_image(self.image_cube[0].shape).astype(bool)
             """
-            backgroundMask = ~aperture
+            background_mask = ~aperture
 
-            medFrame = np.nanmedian(self.image_cube[kf][backgroundMask])
-            # scale.mad(self.image_cube[kf][backgroundMask])
-            madFrame = np.nanstd(self.image_cube[kf][backgroundMask])
+            medFrame = np.nanmedian(self.image_cube[kf][background_mask])
+            # scale.mad(self.image_cube[kf][background_mask])
+            madFrame = np.nanstd(self.image_cube[kf][background_mask])
 
-            medianMask = abs(self.image_cube[kf] - medFrame) < n_sig*madFrame
+            median_mask = abs(self.image_cube[kf] - medFrame) < n_sig*madFrame
 
-            maskComb = medianMask*backgroundMask
+            maskComb = median_mask*background_mask
             # maskComb[maskComb == 0] = False
 
-            self.background_MedianMask[kf] = np.nanmedian(
+            self.background_median_mask[kf] = np.nanmedian(
                 self.image_cube[kf][maskComb]
             )
 
-        self.background_df['MedianMask'] = self.background_MedianMask
+        self.background_df['median_mask'] = self.background_median_mask
 
     def mp_measure_background_median_masked(
             self, aper_rad=10, n_sig=5, centering='Gauss'):
@@ -1836,7 +1838,7 @@ class Wanderer(object):
         """
 
         if centering == 'Gauss':
-            centers = self.centering_GaussianFit
+            centers = self.centering_gaussian_fit
         elif centering == 'fluxweight':
             centers = self.centering_fluxweight
 
@@ -1851,15 +1853,15 @@ class Wanderer(object):
             n_sig=n_sig
         )
 
-        self.background_MedianMask = pool_run_func(
+        self.background_median_mask = pool_run_func(
             func, zip(self.image_cube, centers)
         )
 
         # pool.close()
         # pool.join()
 
-        self.background_MedianMask = np.array(self.background_MedianMask)
-        self.background_df['MedianMask'] = self.background_MedianMask
+        self.background_median_mask = np.array(self.background_median_mask)
+        self.background_df['median_mask'] = self.background_median_mask
 
     def measure_background_KDE_Mode(self, aper_rad=10):
         """Class methods are similar to regular functions.
@@ -1875,7 +1877,7 @@ class Wanderer(object):
             True if successful, False otherwise.
         """
 
-        self.background_KDEUniv = np.zeros(self.n_frames)
+        self.background_kde_univ = np.zeros(self.n_frames)
 
         progress_frames = self.tqdm(
             range(self.n_frames),
@@ -1899,17 +1901,17 @@ class Wanderer(object):
 
             aperture = aperture.to_image(self.image_cube[0].shape).astype(bool)
             """
-            backgroundMask = ~aperture
+            background_mask = ~aperture
 
             kdeFrame = kde.KDEUnivariate(
-                self.image_cube[kf][backgroundMask].ravel()
+                self.image_cube[kf][background_mask].ravel()
             )
             kdeFrame.fit()
 
             density_argmax = kdeFrame.density.argmax()
-            self.background_KDEUniv[kf] = kdeFrame.support[density_argmax]
+            self.background_kde_univ[kf] = kdeFrame.support[density_argmax]
 
-        self.background_df['KDEUnivMask'] = self.background_KDEUniv
+        self.background_df['kde_univ_mask'] = self.background_kde_univ
 
     def mp_measure_background_KDE_Mode(self, aper_rad=10, centering='Gauss'):
         """Class methods are similar to regular functions.
@@ -1927,11 +1929,11 @@ class Wanderer(object):
         """
 
         if centering == 'Gauss':
-            centers = self.centering_GaussianFit
+            centers = self.centering_gaussian_fit
         elif centering == 'fluxweight':
             centers = self.centering_fluxweight
 
-        self.background_KDEUniv = np.zeros(self.n_frames)
+        self.background_kde_univ = np.zeros(self.n_frames)
 
         # This starts the multiprocessing call to arms
         # pool = Pool(self.num_cores)
@@ -1943,7 +1945,7 @@ class Wanderer(object):
             metric=self.metric
         )
 
-        self.background_KDEUniv = pool_run_func(
+        self.background_kde_univ = pool_run_func(
             func,
             zip(self.image_cube, centers)
         )  # the order is very important
@@ -1951,8 +1953,8 @@ class Wanderer(object):
         # pool.close()
         # pool.join()
 
-        self.background_KDEUniv = np.array(self.background_KDEUniv)
-        self.background_df['KDEUnivMask_mp'] = self.background_KDEUniv
+        self.background_kde_univ = np.array(self.background_kde_univ)
+        self.background_df['kde_univ_mask_mp'] = self.background_kde_univ
 
     def measure_all_background(self, aper_rad=10, n_sig=5):
         """Class methods are similar to regular functions.
@@ -2018,8 +2020,8 @@ class Wanderer(object):
         self.noise_tso_df[flux_key] = noise_tso_now
 
     def compute_flux_over_time(
-            self, aper_rad=None, centering='GaussianFit',
-            background='AnnularMask', useTheForce=False):
+            self, aper_rad=None, centering='gaussian_fit',
+            background='Annular_mask', useTheForce=False):
         """Class methods are similar to regular functions.
 
         Note:
@@ -2164,8 +2166,8 @@ class Wanderer(object):
         print('Operation took: ', time()-start)
 
     def mp_compute_flux_over_time(
-            self, aper_rad=3.0, centering='GaussianFit',
-            background='AnnularMask', useTheForce=False):
+            self, aper_rad=3.0, centering='gaussian_fit',
+            background='Annular_mask', useTheForce=False):
         """Class methods are similar to regular functions.
 
         Note:
@@ -2230,7 +2232,7 @@ class Wanderer(object):
                 'if you want to overwrite, then you `useTheForce=True`'
             )
 
-    def mp_compute_flux_over_time_varRad(self, staticRad, varRad=None, centering='gaussian_fit', background='AnnularMask', useTheForce=False):
+    def mp_compute_flux_over_time_varRad(self, staticRad, varRad=None, centering='gaussian_fit', background='Annular_mask', useTheForce=False):
         """Class methods are similar to regular functions.
 
         Note:
@@ -2310,7 +2312,7 @@ class Wanderer(object):
             )
 
     def mp_compute_flux_over_time_beta_rad(
-            self, centering='gaussian_fit', background='AnnularMask',
+            self, centering='gaussian_fit', background='Annular_mask',
             useQuad=False, useTheForce=False):
         """Class methods are similar to regular functions.
 
@@ -2464,18 +2466,18 @@ class Wanderer(object):
         y, x = 0, 1
 
         if centering != 'gaussian':
-            # ycenters = self.centering_GaussianFit.T[y]
-            # xcenters = self.centering_GaussianFit.T[x]
+            # ycenters = self.centering_gaussian_fit.T[y]
+            # xcenters = self.centering_gaussian_fit.T[x]
             print('Only Gaussian Centering is supported at the moment')
             print('Continuting with Gaussian Centering')
         # else:
         #     print('Only Gaussian Centering is supported at the moment')
         #     print('Continuting with Gaussian Centering')
-        #     ycenters = self.centering_GaussianFit.T[y]
-        #     xcenters = self.centering_GaussianFit.T[x]
+        #     ycenters = self.centering_gaussian_fit.T[y]
+        #     xcenters = self.centering_gaussian_fit.T[x]
 
-        ycenters = self.centering_GaussianFit.T[y]
-        xcenters = self.centering_GaussianFit.T[x]
+        ycenters = self.centering_gaussian_fit.T[y]
+        xcenters = self.centering_gaussian_fit.T[x]
 
         if not hasattr(self, 'inliers_phots'):
             self.inliers_phots = {}
@@ -2511,16 +2513,16 @@ class Wanderer(object):
         if centering != 'gaussian':
             print('Only Gaussian Centering is supported at the moment')
             print('Continuting with Gaussian Centering')
-        #     ycenters = self.centering_GaussianFit.T[y]
-        #     xcenters = self.centering_GaussianFit.T[x]
+        #     ycenters = self.centering_gaussian_fit.T[y]
+        #     xcenters = self.centering_gaussian_fit.T[x]
         # else:
         #     print('Only Gaussian Centering is supported at the moment')
         #     print('Continuting with Gaussian Centering')
-        #     ycenters = self.centering_GaussianFit.T[y]
-        #     xcenters = self.centering_GaussianFit.T[x]
+        #     ycenters = self.centering_gaussian_fit.T[y]
+        #     xcenters = self.centering_gaussian_fit.T[x]
 
-        ycenters = self.centering_GaussianFit.T[self.y]
-        xcenters = self.centering_GaussianFit.T[self.x]
+        ycenters = self.centering_gaussian_fit.T[self.y]
+        xcenters = self.centering_gaussian_fit.T[self.x]
 
         if not hasattr(self, 'inliers_phots'):
             self.inliers_phots = {}

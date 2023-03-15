@@ -14,7 +14,7 @@ from photutils.aperture import (
     CircularAperture,
     # CircularAnnulus,
     aperture_photometry,
-    #     findstars
+    # findstars
 )
 from sklearn.cluster import DBSCAN
 
@@ -23,11 +23,12 @@ from skimage.filters import gaussian as gaussianFilter
 from statsmodels.robust import scale
 from statsmodels.nonparametric import kde
 
-from skimage.filters import gaussian as gaussianFilter
-
 y, x = 0, 1
 
-'''Start: From least_asymmetry.asym by N.Lust (github.com/natelust/least_asymmetry) and modified (reversed XY -> YX)'''
+'''
+Start: From least_asymmetry.asym by N.Lust 
+(github.com/natelust/least_asymmetry) and modified (reversed XY -> YX)
+'''
 
 
 @dataclass
@@ -187,9 +188,9 @@ def moments(data, kernel_size=2, n_sig=4):
     moments """
 
     total = data.sum()
-    Y, X = np.indices(data.shape)
-    y = (Y * data).sum()/total
-    x = (X * data).sum()/total
+    yinds, xinds = np.indices(data.shape)
+    y = (yinds * data).sum()/total
+    x = (xinds * data).sum()/total
     height = gaussianFilter(data, kernel_size).max()
 
     med_data = np.nanmedian(data)
@@ -241,6 +242,7 @@ def fitgaussian(data, weights=False):
         weights = np.ones(data.shape, dtype=float)
     elif weights.dtype != np.dtype('float'):
         weights = np.array(weights, dtype=float)
+
     params = moments(data)
 
     yy, xx = np.indices(data.shape)
@@ -248,7 +250,7 @@ def fitgaussian(data, weights=False):
     gausspartial = partial(gaussian, yy=yy, xx=xx)
 
     def errorfunction(p): return np.ravel((gausspartial(*p) - data)*weights)
-    params, success = sp.optimize.leastsq(errorfunction, params)
+    params, _ = sp.optimize.leastsq(errorfunction, params)
 
     return params
 
@@ -275,7 +277,10 @@ def center_of_light(data, weights=False):
 
     ny, nx = np.indices(data.shape)
 
-    return [sum(weights*ny*data)/sum(weights*data), sum(weights*nx*data)/sum(weights*data)]
+    return [
+        sum(weights*ny*data)/sum(weights*data),
+        sum(weights*nx*data)/sum(weights*data)
+    ]
 
 
 def get_julian_date_from_gregorian_date(*date):
@@ -286,7 +291,7 @@ def get_julian_date_from_gregorian_date(*date):
         http://www.astro.ucla.edu/~ianc/python/_modules/date.html
 
     Downloaded from Marshall Perrin Github at
-        https://github.com/mperrin/misc_astro/blob/master/idlastro_ports/gd2jd.py
+    https://github.com/mperrin/misc_astro/blob/master/idlastro_ports/gd2jd.py
 
     Usage: gd2jd.py (2009, 02, 25, 01, 59, 59)
 
@@ -415,14 +420,14 @@ def get_julian_date_from_header(header):
     """
 
     # These are specific to STScI standards -- may vary on the ground
-    fitsDate = header['DATE-OBS']
-    startTimeStr = header['TIME-OBS']
-    endTimeStr = header['TIME-END']
+    fits_date = header['DATE-OBS']
+    start_time_str = header['TIME-OBS']
+    end_time_str = header['TIME-END']
 
-    yyyy, mm, dd = fitsDate.split('-')
+    yyyy, mm, dd = fits_date.split('-')
 
-    hh1, mn1, ss1 = np.array(startTimeStr.split(':')).astype(float)
-    hh2, mn2, ss2 = np.array(endTimeStr.split(':')).astype(float)
+    hh1, mn1, ss1 = np.array(start_time_str.split(':')).astype(float)
+    hh2, mn2, ss2 = np.array(end_time_str.split(':')).astype(float)
 
     yyyy = float(yyyy)
     mm = float(mm)
@@ -436,14 +441,15 @@ def get_julian_date_from_header(header):
     mn2 = float(mn2)
     ss2 = float(ss2)
 
-    startDate = get_julian_date_from_gregorian_date(
-        yyyy, mm, dd, hh1, mn1, ss1)
-    endDate = get_julian_date_from_gregorian_date(yyyy, mm, dd, hh2, mn2, ss2)
+    start_date = get_julian_date_from_gregorian_date(
+        yyyy, mm, dd, hh1, mn1, ss1
+    )
+    end_date = get_julian_date_from_gregorian_date(yyyy, mm, dd, hh2, mn2, ss2)
 
-    return startDate, endDate
+    return start_date, end_date
 
 
-def clipOutlier(oneDarray, n_sig=8):
+def clipOutlier(vector, n_sig=8):
     """Class methods are similar to regular functions.
 
     Note:
@@ -458,22 +464,22 @@ def clipOutlier(oneDarray, n_sig=8):
 
     """
 
-    medarray = np.nanmedian(oneDarray)
-    stdarray = np.nanstd(oneDarray)
-    outliers = abs(oneDarray - medarray) > n_sig*stdarray
+    medarray = np.nanmedian(vector)
+    stdarray = np.nanstd(vector)
+    outliers = abs(vector - medarray) > n_sig*stdarray
 
-    oneDarray[outliers] = np.nanmedian(oneDarray[~outliers])
-    return oneDarray
+    vector[outliers] = np.nanmedian(vector[~outliers])
+    return vector
 
 
-def clipOutlier2D(arr2D, n_sig=10):
-    arr2D = arr2D.copy()
-    medArr2D = np.nanmedian(arr2D, axis=0)
-    sclArr2D = np.sqrt(((scale.mad(arr2D)**2.).sum()))
-    outliers = abs(arr2D - medArr2D) > n_sig*sclArr2D
-    inliers = abs(arr2D - medArr2D) <= n_sig*sclArr2D
-    arr2D[outliers] = np.nanmedian(arr2D[inliers], axis=0)
-    return arr2D
+def clipOutlier2D(arr2d, n_sig=10):
+    arr2d = arr2d.copy()
+    medArr2D = np.nanmedian(arr2d, axis=0)
+    sclArr2D = np.sqrt(((scale.mad(arr2d)**2.).sum()))
+    outliers = abs(arr2d - medArr2D) > n_sig*sclArr2D
+    inliers = abs(arr2d - medArr2D) <= n_sig*sclArr2D
+    arr2d[outliers] = np.nanmedian(arr2d[inliers], axis=0)
+    return arr2d
 
 
 def flux_weighted_centroid(image, ypos, xpos, b_size=7):
@@ -496,20 +502,20 @@ def flux_weighted_centroid(image, ypos, xpos, b_size=7):
         xpos and ypos are the rounded pixel positions of the star
     '''
 
-    ypos, xpos, bsize = np.int32([ypos, xpos, b_size])
+    ypos, xpos, b_size = np.int32([ypos, xpos, b_size])
     # extract a box around the star:
-    #im = a[ypos-b_size:ypos+b_size, xpos-b_size:xpos+b_size].copy()
+    # im = a[ypos-b_size:ypos+b_size, xpos-b_size:xpos+b_size].copy()
 
     ystart = ypos - b_size
     ystop = ypos + b_size
     xstart = xpos - b_size
     xstop = xpos + b_size
-    subImage = image[ystart:ystop, xstart:xstop].transpose().copy()
+    sub_img = image[ystart:ystop, xstart:xstop].transpose().copy()
 
     y, x = 0, 1
 
-    ydim = subImage.shape[y]
-    xdim = subImage.shape[x]
+    ydim = sub_img.shape[y]
+    xdim = sub_img.shape[x]
 
     # add up the flux along x and y
     xflux = np.zeros(xdim)
@@ -519,10 +525,10 @@ def flux_weighted_centroid(image, ypos, xpos, b_size=7):
     yrng = np.arange(ydim)
 
     for i in range(xdim):
-        xflux[i] = sum(subImage[i, :])
+        xflux[i] = sum(sub_img[i, :])
 
     for j in range(ydim):
-        yflux[j] = sum(subImage[:, j])
+        yflux[j] = sum(sub_img[:, j])
 
     # get the flux weighted average position:
     ypeak = sum(yflux * yrng) / sum(yflux) + ypos - float(b_size)
@@ -550,10 +556,10 @@ def gaussian(height, center_y, center_x, width_y, width_x, offset, yy, xx):
     width_x = float(width_x)
     width_y = float(width_y)
 
-    chiY = (center_y - yy) / width_y
-    chiX = (center_x - xx) / width_x
+    chi_y = (center_y - yy) / width_y
+    chi_x = (center_x - xx) / width_x
 
-    return height * np.exp(-0.5*(chiY**2 + chiX**2)) + offset
+    return height * np.exp(-0.5*(chi_y**2 + chi_x**2)) + offset
 
 
 def moments(data, n_sig=4):
@@ -575,9 +581,11 @@ def moments(data, n_sig=4):
     the gaussian parameters of a 2D distribution by calculating its
     moments """
     total = data.sum()
-    X, Y = np.indices(data.shape)
-    x = (X*data).sum()/total
-    y = (Y*data).sum()/total
+    # TODO: Check if this is backwards
+    xinds, yinds = np.indices(data.shape)
+    x = (xinds*data).sum()/total
+    y = (yinds*data).sum()/total
+
     height = data.max()
     firstq = np.nanmedian(data[data < np.nanmedian(data)])
     thirdq = np.nanmedian(data[data > np.nanmedian(data)])
@@ -607,8 +615,8 @@ def moments(data, n_sig=4):
 
 
 def lame_lmfit_gaussian_centering(
-        imageCube, yguess=15, xguess=15, subArraySize=10,
-        init_params=None, n_sig=False, useMoments=False, method='leastsq'):
+        image_cube, yguess=15, xguess=15, sub_array_size=10,
+        init_params=None, n_sig=None, use_moments=False, method='leastsq'):
     """Class methods are similar to regular functions.
 
     Note:
@@ -623,56 +631,64 @@ def lame_lmfit_gaussian_centering(
 
     """
 
-    n_frames, imageSize = imageCube.shape[:2]
+    n_frames, image_size = image_cube.shape[:2]
 
     n_params = 6
     if init_params is None:
-        useMoments = True
-        init_params = moments(imageCube[0])
+        use_moments = True
+        init_params = moments(image_cube[0])
 
     ihg, iyc, ixc, iyw, ixw, ibg = np.arange(n_params)
     lmfit_init_params = Parameters()
     lmfit_init_params.add_many(
         ('height', init_params[ihg], True, 0.0, np.inf),
-        ('center_y', init_params[iyc], True, 0.0, imageSize),
-        ('center_x', init_params[ixc], True, 0.0, imageSize),
-        ('width_y', init_params[iyw], True, 0.0, imageSize),
-        ('width_x', init_params[ixw], True, 0.0, imageSize),
+        ('center_y', init_params[iyc], True, 0.0, image_size),
+        ('center_x', init_params[ixc], True, 0.0, image_size),
+        ('width_y', init_params[iyw], True, 0.0, image_size),
+        ('width_x', init_params[ixw], True, 0.0, image_size),
         ('offset', init_params[ibg], True)
     )
 
     gfit_model = Model(gaussian, independent_vars=['yy', 'xx'])
 
-    yy0, xx0 = np.indices(imageCube[0].shape)
+    yy0, xx0 = np.indices(image_cube[0].shape)
 
-    npix = subArraySize//2
-    ylower = yguess - npix
-    yupper = yguess + npix
-    xlower = xguess - npix
-    xupper = xguess + npix
+    npix = sub_array_size//2
+    ylower = np.int32(yguess - npix)
+    yupper = np.int32(yguess + npix)
+    xlower = np.int32(xguess - npix)
+    xupper = np.int32(xguess + npix)
 
-    ylower, xlower, yupper, xupper = np.int32([ylower, xlower, yupper, xupper])
+    # ylower, xlower, yupper, xupper = np.int32([
+    #   ylower, xlower, yupper, xupper
+    # ])
 
     yy = yy0[ylower:yupper, xlower:xupper]
     xx = xx0[ylower:yupper, xlower:xupper]
 
     heights, ycenters, xcenters, ywidths, xwidths, offsets = np.zeros(
-        (n_params, n_frames))
+        (n_params, n_frames)
+    )
 
-    for k, image in enumerate(imageCube):
-        subFrameNow = image[ylower:yupper, xlower:xupper]
-        subFrameNow[np.isnan(subFrameNow)] = np.nanmedian(subFrameNow)
+    for k, image in enumerate(image_cube):
+        sub_frame_now = image[ylower:yupper, xlower:xupper]
+        sub_frame_now[np.isnan(sub_frame_now)] = np.nanmedian(sub_frame_now)
 
-        # subFrameNow = gaussianFilter(subFrameNow, n_sig) if not isinstance(
-        #     n_sig, bool) else subFrameNow
+        # sub_frame_now = gaussianFilter(sub_frame_now, n_sig)
+        # if not isinstance(n_sig, bool) else sub_frame_now
 
-        if not isinstance(n_sig, bool):
-            subFrameNow = gaussianFilter(subFrameNow, n_sig)
+        if n_sig is not None:
+            sub_frame_now = gaussianFilter(sub_frame_now, n_sig)
 
-        init_params = moments(subFrameNow) if useMoments else init_params
+        init_params = moments(sub_frame_now) if use_moments else init_params
 
         gfit_res = gfit_model.fit(
-            subFrameNow, params=lmfit_init_params, xx=xx, yy=yy, method=method)
+            sub_frame_now,
+            params=lmfit_init_params,
+            xx=xx,
+            yy=yy,
+            method=method
+        )
 
         heights[k] = gfit_res.best_values['height']
         ycenters[k] = gfit_res.best_values['center_y']
@@ -686,7 +702,7 @@ def lame_lmfit_gaussian_centering(
 
 def lmfit_one_center(
         image, yy, xx, gfit_model, lmfit_init_params, yupper, ylower, xupper,
-        xlower, useMoments=True, n_sig=False, method='leastsq'):
+        xlower, use_moments=True, n_sig=None, method='leastsq'):
     """Class methods are similar to regular functions.
 
     Note:
@@ -701,13 +717,13 @@ def lmfit_one_center(
 
     """
 
-    subFrameNow = image[ylower:yupper, xlower:xupper]
-    subFrameNow[np.isnan(subFrameNow)] = np.nanmedian(subFrameNow)
+    sub_frame_now = image[ylower:yupper, xlower:xupper]
+    sub_frame_now[np.isnan(sub_frame_now)] = np.nanmedian(sub_frame_now)
 
-    if not isinstance(n_sig, bool):
-        subFrameNow = gaussianFilter(subFrameNow, n_sig)
+    if n_sig is not None:
+        sub_frame_now = gaussianFilter(sub_frame_now, n_sig)
 
-    init_params = moments(subFrameNow) if useMoments else list(
+    init_params = moments(sub_frame_now) if use_moments else list(
         lmfit_init_params.valuesdict().values())
 
     n_params = 6
@@ -723,7 +739,7 @@ def lmfit_one_center(
     # print(lmfit_init_params)
 
     gfit_res = gfit_model.fit(
-        subFrameNow, params=lmfit_init_params, xx=xx, yy=yy, method=method)
+        sub_frame_now, params=lmfit_init_params, xx=xx, yy=yy, method=method)
     # print(list(gfit_res.best_values.values()))
 
     fit_values = gfit_res.best_values
@@ -739,16 +755,16 @@ def lmfit_one_center(
 
 
 # TODO Rename this here and in `fit_gauss`
-def print_model_params(model, initParams):
-    print(model.amplitude_0 - initParams[0], end=" ")
-    print(model.x_mean_0 - initParams[1], end=" ")
-    print(model.y_mean_0 - initParams[2], end=" ")
-    print(model.x_stddev_0 - initParams[3], end=" ")
-    print(model.y_stddev_0 - initParams[4], end=" ")
-    print(model.amplitude_1 - initParams[5])
+def print_model_params(model, init_params):
+    print(model.amplitude_0 - init_params[0], end=" ")
+    print(model.x_mean_0 - init_params[1], end=" ")
+    print(model.y_mean_0 - init_params[2], end=" ")
+    print(model.x_stddev_0 - init_params[3], end=" ")
+    print(model.y_stddev_0 - init_params[4], end=" ")
+    print(model.amplitude_1 - init_params[5])
 
 
-def fit_gauss(subFrameNow, xinds, yinds, initParams, print_compare=False):
+def fit_gauss(sub_frame_now, xinds, yinds, init_params, print_compare=False):
     """Class methods are similar to regular functions.
 
     Note:
@@ -763,30 +779,30 @@ def fit_gauss(subFrameNow, xinds, yinds, initParams, print_compare=False):
 
     """
 
-    # initParams = (height, x, y, width_x, width_y, offset)
+    # init_params = (height, x, y, width_x, width_y, offset)
     fit_lvmq = fitting.LevMarLSQFitter()
     model0 = models.Gaussian2D(
-        amplitude=initParams[0],
-        x_mean=initParams[1],
-        y_mean=initParams[2],
-        x_stddev=initParams[3],
-        y_stddev=initParams[4],
+        amplitude=init_params[0],
+        x_mean=init_params[1],
+        y_mean=init_params[2],
+        x_stddev=init_params[3],
+        y_stddev=init_params[4],
         theta=0.0
     )
-    model0 = model0 + models.Const2D(amplitude=initParams[5])
+    model0 = model0 + models.Const2D(amplitude=init_params[5])
 
-    model1 = fit_lvmq(model0, xinds, yinds, subFrameNow)
-    model1 = fit_lvmq(model1, xinds, yinds, subFrameNow)
+    model1 = fit_lvmq(model0, xinds, yinds, sub_frame_now)
+    model1 = fit_lvmq(model1, xinds, yinds, sub_frame_now)
 
     if print_compare:
-        print_model_params(model1, initParams)
+        print_model_params(model1, init_params)
 
     return model1.parameters
 
 
 def fit_one_center(
         image, ylower, yupper, xlower, xupper,
-        n_sig=False, method='gaussian', b_size=7):
+        n_sig=None, method='gaussian', b_size=7):
     """Class methods are similar to regular functions.
 
     Note:
@@ -801,20 +817,20 @@ def fit_one_center(
 
     """
 
-    subFrameNow = image[ylower:yupper, xlower:xupper]
-    subFrameNow[np.isnan(subFrameNow)] = np.nanmedian(subFrameNow)
+    sub_frame_now = image[ylower:yupper, xlower:xupper]
+    sub_frame_now[np.isnan(sub_frame_now)] = np.nanmedian(sub_frame_now)
 
-    # subFrameNow = gaussianFilter(subFrameNow, n_sig) if not isinstance(
-    #     n_sig, bool) else subFrameNow
+    # sub_frame_now = gaussianFilter(sub_frame_now, n_sig) if not isinstance(
+    #     n_sig, bool) else sub_frame_now
 
-    if not isinstance(n_sig, bool):
-        subFrameNow = gaussianFilter(subFrameNow, n_sig)
+    if n_sig is not None:
+        sub_frame_now = gaussianFilter(sub_frame_now, n_sig)
 
     if method == 'moments':
-        return np.array(moments(subFrameNow))  # H, Xc, Yc, Xs, Ys, O
+        return np.array(moments(sub_frame_now))  # H, Xc, Yc, Xs, Ys, O
     if method == 'gaussian':
         # , xinds, yinds, np.copy(cmom)) # H, Xc, Yc, Xs, Ys, Th, O
-        return fitgaussian(subFrameNow)
+        return fitgaussian(sub_frame_now)
     if method == 'flux_weighted':
         return flux_weighted_centroid(
             image,
@@ -824,8 +840,8 @@ def fit_one_center(
         )[::-1]
 
 
-def create_aper_mask(centering, aperRad, image_shape, method='exact'):
-    aperture = CircularAperture(centering, aperRad)
+def create_aper_mask(centering, aper_rad, image_shape, method='exact'):
+    aperture = CircularAperture(centering, aper_rad)
     aperture = aperture.to_mask(method=method)
 
     if isinstance(aperture, (list, tuple, np.ndarray)):
@@ -834,7 +850,7 @@ def create_aper_mask(centering, aperRad, image_shape, method='exact'):
     return aperture.to_image(image_shape).astype(bool)
 
 
-def compute_flux_one_frame(image, center, background, aperRad=3.0):
+def compute_flux_one_frame(image, center, background, aper_rad=3.0):
     """Class methods are similar to regular functions.
 
     Note:
@@ -849,15 +865,15 @@ def compute_flux_one_frame(image, center, background, aperRad=3.0):
 
     """
 
-    frameNow = image - background
-    frameNow[np.isnan(frameNow)] = np.nanmedian(frameNow)
+    frame_now = image - background
+    frame_now[np.isnan(frame_now)] = np.nanmedian(frame_now)
 
-    aperture = CircularAperture([center[x], center[y]], r=abs(aperRad))
+    aperture = CircularAperture([center[x], center[y]], r=abs(aper_rad))
 
-    return aperture_photometry(frameNow, aperture)['aperture_sum'].data[0]
+    return aperture_photometry(frame_now, aperture)['aperture_sum'].data[0]
 
 
-def measure_one_circle_bg(image, center, aperRad, metric, apMethod='exact'):
+def measure_one_circle_bg(image, center, aper_rad, metric, aper_method='exact'):
     """Class methods are similar to regular functions.
 
     Note:
@@ -873,15 +889,15 @@ def measure_one_circle_bg(image, center, aperRad, metric, apMethod='exact'):
     """
     aper_mask = create_aper_mask(
         centering=center,
-        aperRad=aperRad,
+        aper_rad=aper_rad,
         image_shape=image.shape,
-        method=apMethod
+        method=aper_method
     )
     """
-    aperture = CircularAperture(center, aperRad)
+    aperture = CircularAperture(center, aper_rad)
     # list of ApertureMask objects (one for each position)
 
-    aper_mask = aperture.to_mask(method=apMethod)
+    aper_mask = aperture.to_mask(method=aper_method)
     aper_mask = aper_mask[0]
 
     # backgroundMask = abs(
@@ -895,7 +911,7 @@ def measure_one_circle_bg(image, center, aperRad, metric, apMethod='exact'):
 
 
 def measure_one_annular_bg(
-        image, center, innerRad, outerRad, metric, apMethod='exact'):
+        image, center, inner_rad, outer_rad, metric, aper_method='exact'):
     """Class methods are similar to regular functions.
 
     Note:
@@ -912,26 +928,26 @@ def measure_one_annular_bg(
 
     inner_aper_mask = create_aper_mask(
         centering=center,
-        aperRad=innerRad,
+        aper_rad=inner_rad,
         image_shape=image.shape,
-        method=apMethod
+        method=aper_method
     )
 
     outer_aper_mask = create_aper_mask(
         centering=center,
-        aperRad=outerRad,
+        aper_rad=outer_rad,
         image_shape=image.shape,
-        method=apMethod
+        method=aper_method
     )
 
     """
-    innerAperture = CircularAperture(center, innerRad)
-    outerAperture = CircularAperture(center, outerRad)
+    inner_aper = CircularAperture(center, inner_rad)
+    outer_aper = CircularAperture(center, outer_rad)
 
-    inner_aper_mask = innerAperture.to_mask(method=apMethod)[0]
+    inner_aper_mask = inner_aper.to_mask(method=aper_method)[0]
     inner_aper_mask = inner_aper_mask.to_image(image.shape).astype(bool)
 
-    outer_aper_mask = outerAperture.to_mask(method=apMethod)[0]
+    outer_aper_mask = outer_aper.to_mask(method=aper_method)[0]
     outer_aper_mask = outer_aper_mask.to_image(image.shape).astype(bool)
     """
 
@@ -944,7 +960,7 @@ def measure_one_annular_bg(
 
 
 def measure_one_median_bg(
-        image, center, aperRad, metric, n_sig, apMethod='exact'):
+        image, center, aper_rad, metric, n_sig, aper_method='exact'):
     """Class methods are similar to regular functions.
 
     Note:
@@ -960,28 +976,28 @@ def measure_one_median_bg(
     """
     aperture = create_aper_mask(
         centering=center,
-        aperRad=aperRad,
+        aper_rad=aper_rad,
         image_shape=image.shape,
-        method=apMethod
+        method=aper_method
     )
     """
-    aperture = CircularAperture(center, aperRad)
-    aperture = aperture.to_mask(method=apMethod)[0]
+    aperture = CircularAperture(center, aper_rad)
+    aperture = aperture.to_mask(method=aper_method)[0]
     aperture = aperture.to_image(image.shape).astype(bool)
     """
     backgroundMask = ~aperture
 
-    medFrame = np.nanmedian(image[backgroundMask])
-    madFrame = np.nanstd(image[backgroundMask])
+    med_frame = np.nanmedian(image[backgroundMask])
+    mad_frame = np.nanstd(image[backgroundMask])
 
-    medianMask = abs(image - medFrame) < n_sig*madFrame
+    medianMask = abs(image - med_frame) < n_sig*mad_frame
 
     maskComb = medianMask*backgroundMask
 
     return np.nanmedian(image[maskComb])
 
 
-def measure_one_KDE_bg(image, center, aperRad, metric, apMethod='exact'):
+def measure_one_kde_bg(image, center, aper_rad, metric, aper_method='exact'):
     """Class methods are similar to regular functions.
 
     Note:
@@ -997,49 +1013,49 @@ def measure_one_KDE_bg(image, center, aperRad, metric, apMethod='exact'):
     """
     aperture = create_aper_mask(
         centering=center,
-        aperRad=aperRad,
+        aper_rad=aper_rad,
         image_shape=image.shape,
-        method=apMethod
+        method=aper_method
     )
     """
-    aperture = CircularAperture(center, aperRad)
-    aperture = aperture.to_mask(method=apMethod)[0]
+    aperture = CircularAperture(center, aper_rad)
+    aperture = aperture.to_mask(method=aper_method)[0]
     aperture = aperture.to_image(image.shape).astype(bool)
     """
     backgroundMask = ~aperture
 
-    kdeFrame = kde.KDEUnivariate(image[backgroundMask])
-    kdeFrame.fit()
+    kde_frame = kde.KDEUnivariate(image[backgroundMask])
+    kde_frame.fit()
 
-    return kdeFrame.support[kdeFrame.density.argmax()]
+    return kde_frame.support[kde_frame.density.argmax()]
 
 
 def compute_annular_mask(
-        aperRad, center, image, method='exact'):
+        aper_rad, center, image, method='exact'):
 
-    innerRad, outerRad = aperRad
+    inner_rad, outer_rad = aper_rad
 
     inner_aper_mask = create_aper_mask(
         centering=center,
-        aperRad=innerRad,
+        aper_rad=inner_rad,
         image_shape=image.shape,
         method=method
     )
 
     outer_aper_mask = create_aper_mask(
         centering=center,
-        aperRad=outerRad,
+        aper_rad=outer_rad,
         image_shape=image.shape,
         method=method
     )
     """
-    innerAperture = CircularAperture(center, innerRad)
-    outerAperture = CircularAperture(center, outerRad)
+    inner_aper = CircularAperture(center, inner_rad)
+    outer_aper = CircularAperture(center, outer_rad)
 
-    inner_aper_mask = innerAperture.to_mask(method=method)[0]
+    inner_aper_mask = inner_aper.to_mask(method=method)[0]
     inner_aper_mask = inner_aper_mask.to_image(image.shape).astype(bool)
 
-    outer_aper_mask = outerAperture.to_mask(method=method)[0]
+    outer_aper_mask = outer_aper.to_mask(method=method)[0]
     outer_aper_mask = outer_aper_mask.to_image(image.shape).astype(bool)
     """
 
@@ -1050,8 +1066,8 @@ def compute_annular_mask(
 
 
 def measure_one_background(
-        image, center, aperRad, metric, n_sig=5,
-        apMethod='exact', bgMethod='circle'):
+        image, center, aper_rad, metric, n_sig=5,
+        aper_method='exact', bg_method='circle'):
     """Class methods are similar to regular functions.
 
     Note:
@@ -1066,44 +1082,46 @@ def measure_one_background(
 
     """
 
-    if np.ndim(aperRad):
+    if np.ndim(aper_rad):
         aperture = compute_annular_mask(
-            aperRad, center, image, method=apMethod)
+            aper_rad, center, image, method=aper_method
+        )
     else:
         aperture = create_aper_mask(
             centering=center,
-            aperRad=aperRad,
+            aper_rad=aper_rad,
             image_shape=image.shape,
-            method=apMethod
+            method=aper_method
         )
+
         """
-        aperture = CircularAperture(center, aperRad)
+        aperture = CircularAperture(center, aper_rad)
         # list of ApertureMask objects (one for each position)
-        aperture = aperture.to_mask(method=apMethod)[0]
+        aperture = aperture.to_mask(method=aper_method)[0]
 
         # inverse to keep 'outside' aperture
         aperture = ~aperture.to_image(image).astype(bool)
         """
         aperture = ~aperture
 
-    if bgMethod == 'median':
-        medFrame = np.nanmedian(image[aperture])
-        madFrame = scale.mad(image[aperture])
+    if bg_method == 'median':
+        med_frame = np.nanmedian(image[aperture])
+        mad_frame = scale.mad(image[aperture])
 
-        medianMask = abs(image - medFrame) < n_sig*madFrame
+        medianMask = abs(image - med_frame) < n_sig*mad_frame
 
         aperture = medianMask*aperture
 
-    if bgMethod == 'kde':
-        kdeFrame = kde.KDEUnivariate(image[aperture].ravel())
-        kdeFrame.fit()
+    if bg_method == 'kde':
+        kde_frame = kde.KDEUnivariate(image[aperture].ravel())
+        kde_frame.fit()
 
-        return kdeFrame.support[kdeFrame.density.argmax()]
+        return kde_frame.support[kde_frame.density.argmax()]
 
     return metric(image[aperture])
 
 
-def DBScan_Flux(phots, ycenters, xcenters, dbsClean=0, useTheForce=False):
+def dbscan_flux(phots, ycenters, xcenters, dbs_clean=0, use_the_force=False):
     """Class methods are similar to regular functions.
 
     Note:
@@ -1118,34 +1136,37 @@ def DBScan_Flux(phots, ycenters, xcenters, dbsClean=0, useTheForce=False):
 
     """
 
-    dbsPhots = DBSCAN()  # n_jobs=-1)
+    dbs_phots = DBSCAN()  # n_jobs=-1)
     stdScaler = StandardScaler()
 
     phots = np.copy(phots.ravel())
     phots[~np.isfinite(phots)] = np.nanmedian(phots[np.isfinite(phots)])
 
-    featuresNow = np.transpose([stdScaler.fit_transform(ycenters[:, None]).ravel(),
-                                stdScaler.fit_transform(
-                                    xcenters[:, None]).ravel(),
-                                stdScaler.fit_transform(phots[:, None]).ravel()])
+    features_now = np.transpose([
+        stdScaler.fit_transform(ycenters[:, None]).ravel(),
+        stdScaler.fit_transform(xcenters[:, None]).ravel(),
+        stdScaler.fit_transform(phots[:, None]).ravel()
+    ])
 
-    # print(featuresNow.shape)
-    dbsPhotsPred = dbsPhots.fit_predict(featuresNow)
+    # print(features_now.shape)
+    dbs_phots_pred = dbs_phots.fit_predict(features_now)
 
-    return dbsPhotsPred == dbsClean
+    return dbs_phots_pred == dbs_clean
 
 
-def factor(numberToFactor, arr=list()):
+def factor(num2factor, arr=list()):
     i = 2
-    maximum = numberToFactor / 2 + 1
+    maximum = num2factor / 2 + 1
     while i < maximum:
-        if numberToFactor % i == 0:
-            return factor(numberToFactor/i, arr + [i])
+        if num2factor % i == 0:
+            return factor(num2factor/i, arr + [i])
         i += 1
-    return list(set(arr + [numberToFactor]))
+    return list(set(arr + [num2factor]))
 
 
-def DBScan_Segmented_Flux(phots, ycenters, xcenters, dbsClean=0, nSegments=None, maxSegment=int(6e4), useTheForce=False):
+def dbscan_segmented_flux(
+        phots, ycenters, xcenters, dbs_clean=0, n_segments=None,
+        max_segment=int(6e4), use_the_force=False):
     """Class methods are similar to regular functions.
 
     Note:
@@ -1159,20 +1180,26 @@ def DBScan_Segmented_Flux(phots, ycenters, xcenters, dbsClean=0, nSegments=None,
         True if successful, False otherwise.
 
     """
-    if phots.size <= maxSegment:
+    if phots.size <= max_segment:
         # Default to un-segmented
-        return DBScan_Flux(phots, ycenters, xcenters, dbsClean=dbsClean, useTheForce=useTheForce)
+        return dbscan_flux(
+            phots,
+            ycenters,
+            xcenters,
+            dbs_clean=dbs_clean,
+            use_the_force=use_the_force
+        )
 
-    dbsPhots = DBSCAN()  # n_jobs=-1)
+    dbs_phots = DBSCAN()  # n_jobs=-1)
     stdScaler = StandardScaler()
 
-    if nSegments is None:
-        nSegments = phots.size // maxSegment
+    if n_segments is None:
+        n_segments = phots.size // max_segment
 
-    segSize = phots.size // nSegments
-    max_in_segs = nSegments * segSize
+    segSize = phots.size // n_segments
+    max_in_segs = n_segments * segSize
 
-    segments = list(np.arange(max_in_segs).reshape(nSegments, -1))
+    segments = list(np.arange(max_in_segs).reshape(n_segments, -1))
 
     leftovers = np.arange(max_in_segs, phots.size)
 
@@ -1181,17 +1208,22 @@ def DBScan_Segmented_Flux(phots, ycenters, xcenters, dbsClean=0, nSegments=None,
     phots = np.copy(phots.ravel())
     phots[~np.isfinite(phots)] = np.nanmedian(phots[np.isfinite(phots)])
 
-    # default to array of `dbsClean` values
-    dbsPhotsPred = np.zeros(phots.size) + dbsClean
+    # default to array of `dbs_clean` values
+    dbs_phots_pred = np.zeros(phots.size) + dbs_clean
 
     for segment in segments:
-        dbsPhotsPred[segment] = DBScan_Flux(
-            phots[segment], ycenters[segment], xcenters[segment], dbsClean=dbsClean, useTheForce=useTheForce)
+        dbs_phots_pred[segment] = dbscan_flux(
+            phots[segment],
+            ycenters[segment],
+            xcenters[segment],
+            dbs_clean=dbs_clean,
+            use_the_force=use_the_force
+        )
 
-    return dbsPhotsPred == dbsClean
+    return dbs_phots_pred == dbs_clean
 
 
-def DBScan_PLD(PLDNow, dbsClean=0, useTheForce=False):
+def dbscan_pld(pld_now, dbs_clean=0, use_the_force=False):
     """Class methods are similar to regular functions.
 
     Note:
@@ -1206,15 +1238,18 @@ def DBScan_PLD(PLDNow, dbsClean=0, useTheForce=False):
 
     """
 
-    dbsPLD = DBSCAN()  # n_jobs=-1)
+    dbs_pld = DBSCAN()  # n_jobs=-1)
     stdScaler = StandardScaler()
 
-    dbsPLDPred = dbsPLD.fit_predict(stdScaler.fit_transform(PLDNow[:, None]))
+    dbs_pld_pred = dbs_pld.fit_predict(
+        stdScaler.fit_transform(pld_now[:, None]))
 
-    return dbsPLDPred == dbsClean
+    return dbs_pld_pred == dbs_clean
 
 
-def DBScan_Segmented_PLD(PLDNow, dbsClean=0, nSegments=None, maxSegment=int(6e4), useTheForce=False):
+def dbscan_segmented_pld(
+        pld_now, dbs_clean=0, n_segments=None, max_segment=int(6e4),
+        use_the_force=False):
     """Class methods are similar to regular functions.
 
     Note:
@@ -1228,37 +1263,45 @@ def DBScan_Segmented_PLD(PLDNow, dbsClean=0, nSegments=None, maxSegment=int(6e4)
         True if successful, False otherwise.
 
     """
-    if PLDNow.size <= maxSegment:
+    if pld_now.size <= max_segment:
         # Default to un-segmented
-        return DBScan_PLD(PLDNow, dbsClean=dbsClean, useTheForce=useTheForce)
+        return dbscan_pld(
+            pld_now,
+            dbs_clean=dbs_clean,
+            use_the_force=use_the_force
+        )
 
-    # dbsPLD = DBSCAN()#n_jobs=-1)
+    # dbs_pld = DBSCAN()#n_jobs=-1)
     # stdScaler = StandardScaler()
     #
-    if nSegments is None:
-        nSegments = PLDNow.size // maxSegment
+    if n_segments is None:
+        n_segments = pld_now.size // max_segment
 
-    segSize = PLDNow.size // nSegments
-    max_in_segs = nSegments * segSize
+    segSize = pld_now.size // n_segments
+    max_in_segs = n_segments * segSize
 
-    segments = list(np.arange(max_in_segs).reshape(nSegments, -1))
+    segments = list(np.arange(max_in_segs).reshape(n_segments, -1))
 
-    leftovers = np.arange(max_in_segs, PLDNow.size)
+    leftovers = np.arange(max_in_segs, pld_now.size)
 
     segments[-1] = np.hstack([segments[-1], leftovers])
 
-    # default to array of `dbsClean` values
-    dbsPLDPred = np.zeros(PLDNow.size) + dbsClean
+    # default to array of `dbs_clean` values
+    dbs_pld_pred = np.zeros(pld_now.size) + dbs_clean
 
     for segment in segments:
-        dbsPLDPred[segment] = DBScan_PLD(
-            PLDNow[segment], dbsClean=dbsClean, useTheForce=useTheForce)
+        dbs_pld_pred[segment] = dbscan_pld(
+            pld_now[segment],
+            dbs_clean=dbs_clean,
+            use_the_force=use_the_force
+        )
 
-    return dbsPLDPred == dbsClean
+    return dbs_pld_pred == dbs_clean
 
 
 def cross_correlation_HST_diff_NDR():
-    # Cross correlated the differential non-destructive reads from HST Scanning mode with WFC3 and G141
+    # Cross correlated the differential non-destructive reads
+    #   from HST Scanning mode with WFC3 and G141
     fitsfiles = glob("*ima*fits")
 
     ylow = 50
