@@ -36,12 +36,12 @@ from tqdm import tqdm, tqdm_notebook
 # from .auxiliary import *
 from .auxiliary import (
     # actr,
-    clipOutlier,
+    clip_outlier,
     compute_flux_one_frame,
     create_aper_mask,
-    DBScan_Flux,
-    DBScan_PLD,
-    DBScan_Segmented_Flux,
+    dbscan_flux,
+    dbscan_pld,
+    dbscan_segmented_flux,
     fit_gauss,
     fitgaussian,
     fit_one_center,
@@ -52,7 +52,7 @@ from .auxiliary import (
     measure_one_annular_bg,
     measure_one_circle_bg,
     measure_one_median_bg,
-    measure_one_KDE_bg,
+    measure_one_kde_bg,
     moments,
     pool_run_func
 )
@@ -77,7 +77,7 @@ class Wanderer(object):
     day2sec = 86400.
 
     def __init__(
-            self, fitsFileDir='./', filetype='slp.fits', telescope=None,
+            self, fits_file_dir='./', filetype='slp.fits', telescope=None,
             yguess=None, xguess=None, pix_rad=5, method='mean', num_cores=None,
             jupyter=False):
         """Example of docstring on the __init__ method.
@@ -114,10 +114,10 @@ class Wanderer(object):
                 "`method` must be from the list ['mean', 'median']"
             )
 
-        self.fitsFileDir = fitsFileDir
-        self.fitsFilenames = glob(f'{self.fitsFileDir}/*{self.filetype}')
-        # self.fitsFilenames = glob(self.fitsFileDir + '/*' + self.filetype)
-        self.nSlopeFiles = len(self.fitsFilenames)
+        self.fits_file_dir = fits_file_dir
+        self.fits_names = glob(f'{self.fits_file_dir}/*{self.filetype}')
+        # self.fits_names = glob(self.fits_file_dir + '/*' + self.filetype)
+        self.n_slope_files = len(self.fits_names)
 
         if telescope is None:
             raise ValueError(
@@ -128,43 +128,44 @@ class Wanderer(object):
         self.telescope = telescope
 
         if self.telescope == 'Spitzer':
-            fitsdir_split = self.fitsFileDir.replace('raw', 'cal').split('/')
+            fitsdir_split = self.fits_file_dir.replace('raw', 'cal').split('/')
             for _ in range(4):
                 fitsdir_split.pop()
 
-            # self.calDir = ''
+            # self.cal_dir = ''
             # for thing in fitsdir_split:
-            #     self.calDir = self.calDir + thing + '/'
+            #     self.cal_dir = self.cal_dir + thing + '/'
             #
             # self.permBadPixels = fits.open(
-            #     self.calDir + 'nov14_ch1_bcd_pmask_subarray.fits'
+            #     self.cal_dir + 'nov14_ch1_bcd_pmask_subarray.fits'
             # )
 
-        if self.nSlopeFiles == 0:
+        if self.n_slope_files == 0:
             print(
                 'Pipeline found no Files in ' +
-                self.fitsFileDir + ' of type /*' +
+                self.fits_file_dir + ' of type /*' +
                 filetype
             )
             exit(-1)
 
         self.centering_df = pd.DataFrame()
         self.background_df = pd.DataFrame()
-        self.flux_TSO_df = pd.DataFrame()
-        self.noise_TSO_df = pd.DataFrame()
+        self.flux_tso_df = pd.DataFrame()
+        self.noise_tso_df = pd.DataFrame()
 
         self.yguess = yguess
         if self.yguess is None:
-            self.yguess = self.imageCube.shape[self.y]//2
+            self.yguess = self.image_cube.shape[self.y]//2
 
         self.xguess = xguess
         if self.xguess is None:
-            self.xguess = self.imageCube.shape[self.x]//2
+            self.xguess = self.image_cube.shape[self.x]//2
 
         self.pix_rad = pix_rad
         self.num_cores = cpu_count()//2 if num_cores is None else int(num_cores)
-
-        tm_year, tm_mon, tm_mday, tm_hour, tm_min, tm_sec, tm_wday, tm_yday, tm_isdst = localtime()
+        # TODO: Use timestamp reformatting methods
+        tm_year, tm_mon, tm_mday, tm_hour, tm_min, tm_sec, tm_wday, tm_yday, \
+            tm_isdst = localtime()
         print(
             'Completed Class Definition at ' +
             str(tm_year) + '-' + str(tm_mon) + '-' + str(tm_mday) + ' ' +
@@ -185,44 +186,44 @@ class Wanderer(object):
             True if successful, False otherwise.
 
         """
-        testfits = fits.open(self.fitsFilenames[0])[0]
+        testfits = fits.open(self.fits_names[0])[0]
 
-        self.nFrames = self.nSlopeFiles
-        self.imageCube = np.zeros(
-            (self.nFrames, testfits.data[0].shape[0], testfits.data[0].shape[1]))
-        self.noiseCube = np.zeros(
-            (self.nFrames, testfits.data[0].shape[0], testfits.data[0].shape[1]))
-        self.timeCube = np.zeros(self.nFrames)
+        self.n_frames = self.n_slope_files
+        self.image_cube = np.zeros(
+            (self.n_frames, testfits.data[0].shape[0], testfits.data[0].shape[1]))
+        self.noise_cube = np.zeros(
+            (self.n_frames, testfits.data[0].shape[0], testfits.data[0].shape[1]))
+        self.time_cube = np.zeros(self.n_frames)
 
-        self.imageBadPixMasks = None
+        self.bad_pixel_masks = None
 
         del testfits
 
         progress_fits_filenames = self.tqdm(
-            enumerate(self.fitsFilenames),
+            enumerate(self.fits_names),
             desc='JWST Load File',
             leave=False,
-            total=self.nSlopeFiles
+            total=self.n_slope_files
         )
 
         for kf, fname in progress_fits_filenames:
-            fitsNow = fits.open(fname)
+            fits_now = fits.open(fname)
 
-            self.imageCube[kf] = fitsNow[0].data[0]
-            self.noiseCube[kf] = fitsNow[0].data[1]
+            self.image_cube[kf] = fits_now[0].data[0]
+            self.noise_cube[kf] = fits_now[0].data[1]
 
             # re-write these 4 lines into `get_julian_date_from_header`
-            startJD, endJD = get_julian_date_from_header(fitsNow[0].header)
-            timeSpan = (endJD - startJD) * self.day2sec / self.nFrames
+            start_jd, end_jd = get_julian_date_from_header(fits_now[0].header)
+            timeSpan = (end_jd - start_jd) * self.day2sec / self.n_frames
 
-            self.timeCube[kf] = startJD + timeSpan * (kf + 0.5)
-            self.timeCube[kf] = self.timeCube[kf] / self.day2sec - 2450000.
+            self.time_cube[kf] = start_jd + timeSpan * (kf + 0.5)
+            self.time_cube[kf] = self.time_cube[kf] / self.day2sec - 2450000.
 
-            del fitsNow[0].data
+            del fits_now[0].data
 
-            fitsNow.close()
+            fits_now.close()
 
-            del fitsNow
+            del fits_now
 
     def spitzer_load_fits_file(self, output_units='electrons', remove_nans=True):
         """Class methods are similar to regular functions.
@@ -243,25 +244,25 @@ class Wanderer(object):
 
         # sec2day = 1/(24*3600)
         sec2day = 1 / self.day2sec
-        nFramesPerFile = 64
+        nframes_per_file = 64
 
-        testfits = fits.open(self.fitsFilenames[0])[0]
+        testfits = fits.open(self.fits_names[0])[0]
         testheader = testfits.header
 
         bcd_shape = testfits.data[0].shape
         # bcd_shape = testfits.data.shape
 
-        self.nFrames = self.nSlopeFiles * nFramesPerFile
-        self.imageCube = np.zeros((self.nFrames, bcd_shape[0], bcd_shape[1]))
-        self.noiseCube = np.zeros((self.nFrames, bcd_shape[0], bcd_shape[1]))
-        self.timeCube = np.zeros(self.nFrames)
+        self.n_frames = self.n_slope_files * nframes_per_file
+        self.image_cube = np.zeros((self.n_frames, bcd_shape[0], bcd_shape[1]))
+        self.noise_cube = np.zeros((self.n_frames, bcd_shape[0], bcd_shape[1]))
+        self.time_cube = np.zeros(self.n_frames)
 
-        self.imageBadPixMasks = None
+        self.bad_pixel_masks = None
 
         del testfits
 
         # Converts DN/s to microJy per pixel
-        #   1) expTime * gain / fluxConv converts MJ/sr to electrons
+        #   1) expTime * gain / flux_conv converts MJ/sr to electrons
         #   2) as2sr * MJ2mJ * testheader['PXSCAL1'] * testheader['PXSCAL2']
         #       converts MJ/sr to muJ/pixel
 
@@ -269,16 +270,16 @@ class Wanderer(object):
         #     print(f'{key} = {val}')
 
         if output_units == 'electrons':
-            fluxConv = testheader['FLUXCONV']
+            flux_conv = testheader['FLUXCONV']
             expTime = testheader['EXPTIME']
             gain = testheader['GAIN']
-            fluxConversion = expTime*gain / fluxConv
+            flux_conversion = expTime*gain / flux_conv
 
         elif output_units == 'muJ_per_Pixel':
             as2sr = arcsec**2.0  # steradians per square arcsecond
             MJ2mJ = 1e12  # mircro-Janskeys per Mega-Jansky
             # converts MJ
-            fluxConversion = abs(
+            flux_conversion = abs(
                 as2sr * MJ2mJ * testheader['PXSCAL1'] * testheader['PXSCAL2']
             )
         else:
@@ -289,18 +290,18 @@ class Wanderer(object):
         print('Loading Spitzer Data')
 
         progress_fits_filenames = self.tqdm(
-            enumerate(self.fitsFilenames),
+            enumerate(self.fits_names),
             desc='Spitzer Load File',
             leave=False,
-            total=self.nSlopeFiles
+            total=self.n_slope_files
         )
         for kfile, fname in progress_fits_filenames:
-            bcdNow = fits.open(fname)
-            buncNow = fits.open(fname.replace('bcd.fits', 'bunc.fits'))
+            bcd_now = fits.open(fname)
+            bunc_now = fits.open(fname.replace('bcd.fits', 'bunc.fits'))
 
-            for iframe in range(nFramesPerFile):
-                idx_ = kfile * nFramesPerFile + iframe
-                header_ = bcdNow[0].header
+            for iframe in range(nframes_per_file):
+                idx_ = kfile * nframes_per_file + iframe
+                header_ = bcd_now[0].header
                 bmjd_obs_ = header_['BMJD_OBS']
                 et_obs_ = header_['ET_OBS']
                 utcs_obs_ = header_['UTCS_OBS']
@@ -313,33 +314,35 @@ class Wanderer(object):
                 frametime_adjust = et_to_utc + iframe * frametime_ * sec2day
 
                 # Same time as BMJD with UTC correction
-                self.timeCube[idx_] = bmjd_obs_ + frametime_adjust
+                self.time_cube[idx_] = bmjd_obs_ + frametime_adjust
 
-                self.imageCube[idx_] = bcdNow[0].data[iframe] * fluxConversion
-                self.noiseCube[idx_] = buncNow[0].data[iframe] * fluxConversion
+                self.image_cube[idx_] = bcd_now[0].data[iframe] * \
+                    flux_conversion
+                self.noise_cube[idx_] = bunc_now[0].data[iframe] * \
+                    flux_conversion
 
             def delete_fits_data(fits_data):
                 del fits_data[0].data
                 fits_data.close()
                 del fits_data
 
-            delete_fits_data(bcdNow)
-            delete_fits_data(buncNow)
-            # del bcdNow[0].data
-            # bcdNow.close()
-            # del bcdNow
+            delete_fits_data(bcd_now)
+            delete_fits_data(bunc_now)
+            # del bcd_now[0].data
+            # bcd_now.close()
+            # del bcd_now
 
-            # del buncNow[0].data
-            # buncNow.close()
-            # del buncNow
+            # del bunc_now[0].data
+            # bunc_now.close()
+            # del bunc_now
 
         if remove_nans:
             # Set NaNs to Median
-            # where_is_nan_ = np.where(np.isnan(self.imageCube))
-            is_nan_ = np.isnan(self.imageCube)
-            self.imageCube[is_nan_] = np.nanmedian(self.imageCube)
+            # where_is_nan_ = np.where(np.isnan(self.image_cube))
+            is_nan_ = np.isnan(self.image_cube)
+            self.image_cube[is_nan_] = np.nanmedian(self.image_cube)
 
-    def hst_load_fits_file(self, fitsNow):
+    def hst_load_fits_file(self, fits_now):
         """Not Yet Implemented"""
         raise NotImplementedError('HST Load Fits File does not exist, yet')
 
@@ -400,38 +403,38 @@ class Wanderer(object):
             file_path_template.format('_background_dataframe')
         )
 
-        print(f"Loading {file_path_template.format('_flux_TSO_dataframe')}")
-        self.flux_TSO_df = joblib.load(
-            file_path_template.format('_flux_TSO_dataframe')
+        print(f"Loading {file_path_template.format('_flux_tso_dataframe')}")
+        self.flux_tso_df = joblib.load(
+            file_path_template.format('_flux_tso_dataframe')
         )
 
-        noise_file_path = file_path_template.format('_noise_TSO_dataframe')
+        noise_file_path = file_path_template.format('_noise_tso_dataframe')
 
         if os.path.exists(noise_file_path):
             print(f"Loading {noise_file_path}")
-            self.noise_TSO_df = joblib.load(noise_file_path)
+            self.noise_tso_df = joblib.load(noise_file_path)
         else:
-            self.noise_TSO_df = None
+            self.noise_tso_df = None
 
         print(f"Loading {file_path_template.format('_image_cube_array')}")
-        self.imageCube = joblib.load(
+        self.image_cube = joblib.load(
             file_path_template.format('_image_cube_array')
         )
 
         print(f"Loading {file_path_template.format('_noise_cube_array')}")
-        self.noiseCube = joblib.load(
+        self.noise_cube = joblib.load(
             file_path_template.format('_noise_cube_array')
         )
 
         print(f"Loading {file_path_template.format('_time_cube_array')}")
-        self.timeCube = joblib.load(
+        self.time_cube = joblib.load(
             file_path_template.format('_time_cube_array')
         )
 
         print(
             f"Loading {file_path_template.format('_image_bad_pix_cube_array')}"
         )
-        self.imageBadPixMasks = joblib.load(
+        self.bad_pixel_masks = joblib.load(
             file_path_template.format('_image_bad_pix_cube_array')
         )
 
@@ -440,7 +443,7 @@ class Wanderer(object):
             file_path_template.format('_save_dict')
         )
 
-        print('nFrames', 'nFrames' in self.save_dict.keys())
+        print('n_frames', 'n_frames' in self.save_dict.keys())
         print(
             'Assigning Parts of `self.save_dict` to individual data structures'
         )
@@ -452,11 +455,11 @@ class Wanderer(object):
         dump_dict = {
             '_centering_dataframe': self.centering_df,
             '_background_dataframe': self.background_df,
-            '_flux_TSO_dataframe': self.flux_TSO_df,
-            '_image_cube_array': self.imageCube,
-            '_noise_cube_array': self.noiseCube,
-            '_time_cube_array': self.timeCube,
-            '_image_bad_pix_cube_array': self.imageBadPixMasks,
+            '_flux_tso_dataframe': self.flux_tso_df,
+            '_image_cube_array': self.image_cube,
+            '_noise_cube_array': self.noise_cube,
+            '_time_cube_array': self.time_cube,
+            '_image_bad_pix_cube_array': self.bad_pixel_masks,
             '_save_dict': self.save_dict,
         }
 
@@ -554,21 +557,21 @@ class Wanderer(object):
             'background_GaussianFit',
             'background_KDEUniv',
             'background_MedianMask',
-            'centering_FluxWeight',
+            'centering_fluxweight',
             'centering_GaussianFit',
             'centering_LeastAsym',
             'effective_widths',
-            'fitsFileDir',
-            'fitsFilenames',
+            'fits_file_dir',
+            'fits_names',
             'heights_GaussianFit',
-            'inliers_Phots',
-            'inliers_PLD',
+            'inliers_phots',
+            'inliers_pld',
             'inliers_Master',
             'method',
             'pix_rad',
-            'nFrames',
-            'PLD_components',
-            'PLD_norm',
+            'n_frames',
+            'pld_components',
+            'pld_norm',
             'quadrature_widths',
             'yguess',
             'xguess',
@@ -618,7 +621,7 @@ class Wanderer(object):
         """
 
         temp = Wanderer(
-            fitsFileDir=self.fitsFileDir,
+            fits_file_dir=self.fits_file_dir,
             filetype=self.filetype,
             telescope=self.telescope,
             yguess=self.yguess,
@@ -630,14 +633,14 @@ class Wanderer(object):
 
         temp.centering_df = self.centering_df
         temp.background_df = self.background_df
-        temp.flux_TSO_df = self.flux_TSO_df
-        temp.noise_TSO_df = self.noise_TSO_df
+        temp.flux_tso_df = self.flux_tso_df
+        temp.noise_tso_df = self.noise_tso_df
 
-        temp.imageCube = self.imageCube
-        temp.noiseCube = self.noiseCube
-        temp.timeCube = self.timeCube
+        temp.image_cube = self.image_cube
+        temp.noise_cube = self.noise_cube
+        temp.time_cube = self.time_cube
 
-        temp.imageBadPixMasks = self.imageBadPixMasks
+        temp.bad_pixel_masks = self.bad_pixel_masks
 
         print('Assigning Parts of `temp.save_dict` to from `self.save_dict`')
         temp.save_dict = self.save_dict
@@ -662,18 +665,18 @@ class Wanderer(object):
         """
 
         # we chose 5 arbitrarily, but from experience
-        self.imageCubeMedian = np.nanmedian(self.imageCube, axis=0)
-        self.imageCubeMAD = scale.mad(self.imageCube, axis=0)
+        self.imagecube_median = np.nanmedian(self.image_cube, axis=0)
+        self.imagecube_mad = scale.mad(self.image_cube, axis=0)
 
-        self.imageBadPixMasks = abs(
-            self.imageCube - self.imageCubeMedian) > n_sig*self.imageCubeMAD
+        self.bad_pixel_masks = abs(self.image_cube - self.imagecube_median)
+        self.bad_pixel_masks = self.bad_pixel_masks > n_sig*self.imagecube_mad
 
         # print(
-        #   "There are " + str(np.sum(self.imageBadPixMasks)) + " 'Hot' Pixels"
+        #   "There are " + str(np.sum(self.bad_pixel_masks)) + " 'Hot' Pixels"
         # )
-        print(f"There are {str(np.sum(self.imageBadPixMasks))} 'Hot' Pixels")
+        print(f"There are {str(np.sum(self.bad_pixel_masks))} 'Hot' Pixels")
 
-        # self.imageCube[self.imageBadPixMasks] = nan
+        # self.image_cube[self.bad_pixel_masks] = nan
 
     def fit_gaussian_centering(
             self, method='la', initc='fw', subArray=False, print_compare=False):
@@ -693,7 +696,7 @@ class Wanderer(object):
 
         y, x = 0, 1
 
-        yinds0, xinds0 = np.indices(self.imageCube[0].shape)
+        yinds0, xinds0 = np.indices(self.image_cube[0].shape)
 
         ylower = np.int32(self.yguess - self.pix_rad)
         yupper = np.int32(self.yguess + self.pix_rad)
@@ -707,29 +710,29 @@ class Wanderer(object):
         yinds = yinds0[ylower:yupper, xlower:xupper]
         xinds = xinds0[ylower:yupper, xlower:xupper]
 
-        self.centering_GaussianFit = np.zeros((self.imageCube.shape[0], 2))
-        self.widths_GaussianFit = np.zeros((self.imageCube.shape[0], 2))
+        self.centering_GaussianFit = np.zeros((self.image_cube.shape[0], 2))
+        self.widths_GaussianFit = np.zeros((self.image_cube.shape[0], 2))
 
-        self.heights_GaussianFit = np.zeros(self.imageCube.shape[0])
-        # self.rotation_GaussianFit = np.zeros(self.imageCube.shape[0])
-        self.background_GaussianFit = np.zeros(self.imageCube.shape[0])
+        self.heights_GaussianFit = np.zeros(self.image_cube.shape[0])
+        # self.rotation_GaussianFit = np.zeros(self.image_cube.shape[0])
+        self.background_GaussianFit = np.zeros(self.image_cube.shape[0])
 
         progress_kframe = self.tqdm(
-            range(self.nFrames),
+            range(self.n_frames),
             desc='GaussFit',
             leave=False,
-            total=self.nFrames
+            total=self.n_frames
         )
         for kf in progress_kframe:
-            subFrameNow = self.imageCube[kf][ylower:yupper, xlower:xupper]
-            # subFrameNow[np.isnan(subFrameNow)] = np.nanmedian(~np.isnan(subFrameNow))
-            subFrameNow[np.isnan(subFrameNow)] = np.nanmedian(subFrameNow)
+            subFrame_now = self.image_cube[kf][ylower:yupper, xlower:xupper]
+            # subFrame_now[np.isnan(subFrame_now)] = np.nanmedian(~np.isnan(subFrame_now))
+            subFrame_now[np.isnan(subFrame_now)] = np.nanmedian(subFrame_now)
 
-            cmom = np.array(moments(subFrameNow))  # H, Xc, Yc, Xs, Ys, O
+            cmom = np.array(moments(subFrame_now))  # H, Xc, Yc, Xs, Ys, O
 
             if method == 'aperture_photometry':
-                if initc == 'flux_weighted' and self.centering_FluxWeight.sum():
-                    fwc_ = self.centering_FluxWeight[kf]
+                if initc == 'flux_weighted' and self.centering_fluxweight.sum():
+                    fwc_ = self.centering_fluxweight[kf]
                     fwc_[self.y] = fwc_[self.y] - ylower
                     fwc_[self.x] = fwc_[self.x] - xlower
                     gaussI = np.hstack([cmom[0], fwc_, cmom[3:]])
@@ -737,11 +740,11 @@ class Wanderer(object):
                     gaussI = np.hstack([cmom[0], cmom[1], cmom[2], cmom[3:]])
 
                 # H, Xc, Yc, Xs, Ys, Th, O
-                gaussP = fit_gauss(subFrameNow, xinds, yinds, gaussI)
+                gaussP = fit_gauss(subFrame_now, xinds, yinds, gaussI)
 
             if method == 'la':
                 # , xinds, yinds, np.copy(cmom)) # H, Xc, Yc, Xs, Ys, Th, O
-                gaussP = fitgaussian(subFrameNow)
+                gaussP = fitgaussian(subFrame_now)
 
             self.centering_GaussianFit[kf][self.x] = gaussP[1] + xlower
             self.centering_GaussianFit[kf][self.y] = gaussP[2] + ylower
@@ -755,16 +758,16 @@ class Wanderer(object):
             del gaussP, cmom
 
         self.centering_df = pd.DataFrame()
-        self.centering_df['Gaussian_Fit_Y_Centers'] = self.centering_GaussianFit.T[self.y]
-        self.centering_df['Gaussian_Fit_X_Centers'] = self.centering_GaussianFit.T[self.x]
-        self.centering_df['Gaussian_Mom_Y_Centers'] = self.centering_GaussianFit.T[self.y]
-        self.centering_df['Gaussian_Mom_X_Centers'] = self.centering_GaussianFit.T[self.x]
+        self.centering_df['gaussian_fit_ycenters'] = self.centering_GaussianFit.T[self.y]
+        self.centering_df['gaussian_fit_xcenters'] = self.centering_GaussianFit.T[self.x]
+        self.centering_df['gaussian_mom_ycenters'] = self.centering_GaussianFit.T[self.y]
+        self.centering_df['gaussian_mom_xcenters'] = self.centering_GaussianFit.T[self.x]
 
-        self.centering_df['Gaussian_Fit_Y_Widths'] = self.widths_GaussianFit.T[self.y]
-        self.centering_df['Gaussian_Fit_X_Widths'] = self.widths_GaussianFit.T[self.x]
+        self.centering_df['gaussian_fit_y_Widths'] = self.widths_GaussianFit.T[self.y]
+        self.centering_df['gaussian_fit_x_Widths'] = self.widths_GaussianFit.T[self.x]
 
-        self.centering_df['Gaussian_Fit_Heights'] = self.heights_GaussianFit
-        self.centering_df['Gaussian_Fit_Offset'] = self.background_GaussianFit
+        self.centering_df['gaussian_fit_Heights'] = self.heights_GaussianFit
+        self.centering_df['gaussian_fit_Offset'] = self.background_GaussianFit
 
     def mp_lmfit_gaussian_centering(
             self, yguess=15, xguess=15, subArraySize=10, init_params=None,
@@ -785,16 +788,16 @@ class Wanderer(object):
 
         """
         y, x = 0, 1
-        if np.isnan(self.imageCube).any():
-            is_nan_ = np.isnan(self.imageCube)
-            self.imageCube[is_nan_] = np.nanmedian(self.imageCube)
+        if np.isnan(self.image_cube).any():
+            is_nan_ = np.isnan(self.image_cube)
+            self.image_cube[is_nan_] = np.nanmedian(self.image_cube)
 
-        imageSize = self.imageCube.shape[1]
+        imageSize = self.image_cube.shape[1]
 
         nparams = 6
         if init_params is None:
             useMoments = True
-            init_params = moments(self.imageCube[0])
+            init_params = moments(self.image_cube[0])
 
         ctr_min, ctr_max = 0, imageSize  # Set default as full fimage
         if center_range is not None:
@@ -818,7 +821,7 @@ class Wanderer(object):
 
         gfit_model = Model(gaussian, independent_vars=['yy', 'xx'])
 
-        yy0, xx0 = np.indices(self.imageCube[0].shape)
+        yy0, xx0 = np.indices(self.image_cube[0].shape)
 
         pix_rad = subArraySize//2
         ylower = self.yguess - self.pix_rad
@@ -847,7 +850,7 @@ class Wanderer(object):
             method=method
         )
 
-        gaussian_centers = pool_run_func(func, zip(self.imageCube))
+        gaussian_centers = pool_run_func(func, zip(self.image_cube))
 
         # pool.close()
         # pool.join()
@@ -856,11 +859,11 @@ class Wanderer(object):
             'Finished with Fitting Centers. Now assigning to instance values.'
         )
 
-        self.centering_GaussianFit = np.zeros((self.imageCube.shape[0], 2))
-        self.widths_GaussianFit = np.zeros((self.imageCube.shape[0], 2))
+        self.centering_GaussianFit = np.zeros((self.image_cube.shape[0], 2))
+        self.widths_GaussianFit = np.zeros((self.image_cube.shape[0], 2))
 
-        self.heights_GaussianFit = np.zeros(self.imageCube.shape[0])
-        self.background_GaussianFit = np.zeros(self.imageCube.shape[0])
+        self.heights_GaussianFit = np.zeros(self.image_cube.shape[0])
+        self.background_GaussianFit = np.zeros(self.image_cube.shape[0])
 
         gaussian_centers = np.array(gaussian_centers)
 
@@ -898,7 +901,7 @@ class Wanderer(object):
                     )
 
                 gaussP = lmfit_one_center(
-                    self.imageCube[kf],
+                    self.image_cube[kf],
                     yy=yy,
                     xx=xx,
                     gfit_model=gfit_model,
@@ -943,18 +946,18 @@ class Wanderer(object):
             print(f"Option X2 Fit Failed as {err}")
             self.centering_df = pd.DataFrame()       # create it if it does not exist
 
-        y_center = self.centering_GaussianFit.T[self.y]
-        x_center = self.centering_GaussianFit.T[self.x]
-        self.centering_df['Gaussian_Fit_Y_Centers'] = y_center
-        self.centering_df['Gaussian_Fit_X_Centers'] = x_center
+        ycenter = self.centering_GaussianFit.T[self.y]
+        xcenter = self.centering_GaussianFit.T[self.x]
+        self.centering_df['gaussian_fit_ycenters'] = ycenter
+        self.centering_df['gaussian_fit_xcenters'] = xcenter
 
         y_width = self.widths_GaussianFit.T[self.y]
         x_width = self.widths_GaussianFit.T[self.x]
-        self.centering_df['Gaussian_Fit_Y_Widths'] = y_width
-        self.centering_df['Gaussian_Fit_X_Widths'] = x_width
+        self.centering_df['gaussian_fit_y_Widths'] = y_width
+        self.centering_df['gaussian_fit_x_Widths'] = x_width
 
-        self.centering_df['Gaussian_Fit_Heights'] = self.heights_GaussianFit
-        self.centering_df['Gaussian_Fit_Offset'] = self.background_GaussianFit
+        self.centering_df['gaussian_fit_Heights'] = self.heights_GaussianFit
+        self.centering_df['gaussian_fit_Offset'] = self.background_GaussianFit
 
     def assign_gaussian_centering(self, gaussP, xlower, kf, ylower):
 
@@ -985,13 +988,13 @@ class Wanderer(object):
 
         """
 
-        if np.isnan(self.imageCube).any():
-            is_nan_ = np.isnan(self.imageCube)
-            self.imageCube[is_nan_] = np.nanmedian(self.imageCube)
+        if np.isnan(self.image_cube).any():
+            is_nan_ = np.isnan(self.image_cube)
+            self.image_cube[is_nan_] = np.nanmedian(self.image_cube)
 
         y, x = self.y, self.x
 
-        yinds0, xinds0 = np.indices(self.imageCube[0].shape)
+        yinds0, xinds0 = np.indices(self.image_cube[0].shape)
 
         ylower = self.yguess - self.pix_rad
         yupper = self.yguess + self.pix_rad
@@ -1004,12 +1007,12 @@ class Wanderer(object):
         yinds = yinds0[ylower:yupper, xlower:xupper]
         xinds = xinds0[ylower:yupper, xlower:xupper]
 
-        self.centering_GaussianFit = np.zeros((self.imageCube.shape[0], 2))
-        self.widths_GaussianFit = np.zeros((self.imageCube.shape[0], 2))
+        self.centering_GaussianFit = np.zeros((self.image_cube.shape[0], 2))
+        self.widths_GaussianFit = np.zeros((self.image_cube.shape[0], 2))
 
-        self.heights_GaussianFit = np.zeros(self.imageCube.shape[0])
-        # self.rotation_GaussianFit = np.zeros(self.imageCube.shape[0])
-        self.background_GaussianFit = np.zeros(self.imageCube.shape[0])
+        self.heights_GaussianFit = np.zeros(self.image_cube.shape[0])
+        # self.rotation_GaussianFit = np.zeros(self.image_cube.shape[0])
+        self.background_GaussianFit = np.zeros(self.image_cube.shape[0])
 
         # Gaussian fit centering
         # This starts the multiprocessing call to arms
@@ -1026,7 +1029,7 @@ class Wanderer(object):
         )
 
         # the order is very important
-        gaussian_centers = pool_run_func(func, zip(self.imageCube))
+        gaussian_centers = pool_run_func(func, zip(self.image_cube))
 
         # pool.close()
         # pool.join()
@@ -1047,24 +1050,24 @@ class Wanderer(object):
             self.background_GaussianFit[kf] = gaussP[5]
             """
 
-        y_center = self.centering_GaussianFit.T[y]
-        x_center = self.centering_GaussianFit.T[x]
+        ycenter = self.centering_GaussianFit.T[y]
+        xcenter = self.centering_GaussianFit.T[x]
 
         y_width = self.widths_GaussianFit.T[y]
         x_width = self.widths_GaussianFit.T[x]
         self.centering_df = pd.DataFrame()
-        self.centering_df['Gaussian_Fit_Y_Centers'] = y_center
-        self.centering_df['Gaussian_Fit_X_Centers'] = x_center
-        self.centering_df['Gaussian_Mom_Y_Centers'] = y_center
-        self.centering_df['Gaussian_Mom_X_Centers'] = x_center
+        self.centering_df['gaussian_fit_ycenters'] = ycenter
+        self.centering_df['gaussian_fit_xcenters'] = xcenter
+        self.centering_df['gaussian_mom_ycenters'] = ycenter
+        self.centering_df['gaussian_mom_xcenters'] = xcenter
 
-        self.centering_df['Gaussian_Fit_Y_Widths'] = y_width
-        self.centering_df['Gaussian_Fit_X_Widths'] = x_width
+        self.centering_df['gaussian_fit_y_Widths'] = y_width
+        self.centering_df['gaussian_fit_x_Widths'] = x_width
 
-        self.centering_df['Gaussian_Fit_Heights'] = self.heights_GaussianFit
-        self.centering_df['Gaussian_Fit_Offset'] = self.background_GaussianFit
+        self.centering_df['gaussian_fit_Heights'] = self.heights_GaussianFit
+        self.centering_df['gaussian_fit_Offset'] = self.background_GaussianFit
 
-        # self.centering_df['Gaussian_Fit_Rotation'] = self.rotation_GaussianFit
+        # self.centering_df['gaussian_fit_Rotation'] = self.rotation_GaussianFit
 
     def fit_flux_weighted_centering(self):
         """Class methods are similar to regular functions.
@@ -1083,7 +1086,7 @@ class Wanderer(object):
 
         y, x = 0, 1
 
-        # yinds0, xinds0 = np.indices(self.imageCube[0].shape)
+        # yinds0, xinds0 = np.indices(self.image_cube[0].shape)
 
         ylower = np.int32(self.yguess - self.pix_rad)
         yupper = np.int32(self.yguess + self.pix_rad)
@@ -1094,39 +1097,39 @@ class Wanderer(object):
         # xinds = xinds0[ylower:yupper, xlower:xupper]
 
         nFWCParams = 2  # Xc, Yc
-        self.centering_FluxWeight = np.zeros((self.nFrames, nFWCParams))
-        # print(self.imageCube.shape)
+        self.centering_fluxweight = np.zeros((self.n_frames, nFWCParams))
+        # print(self.image_cube.shape)
         progress_flux_wght_center = self.tqdm(
-            range(self.nFrames),
+            range(self.n_frames),
             desc='Flux Weighted Centering',
             leave=False,
-            total=self.nFrames
+            total=self.n_frames
         )
 
         for kf in progress_flux_wght_center:
-            subFrameNow = self.imageCube[kf][ylower:yupper, xlower:xupper]
-            subFrameNow[np.isnan(subFrameNow)] = np.nanmedian(
-                ~np.isnan(subFrameNow))
+            subFrame_now = self.image_cube[kf][ylower:yupper, xlower:xupper]
+            subFrame_now[np.isnan(subFrame_now)] = np.nanmedian(
+                ~np.isnan(subFrame_now))
 
-            self.centering_FluxWeight[kf] = flux_weighted_centroid(
-                self.imageCube[kf],
+            self.centering_fluxweight[kf] = flux_weighted_centroid(
+                self.image_cube[kf],
                 self.yguess,
                 self.xguess,
                 b_size=7
             )
-            self.centering_FluxWeight[kf] = self.centering_FluxWeight[kf][::-1]
+            self.centering_fluxweight[kf] = self.centering_fluxweight[kf][::-1]
 
-        self.centering_FluxWeight[:, 0] = clipOutlier(
-            self.centering_FluxWeight.T[0]
+        self.centering_fluxweight[:, 0] = clip_outlier(
+            self.centering_fluxweight.T[0]
         )
-        self.centering_FluxWeight[:, 1] = clipOutlier(
-            self.centering_FluxWeight.T[1]
+        self.centering_fluxweight[:, 1] = clip_outlier(
+            self.centering_fluxweight.T[1]
         )
 
-        y_center_ = self.centering_FluxWeight.T[self.y]
-        x_center_ = self.centering_FluxWeight.T[self.x]
-        self.centering_df['FluxWeighted_Y_Centers'] = y_center_
-        self.centering_df['FluxWeighted_X_Centers'] = x_center_
+        ycenter_ = self.centering_fluxweight.T[self.y]
+        xcenter_ = self.centering_fluxweight.T[self.x]
+        self.centering_df['fluxweighted_ycenters'] = ycenter_
+        self.centering_df['fluxweighted_xcenters'] = xcenter_
 
     def mp_fit_flux_weighted_centering(self, n_sig=False):
         """Class methods are similar to regular functions.
@@ -1143,7 +1146,7 @@ class Wanderer(object):
 
         """
 
-        # yinds0, xinds0 = np.indices(self.imageCube[0].shape)
+        # yinds0, xinds0 = np.indices(self.image_cube[0].shape)
 
         ylower = np.int32(self.yguess - self.pix_rad)
         yupper = np.int32(self.yguess + self.pix_rad)
@@ -1157,7 +1160,7 @@ class Wanderer(object):
         # xinds = xinds0[ylower:yupper, xlower:xupper]
 
         # nFWCParams = 2  # Xc, Yc
-        # self.centering_FluxWeight = np.zeros((self.nFrames, nFWCParams))
+        # self.centering_fluxweight = np.zeros((self.n_frames, nFWCParams))
 
         # This starts the multiprocessing call to arms
         # pool = Pool(self.num_cores)
@@ -1174,17 +1177,17 @@ class Wanderer(object):
         )
 
         # the order is very important
-        fwc_centers = pool_run_func(func, zip(self.imageCube))
+        fwc_centers = pool_run_func(func, zip(self.image_cube))
 
         # pool.close()
         # pool.join()
 
-        self.centering_FluxWeight = np.array(fwc_centers)
+        self.centering_fluxweight = np.array(fwc_centers)
 
-        y_center_ = self.centering_FluxWeight.T[self.y]
-        x_center_ = self.centering_FluxWeight.T[self.x]
-        self.centering_df['FluxWeighted_Y_Centers'] = y_center_
-        self.centering_df['FluxWeighted_X_Centers'] = x_center_
+        ycenter_ = self.centering_fluxweight.T[self.y]
+        xcenter_ = self.centering_fluxweight.T[self.x]
+        self.centering_df['fluxweighted_ycenters'] = ycenter_
+        self.centering_df['fluxweighted_xcenters'] = xcenter_
 
     def fit_least_asymmetry_centering(self):
         """Class methods are similar to regular functions.
@@ -1205,7 +1208,7 @@ class Wanderer(object):
         )
         y, x = 0, 1
 
-        # yinds0, xinds0 = np.indices(self.imageCube[0].shape)
+        # yinds0, xinds0 = np.indices(self.image_cube[0].shape)
 
         ylower = np.int32(self.yguess - self.pix_rad)
         yupper = np.int32(self.yguess + self.pix_rad)
@@ -1219,13 +1222,13 @@ class Wanderer(object):
         # xinds = xinds0[ylower:yupper+1, xlower:xupper+1]
 
         nAsymParams = 2  # Xc, Yc
-        self.centering_LeastAsym = np.zeros((self.nFrames, nAsymParams))
+        self.centering_LeastAsym = np.zeros((self.n_frames, nAsymParams))
 
         progress_frame = self.tqdm(
-            range(self.nFrames),
+            range(self.n_frames),
             desc='Asym',
             leave=False,
-            total=self.nFrames
+            total=self.n_frames
         )
         for kf in progress_frame:
             """
@@ -1262,7 +1265,7 @@ class Wanderer(object):
 
             try:
                 center_asym = actr(
-                    self.imageCube[kf],
+                    self.image_cube[kf],
                     [yguess, xguess],
                     asym_rad=8,
                     asym_size=5,
@@ -1280,7 +1283,7 @@ class Wanderer(object):
             if fitFailed:
                 try:
                     center_asym = actr(
-                        np.sign(self.imageCube[kf])*self.imageCube[kf]**2,
+                        np.sign(self.image_cube[kf])*self.image_cube[kf]**2,
                         [yguess, xguess],
                         asym_rad=8,
                         asym_size=5,
@@ -1299,7 +1302,7 @@ class Wanderer(object):
             if fitFailed:
                 try:
                     center_asym = actr(
-                        self.imageCube[kf],
+                        self.image_cube[kf],
                         [yguess, xguess],
                         asym_rad=4,
                         asym_size=5,
@@ -1322,7 +1325,7 @@ class Wanderer(object):
             if fitFailed:
                 try:
                     center_asym = actr(
-                        np.sign(self.imageCube[kf])*self.imageCube[kf]**2,
+                        np.sign(self.image_cube[kf])*self.image_cube[kf]**2,
                         [yguess, xguess],
                         asym_rad=4,
                         asym_size=5,
@@ -1345,7 +1348,7 @@ class Wanderer(object):
             if fitFailed:
                 try:
                     center_asym = actr(
-                        np.sign(self.imageCube[kf])*self.imageCube[kf]**2,
+                        np.sign(self.image_cube[kf])*self.image_cube[kf]**2,
                         [yguess, xguess],
                         asym_rad=4,
                         asym_size=3,
@@ -1379,10 +1382,10 @@ class Wanderer(object):
 
                 self.centering_LeastAsym[kf] = np.array([yguess, xguess])
 
-        y_center_ = self.centering_LeastAsym.T[self.y]
-        x_center_ = self.centering_LeastAsym.T[self.x]
-        self.centering_df['LeastAsymmetry_Y_Centers'] = y_center_
-        self.centering_df['LeastAsymmetry_X_Centers'] = x_center_
+        ycenter_ = self.centering_LeastAsym.T[self.y]
+        xcenter_ = self.centering_LeastAsym.T[self.x]
+        self.centering_df['least_asym_ycenters'] = ycenter_
+        self.centering_df['least_asym_xcenters'] = xcenter_
 
     def mp_fit_least_asymmetry_centering(self):
         """Class methods are similar to regular functions.
@@ -1401,7 +1404,7 @@ class Wanderer(object):
 
         y, x = 0, 1
 
-        # yinds0, xinds0 = np.indices(self.imageCube[0].shape)
+        # yinds0, xinds0 = np.indices(self.image_cube[0].shape)
 
         ylower = np.int32(self.yguess - self.pix_rad)
         yupper = np.int32(self.yguess + self.pix_rad)
@@ -1417,9 +1420,9 @@ class Wanderer(object):
         # xinds = xinds0[ylower:yupper+1, xlower:xupper+1]
 
         # nAsymParams = 2  # Xc, Yc
-        # self.centering_LeastAsym = np.zeros((self.nFrames, nAsymParams))
-        # for kf in self.tqdm(range(self.nFrames), desc='Asym',
-        #   leave = False, total=self.nFrames):
+        # self.centering_LeastAsym = np.zeros((self.n_frames, nAsymParams))
+        # for kf in self.tqdm(range(self.n_frames), desc='Asym',
+        #   leave = False, total=self.n_frames):
         # This starts the multiprocessing call to arms
         # pool = Pool(self.num_cores)
 
@@ -1438,7 +1441,7 @@ class Wanderer(object):
         self.centering_LeastAsym = pool_run_func(
             func,
             zip(
-                self.imageCube,
+                self.image_cube,
                 [[yguess, xguess]]*self.nframes
             )
         )
@@ -1448,10 +1451,10 @@ class Wanderer(object):
 
         self.centering_LeastAsym = np.array(self.centering_LeastAsym[0])
 
-        y_center_ = self.centering_LeastAsym.T[self.y]
-        x_center_ = self.centering_LeastAsym.T[self.x]
-        self.centering_df['LeastAsymmetry_Y_Centers'] = y_center_
-        self.centering_df['LeastAsymmetry_X_Centers'] = x_center_
+        ycenter_ = self.centering_LeastAsym.T[self.y]
+        xcenter_ = self.centering_LeastAsym.T[self.x]
+        self.centering_df['least_asym_ycenters'] = ycenter_
+        self.centering_df['least_asym_xcenters'] = xcenter_
 
     def fit_all_centering(self):
         """Class methods are similar to regular functions.
@@ -1471,7 +1474,7 @@ class Wanderer(object):
         print('Fit for Gaussian Fitting Centers\n')
         self.mp_lmfit_gaussian_centering()
 
-        print('Fit for Flux Weighted Centers\n')
+        print('Fit for flux weighted Centers\n')
         self.fit_flux_weighted_centering()
 
         print('Fit for Least Asymmetry Centers\n')
@@ -1479,11 +1482,11 @@ class Wanderer(object):
 
     def measure_effective_width_subframe(self, pix_rad=None):
         pix_rad = self.pix_rad if pix_rad is None else pix_rad
-        midFrame = self.imageCube.shape[1]//2
+        midFrame = self.image_cube.shape[1]//2
         lower = midFrame - pix_rad
         upper = midFrame + pix_rad
 
-        image_view = self.imageCube[:, lower:upper, lower:upper]
+        image_view = self.image_cube[:, lower:upper, lower:upper]
 
         image_sum_sq = image_view.sum(axis=(1, 2))**2.
         image_sq_sum = (image_view**2).sum(axis=(1, 2))
@@ -1507,31 +1510,31 @@ class Wanderer(object):
         if subFrame:
             self.measure_effective_width_subframe(pix_rad=self.pix_rad)
             """
-            midFrame = self.imageCube.shape[1]//2
+            midFrame = self.image_cube.shape[1]//2
             lower = midFrame - self.pix_rad
             upper = midFrame + self.pix_rad
 
-            image_view = self.imageCube[:, lower:upper, lower:upper]
+            image_view = self.image_cube[:, lower:upper, lower:upper]
 
             image_sum_sq = image_view.sum(axis=(1, 2))**2.
             image_sq_sum = (image_view**2).sum(axis=(1, 2))
             self.effective_widths = image_sum_sq / image_sq_sum
             """
         else:
-            image_sum_sq = self.imageCube.sum(axis=(1, 2))**2.
-            image_sq_sum = (self.imageCube**2).sum(axis=(1, 2))
+            image_sum_sq = self.image_cube.sum(axis=(1, 2))**2.
+            image_sq_sum = (self.image_cube**2).sum(axis=(1, 2))
             self.effective_widths = image_sum_sq / image_sq_sum
 
         self.centering_df['Effective_Widths'] = self.effective_widths
 
-        x_widths = self.centering_df['Gaussian_Fit_X_Widths']
-        y_widths = self.centering_df['Gaussian_Fit_Y_Widths']
+        x_widths = self.centering_df['gaussian_fit_x_Widths']
+        y_widths = self.centering_df['gaussian_fit_y_Widths']
 
         self.quadrature_widths = np.sqrt(x_widths**2 + y_widths**2)
         self.centering_df['Quadrature_Widths'] = self.quadrature_widths
 
     def measure_background_circle_masked(
-            self, aperRad=10, centering='FluxWeight'):
+            self, aper_rad=10, centering='fluxweight'):
         """Class methods are similar to regular functions.
 
         Note:
@@ -1552,26 +1555,26 @@ class Wanderer(object):
                 which will skip all NaNs
         """
 
-        self.background_CircleMask = np.zeros(self.nFrames)
+        self.background_CircleMask = np.zeros(self.n_frames)
 
         progress_frame = self.tqdm(
-            range(self.nFrames),
+            range(self.n_frames),
             desc='CircleBG',
             leave=False,
-            total=self.nFrames
+            total=self.n_frames
         )
         for kf in progress_frame:
             aperture = create_aper_mask(
-                centering=self.centering_FluxWeight[kf],
-                aperRad=aperRad,
-                image_shape=self.imageCube[0].shape,
+                centering=self.centering_fluxweight[kf],
+                aper_rad=aper_rad,
+                image_shape=self.image_cube[0].shape,
                 method='exact'
             )
 
             backgroundMask = ~aperture
 
             """
-            aperture = CircularAperture(self.centering_FluxWeight[kf], aperRad)
+            aperture = CircularAperture(self.centering_fluxweight[kf], aper_rad)
 
             # list of ApertureMask objects (one for each position)
             aper_mask = aperture.to_mask(method='exact')
@@ -1580,22 +1583,22 @@ class Wanderer(object):
                 aper_mask = aper_mask[0]
 
             # backgroundMask = abs(aperture.get_fractions(
-            #   np.ones(self.imageCube[0].shape))-1)
+            #   np.ones(self.image_cube[0].shape))-1)
             # backgroundMask = ~aperture
             # backgroundMask = ~aper_mask.to_image(
-            #     self.imageCube[0].shape
+            #     self.image_cube[0].shape
             # ).astype(bool)
 
             # backgroundMask = ~backgroundMask  # [backgroundMask == 0] = False
             """
             self.background_CircleMask[kf] = self.metric(
-                self.imageCube[kf][backgroundMask]
+                self.image_cube[kf][backgroundMask]
             )
 
         self.background_df['CircleMask'] = self.background_CircleMask.copy()
 
     def mp_measure_background_circle_masked(
-            self, aperRad=10, centering='Gauss'):
+            self, aper_rad=10, centering='Gauss'):
         """Class methods are similar to regular functions.
 
         Note:
@@ -1618,21 +1621,21 @@ class Wanderer(object):
 
         if centering == 'Gauss':
             centers = self.centering_GaussianFit
-        elif centering == 'FluxWeight':
-            centers = self.centering_FluxWeight
+        elif centering == 'fluxweight':
+            centers = self.centering_fluxweight
 
         # This starts the multiprocessing call to arms
         # pool = Pool(self.num_cores)
 
         func = partial(
             measure_one_circle_bg,
-            aperRad=aperRad,
+            aper_rad=aper_rad,
             metric=self.metric,
             apMethod='exact'
         )
 
         self.background_CircleMask = pool_run_func(
-            func, zip(self.imageCube, centers)
+            func, zip(self.image_cube, centers)
         )
 
         # pool.close()
@@ -1641,7 +1644,7 @@ class Wanderer(object):
         self.background_CircleMask = np.array(self.background_CircleMask)
         self.background_df['CircleMask'] = self.background_CircleMask.copy()
 
-    def measure_background_annular_mask(self, innerRad=8, outerRad=13):
+    def measure_background_annular_mask(self, inner_rad=8, outer_rad=13):
         """Class methods are similar to regular functions.
 
         Note:
@@ -1656,32 +1659,32 @@ class Wanderer(object):
 
         """
 
-        self.background_Annulus = np.zeros(self.nFrames)
+        self.background_Annulus = np.zeros(self.n_frames)
 
         progress_frame = self.tqdm(
-            range(self.nFrames),
+            range(self.n_frames),
             desc='AnnularBG',
             leave=False,
-            total=self.nFrames
+            total=self.n_frames
         )
         for kf in progress_frame:
             inner_aper_mask = create_aper_mask(
-                centering=self.centering_FluxWeight[kf],
-                aperRad=innerRad,
-                image_shape=self.imageCube[0].shape,
+                centering=self.centering_fluxweight[kf],
+                aper_rad=inner_rad,
+                image_shape=self.image_cube[0].shape,
                 method='exact'
             )
 
             outer_aper_mask = create_aper_mask(
-                centering=self.centering_FluxWeight[kf],
-                aperRad=outerRad,
-                image_shape=self.imageCube[0].shape,
+                centering=self.centering_fluxweight[kf],
+                aper_rad=outer_rad,
+                image_shape=self.image_cube[0].shape,
                 method='exact'
             )
             """
             innerAperture = CircularAperture(
-                self.centering_FluxWeight[kf],
-                innerRad
+                self.centering_fluxweight[kf],
+                inner_rad
             )
 
             inner_aper_mask = innerAperture.to_mask(method='exact')
@@ -1690,13 +1693,13 @@ class Wanderer(object):
                 inner_aper_mask = inner_aper_mask[0]
 
             inner_aper_mask = inner_aper_mask.to_image(
-                self.imageCube[0].shape
+                self.image_cube[0].shape
             ).astype(bool)
             """
             """
             outerAperture = CircularAperture(
-                self.centering_FluxWeight[kf],
-                outerRad
+                self.centering_fluxweight[kf],
+                outer_rad
             )
 
             outer_aper_mask = outerAperture.to_mask(method='exact')
@@ -1705,19 +1708,19 @@ class Wanderer(object):
                 outer_aper_mask = outer_aper_mask[0]
 
             outer_aper_mask = outer_aper_mask.to_image(
-                self.imageCube[0].shape
+                self.image_cube[0].shape
             ).astype(bool)
             """
             backgroundMask = (~inner_aper_mask)*outer_aper_mask
 
             self.background_Annulus[kf] = self.metric(
-                self.imageCube[kf][backgroundMask]
+                self.image_cube[kf][backgroundMask]
             )
 
         self.background_df['AnnularMask'] = self.background_Annulus.copy()
 
     def mp_measure_background_annular_mask(
-            self, innerRad=8, outerRad=13, method='exact', centering='Gauss'):
+            self, inner_rad=8, outer_rad=13, method='exact', centering='Gauss'):
         """Class methods are similar to regular functions.
 
         Note:
@@ -1734,23 +1737,23 @@ class Wanderer(object):
 
         if centering == 'Gauss':
             centers = self.centering_GaussianFit
-        elif centering == 'FluxWeight':
-            centers = self.centering_FluxWeight
+        elif centering == 'fluxweight':
+            centers = self.centering_fluxweight
 
         # This starts the multiprocessing call to arms
         # pool = Pool(self.num_cores)
 
         func = partial(
             measure_one_annular_bg,
-            innerRad=innerRad,
-            outerRad=outerRad,
+            inner_rad=inner_rad,
+            outer_rad=outer_rad,
             metric=self.metric,
             apMethod='exact'
         )
 
         # the order is very important
         self.background_Annulus = pool_run_func(
-            func, zip(self.imageCube, centers)
+            func, zip(self.image_cube, centers)
         )
 
         # pool.close()
@@ -1759,7 +1762,7 @@ class Wanderer(object):
         self.background_Annulus = np.array(self.background_Annulus)
         self.background_df['AnnularMask'] = self.background_Annulus.copy()
 
-    def measure_background_median_masked(self, aperRad=10, n_sig=5):
+    def measure_background_median_masked(self, aper_rad=10, n_sig=5):
         """Class methods are similar to regular functions.
 
         Note:
@@ -1774,50 +1777,50 @@ class Wanderer(object):
 
         """
 
-        self.background_MedianMask = np.zeros(self.nFrames)
+        self.background_MedianMask = np.zeros(self.n_frames)
 
         # the order is very important
         progress_frames = self.tqdm(
-            range(self.nFrames),
+            range(self.n_frames),
             desc='MedianMaskedBG',
             leave=False,
-            total=self.nFrames
+            total=self.n_frames
         )
         for kf in progress_frames:
             aperture = create_aper_mask(
-                centering=self.centering_FluxWeight[kf],
-                aperRad=aperRad,
-                image_shape=self.imageCube[0].shape,
+                centering=self.centering_fluxweight[kf],
+                aper_rad=aper_rad,
+                image_shape=self.image_cube[0].shape,
                 method='exact'
             )
             """
-            aperture = CircularAperture(self.centering_FluxWeight[kf], aperRad)
+            aperture = CircularAperture(self.centering_fluxweight[kf], aper_rad)
             aperture = aperture.to_mask(method='exact')
 
             if isinstance(aperture, (list, tuple, np.ndarray)):
                 aperture = aperture[0]
 
-            aperture = aperture.to_image(self.imageCube[0].shape).astype(bool)
+            aperture = aperture.to_image(self.image_cube[0].shape).astype(bool)
             """
             backgroundMask = ~aperture
 
-            medFrame = np.nanmedian(self.imageCube[kf][backgroundMask])
-            # scale.mad(self.imageCube[kf][backgroundMask])
-            madFrame = np.nanstd(self.imageCube[kf][backgroundMask])
+            medFrame = np.nanmedian(self.image_cube[kf][backgroundMask])
+            # scale.mad(self.image_cube[kf][backgroundMask])
+            madFrame = np.nanstd(self.image_cube[kf][backgroundMask])
 
-            medianMask = abs(self.imageCube[kf] - medFrame) < n_sig*madFrame
+            medianMask = abs(self.image_cube[kf] - medFrame) < n_sig*madFrame
 
             maskComb = medianMask*backgroundMask
             # maskComb[maskComb == 0] = False
 
             self.background_MedianMask[kf] = np.nanmedian(
-                self.imageCube[kf][maskComb]
+                self.image_cube[kf][maskComb]
             )
 
         self.background_df['MedianMask'] = self.background_MedianMask
 
     def mp_measure_background_median_masked(
-            self, aperRad=10, n_sig=5, centering='Gauss'):
+            self, aper_rad=10, n_sig=5, centering='Gauss'):
         """Class methods are similar to regular functions.
 
         Note:
@@ -1834,22 +1837,22 @@ class Wanderer(object):
 
         if centering == 'Gauss':
             centers = self.centering_GaussianFit
-        elif centering == 'FluxWeight':
-            centers = self.centering_FluxWeight
+        elif centering == 'fluxweight':
+            centers = self.centering_fluxweight
 
         # This starts the multiprocessing call to arms
         # pool = Pool(self.num_cores)
 
         func = partial(
             measure_one_median_bg,
-            aperRad=aperRad,
+            aper_rad=aper_rad,
             apMethod='exact',
             metric=self.metric,
             n_sig=n_sig
         )
 
         self.background_MedianMask = pool_run_func(
-            func, zip(self.imageCube, centers)
+            func, zip(self.image_cube, centers)
         )
 
         # pool.close()
@@ -1858,7 +1861,7 @@ class Wanderer(object):
         self.background_MedianMask = np.array(self.background_MedianMask)
         self.background_df['MedianMask'] = self.background_MedianMask
 
-    def measure_background_KDE_Mode(self, aperRad=10):
+    def measure_background_KDE_Mode(self, aper_rad=10):
         """Class methods are similar to regular functions.
 
         Note:
@@ -1872,34 +1875,34 @@ class Wanderer(object):
             True if successful, False otherwise.
         """
 
-        self.background_KDEUniv = np.zeros(self.nFrames)
+        self.background_KDEUniv = np.zeros(self.n_frames)
 
         progress_frames = self.tqdm(
-            range(self.nFrames),
+            range(self.n_frames),
             desc='KDE_BG',
             leave=False,
-            total=self.nFrames
+            total=self.n_frames
         )
         for kf in progress_frames:
             aperture = create_aper_mask(
-                centering=self.centering_FluxWeight[kf],
-                aperRad=aperRad,
-                image_shape=self.imageCube[0].shape,
+                centering=self.centering_fluxweight[kf],
+                aper_rad=aper_rad,
+                image_shape=self.image_cube[0].shape,
                 method='exact'
             )
             """
-            aperture = CircularAperture(self.centering_FluxWeight[kf], aperRad)
+            aperture = CircularAperture(self.centering_fluxweight[kf], aper_rad)
             aperture = aperture.to_mask(method='exact')
 
             if isinstance(aperture, (list, tuple, np.ndarray)):
                 aperture = aperture[0]
 
-            aperture = aperture.to_image(self.imageCube[0].shape).astype(bool)
+            aperture = aperture.to_image(self.image_cube[0].shape).astype(bool)
             """
             backgroundMask = ~aperture
 
             kdeFrame = kde.KDEUnivariate(
-                self.imageCube[kf][backgroundMask].ravel()
+                self.image_cube[kf][backgroundMask].ravel()
             )
             kdeFrame.fit()
 
@@ -1908,7 +1911,7 @@ class Wanderer(object):
 
         self.background_df['KDEUnivMask'] = self.background_KDEUniv
 
-    def mp_measure_background_KDE_Mode(self, aperRad=10, centering='Gauss'):
+    def mp_measure_background_KDE_Mode(self, aper_rad=10, centering='Gauss'):
         """Class methods are similar to regular functions.
 
         Note:
@@ -1925,24 +1928,24 @@ class Wanderer(object):
 
         if centering == 'Gauss':
             centers = self.centering_GaussianFit
-        elif centering == 'FluxWeight':
-            centers = self.centering_FluxWeight
+        elif centering == 'fluxweight':
+            centers = self.centering_fluxweight
 
-        self.background_KDEUniv = np.zeros(self.nFrames)
+        self.background_KDEUniv = np.zeros(self.n_frames)
 
         # This starts the multiprocessing call to arms
         # pool = Pool(self.num_cores)
 
         func = partial(
-            measure_one_KDE_bg,
-            aperRad=aperRad,
+            measure_one_kde_bg,
+            aper_rad=aper_rad,
             apMethod='exact',
             metric=self.metric
         )
 
         self.background_KDEUniv = pool_run_func(
             func,
-            zip(self.imageCube, centers)
+            zip(self.image_cube, centers)
         )  # the order is very important
 
         # pool.close()
@@ -1951,7 +1954,7 @@ class Wanderer(object):
         self.background_KDEUniv = np.array(self.background_KDEUniv)
         self.background_df['KDEUnivMask_mp'] = self.background_KDEUniv
 
-    def measure_all_background(self, aperRad=10, n_sig=5):
+    def measure_all_background(self, aper_rad=10, n_sig=5):
         """Class methods are similar to regular functions.
 
         Note:
@@ -1967,54 +1970,55 @@ class Wanderer(object):
         """
 
         pInner = 0.2  # Percent Inner = -20%
-        pOuter = 0.3  # Percent Outer = +30%
+        p_outer = 0.3  # Percent Outer = +30%
 
         print('Measuring Background Using Circle Mask with Multiprocessing')
-        self.mp_measure_background_circle_masked(aperRad=aperRad)
+        self.mp_measure_background_circle_masked(aper_rad=aper_rad)
 
         print('Measuring Background Using Annular Mask with Multiprocessing')
         self.mp_measure_background_annular_mask(
-            innerRad=(1-pInner)*aperRad, outerRad=(1+pOuter)*aperRad)
+            inner_rad=(1-p_inner)*aper_rad, outer_rad=(1+p_outer)*aper_rad)
 
         print('Measuring Background Using Median Mask with Multiprocessing')
-        self.mp_measure_background_median_masked(aperRad=aperRad, n_sig=n_sig)
+        self.mp_measure_background_median_masked(
+            aper_rad=aper_rad, n_sig=n_sig)
 
         print('Measuring Background Using KDE Mode with Multiprocessing')
-        self.mp_measure_background_KDE_Mode(aperRad=aperRad)
+        self.mp_measure_background_KDE_Mode(aper_rad=aper_rad)
 
-    def helper_flux_over_time(self, aperRad, flux_key, centers, backgrounds):
-        flux_TSO_now = np.zeros(self.nFrames)
-        noise_TSO_now = np.zeros(self.nFrames)
+    def helper_flux_over_time(self, aper_rad, flux_key, centers, backgrounds):
+        flux_tso_now = np.zeros(self.n_frames)
+        noise_tso_now = np.zeros(self.n_frames)
 
         progress_frames = self.tqdm(
-            range(self.nFrames),
-            desc='Flux',
+            range(self.n_frames),
+            desc='flux',
             leave=False,
-            total=self.nFrames
+            total=self.n_frames
         )
 
         for kf in progress_frames:
-            frameNow = np.copy(self.imageCube[kf]) - backgrounds[kf]
-            frameNow[np.isnan(frameNow)] = np.nanmedian(frameNow)
+            frame_now = np.copy(self.image_cube[kf]) - backgrounds[kf]
+            frame_now[np.isnan(frame_now)] = np.nanmedian(frame_now)
 
-            noiseNow = np.copy(self.noiseCube[kf])**2.
-            noiseNow[np.isnan(noiseNow)] = np.nanmedian(noiseNow)
+            noise_now = np.copy(self.noise_cube[kf])**2.
+            noise_now[np.isnan(noise_now)] = np.nanmedian(noise_now)
 
-            x_center_ = centers[kf][self.x]
-            y_center_ = centers[kf][self.y]
-            aperture = CircularAperture([x_center_, y_center_], r=aperRad)
+            xcenter_ = centers[kf][self.x]
+            ycenter_ = centers[kf][self.y]
+            aperture = CircularAperture([xcenter_, ycenter_], r=aper_rad)
 
-            flux_TSO_now[kf] = aperture_photometry(frameNow, aperture)
-            flux_TSO_now[kf] = flux_TSO_now[kf]['aperture_sum']
+            flux_tso_now[kf] = aperture_photometry(frame_now, aperture)
+            flux_tso_now[kf] = flux_tso_now[kf]['aperture_sum']
 
-            noise_TSO_now[kf] = aperture_photometry(noiseNow, aperture)
-            noise_TSO_now[kf] = np.sqrt(noise_TSO_now[kf]['aperture_sum'])
+            noise_tso_now[kf] = aperture_photometry(noise_now, aperture)
+            noise_tso_now[kf] = np.sqrt(noise_tso_now[kf]['aperture_sum'])
 
-        self.flux_TSO_df[flux_key] = flux_TSO_now
-        self.noise_TSO_df[flux_key] = noise_TSO_now
+        self.flux_tso_df[flux_key] = flux_tso_now
+        self.noise_tso_df[flux_key] = noise_tso_now
 
     def compute_flux_over_time(
-            self, aperRad=None, centering='GaussianFit',
+            self, aper_rad=None, centering='GaussianFit',
             background='AnnularMask', useTheForce=False):
         """Class methods are similar to regular functions.
 
@@ -2038,74 +2042,74 @@ class Wanderer(object):
             )
 
         centering_options = [
-            'Gaussian_Fit',
-            'Gaussian_Mom',
-            'FluxWeighted',
-            'LeastAsymmetry'
+            'gaussian_fit',
+            'gaussian_mom',
+            'fluxweighted',
+            'least_asym'
         ]
         if centering not in centering_options:
             raise ValueError(
-                "`centering` must be either 'Gaussian_Fit', "
-                "'Gaussian_Mom', 'FluxWeighted', or 'LeastAsymmetry'"
+                "`centering` must be either 'gaussian_fit', "
+                "'gaussian_mom', 'fluxweighted', or 'least_asym'"
             )
 
-        if aperRad is None:
-            staticRad = 70 if 'wlp' in self.fitsFilenames[0].lower() else 3
+        if aper_rad is None:
+            staticRad = 70 if 'wlp' in self.fits_names[0].lower() else 3
             """
-            if 'wlp' in self.fitsFilenames[0].lower():
+            if 'wlp' in self.fits_names[0].lower():
                 staticRad = 70
             else:
                 staticRad = 3
             """
 
-        y_centers = self.centering_df[centering + '_Y_Centers']
-        x_centers = self.centering_df[centering + '_X_Centers']
-        centering_Use = np.transpose([y_centers, x_centers])
+        ycenters = self.centering_df[centering + '_ycenters']
+        xcenters = self.centering_df[centering + '_xcenters']
+        centering_Use = np.transpose([ycenters, xcenters])
 
         background_Use = self.background_df[background]
 
-        flux_key_now = f"{centering}_{background}_rad_{aperRad}"
+        flux_key_now = f"{centering}_{background}_rad_{aper_rad}"
 
-        if flux_key_now not in self.flux_TSO_df.keys() or useTheForce:
+        if flux_key_now not in self.flux_tso_df.keys() or useTheForce:
             self.helper_flux_over_time(
-                aperRad=aperRad,
+                aper_rad=aper_rad,
                 flux_key=flux_key_now,
                 centers=centering_Use,
                 backgrounds=background_Use
             )
             """
-            flux_TSO_now = np.zeros(self.nFrames)
-            noise_TSO_now = np.zeros(self.nFrames)
+            flux_tso_now = np.zeros(self.n_frames)
+            noise_tso_now = np.zeros(self.n_frames)
 
             progress_frames = self.tqdm(
-                range(self.nFrames),
-                desc='Flux',
+                range(self.n_frames),
+                desc='flux',
                 leave=False,
-                total=self.nFrames
+                total=self.n_frames
             )
             for kf in progress_frames:
-                frameNow = np.copy(self.imageCube[kf]) - background_Use[kf]
-                frameNow[np.isnan(frameNow)] = np.nanmedian(frameNow)
+                frame_now = np.copy(self.image_cube[kf]) - background_Use[kf]
+                frame_now[np.isnan(frame_now)] = np.nanmedian(frame_now)
 
-                noiseNow = np.copy(self.noiseCube[kf])**2.
-                noiseNow[np.isnan(noiseNow)] = np.nanmedian(noiseNow)
+                noise_now = np.copy(self.noise_cube[kf])**2.
+                noise_now[np.isnan(noise_now)] = np.nanmedian(noise_now)
 
-                x_center_ = centering_Use[kf][self.x]
-                y_center_ = centering_Use[kf][self.y]
-                aperture = CircularAperture([x_center_, y_center_], r=aperRad)
+                xcenter_ = centering_Use[kf][self.x]
+                ycenter_ = centering_Use[kf][self.y]
+                aperture = CircularAperture([xcenter_, ycenter_], r=aper_rad)
 
-                flux_TSO_now[kf] = aperture_photometry(
-                    frameNow, aperture
+                flux_tso_now[kf] = aperture_photometry(
+                    frame_now, aperture
                 )['aperture_sum']
-                noise_TSO_now[kf] = np.sqrt(
+                noise_tso_now[kf] = np.sqrt(
                     aperture_photometry(
-                        noiseNow,
+                        noise_now,
                         aperture
                     )['aperture_sum']
                 )
 
-            self.flux_TSO_df[flux_key_now] = flux_TSO_now
-            self.noise_TSO_df[flux_key_now] = noise_TSO_now
+            self.flux_tso_df[flux_key_now] = flux_tso_now
+            self.noise_tso_df[flux_key_now] = noise_tso_now
             """
         else:
             print(
@@ -2113,8 +2117,8 @@ class Wanderer(object):
                 'if you want to overwrite, then you `useTheForce=True`'
             )
 
-    def compute_flux_over_time_over_aperRad(
-            self, aperRads=None, centering_choices=None,
+    def compute_flux_over_time_over_aper_rad(
+            self, aper_rads=None, centering_choices=None,
             background_choices=None, useTheForce=False, verbose=False):
         """Class methods are similar to regular functions.
 
@@ -2132,27 +2136,27 @@ class Wanderer(object):
 
         ppm = 1e6
         start = time()
-        for bgNow in background_choices:
-            for ctrNow in centering_choices:
-                for aperRad in aperRads:
+        for bg_now in background_choices:
+            for ctr_now in centering_choices:
+                for aper_rad in aper_rads:
                     if verbose:
                         print(
-                            f'Working on Background {bgNow} '
-                            f'with Centering {ctrNow} and AperRad {aperRad}',
+                            f'Working on Background {bg_now} '
+                            f'with Centering {ctr_now} and AperRad {aper_rad}',
                             end=" ",
                         )
 
                     self.compute_flux_over_time(
-                        aperRad=aperRad,
-                        centering=ctrNow,
-                        background=bgNow,
+                        aper_rad=aper_rad,
+                        centering=ctr_now,
+                        background=bg_now,
                         useTheForce=useTheForce
                     )
 
-                    flux_key_now = f"{ctrNow}_{bgNow}_rad_{aperRad}"
+                    flux_key_now = f"{ctr_now}_{bg_now}_rad_{aper_rad}"
 
                     if verbose:
-                        flux_now = self.flux_TSO_df[flux_key_now]
+                        flux_now = self.flux_tso_df[flux_key_now]
                         print(
                             np.nanstd(flux_now / np.nanmedian(flux_now)) * ppm
                         )
@@ -2160,7 +2164,7 @@ class Wanderer(object):
         print('Operation took: ', time()-start)
 
     def mp_compute_flux_over_time(
-            self, aperRad=3.0, centering='GaussianFit',
+            self, aper_rad=3.0, centering='GaussianFit',
             background='AnnularMask', useTheForce=False):
         """Class methods are similar to regular functions.
 
@@ -2184,41 +2188,41 @@ class Wanderer(object):
             )
 
         centering_options = [
-            'Gaussian_Fit', 'Gaussian_Mom', 'FluxWeighted', 'LeastAsymmetry'
+            'gaussian_fit', 'gaussian_mom', 'fluxweighted', 'least_asym'
         ]
         if centering not in centering_options:
             raise ValueError(
-                "`centering` must be either 'Gaussian_Fit', 'Gaussian_Mom', "
-                "'FluxWeighted', or 'LeastAsymmetry'"
+                "`centering` must be either 'gaussian_fit', 'gaussian_mom', "
+                "'fluxweighted', or 'least_asym'"
             )
 
-        y_center_ = self.centering_df[centering + '_Y_Centers']
-        x_center_ = self.centering_df[centering + '_X_Centers']
-        centering_Use = np.transpose([y_center_, x_center_])
+        ycenter_ = self.centering_df[centering + '_ycenters']
+        xcenter_ = self.centering_df[centering + '_xcenters']
+        centering_Use = np.transpose([ycenter_, xcenter_])
 
         background_Use = self.background_df[background]
 
-        flux_key_now = f"{centering}_{background}_rad_{aperRad}"
+        flux_key_now = f"{centering}_{background}_rad_{aper_rad}"
 
-        if flux_key_now not in self.flux_TSO_df.keys() or useTheForce:
-            # for kf in self.tqdm(range(self.nFrames), desc='Flux', leave = False, total=self.nFrames):
+        if flux_key_now not in self.flux_tso_df.keys() or useTheForce:
+            # for kf in self.tqdm(range(self.n_frames), desc='flux', leave = False, total=self.n_frames):
 
             # pool = Pool(self.num_cores)
 
-            func = partial(compute_flux_one_frame, aperRad=aperRad)
+            func = partial(compute_flux_one_frame, aper_rad=aper_rad)
 
-            fluxNow = pool_run_func(
-                func, zip(self.imageCube, centering_Use, background_Use)
+            flux_now = pool_run_func(
+                func, zip(self.image_cube, centering_Use, background_Use)
             )
 
             # pool.close()
             # pool.join()
 
-            # fluxNow[~np.isfinite(fluxNow)] = np.nanmedian(fluxNow[np.isfinite(fluxNow)])
-            # fluxNow[fluxNow < 0] = np.nanmedian(fluxNow[fluxNow > 0])
+            # flux_now[~np.isfinite(flux_now)] = np.nanmedian(flux_now[np.isfinite(flux_now)])
+            # flux_now[flux_now < 0] = np.nanmedian(flux_now[flux_now > 0])
 
-            self.flux_TSO_df[flux_key_now] = fluxNow
-            self.noise_TSO_df[flux_key_now] = np.sqrt(fluxNow)
+            self.flux_tso_df[flux_key_now] = flux_now
+            self.noise_tso_df[flux_key_now] = np.sqrt(flux_now)
 
         else:
             print(
@@ -2226,7 +2230,7 @@ class Wanderer(object):
                 'if you want to overwrite, then you `useTheForce=True`'
             )
 
-    def mp_compute_flux_over_time_varRad(self, staticRad, varRad=None, centering='Gaussian_Fit', background='AnnularMask', useTheForce=False):
+    def mp_compute_flux_over_time_varRad(self, staticRad, varRad=None, centering='gaussian_fit', background='AnnularMask', useTheForce=False):
         """Class methods are similar to regular functions.
 
         Note:
@@ -2249,20 +2253,20 @@ class Wanderer(object):
             )
 
         centering_options = [
-            'Gaussian_Fit',
-            'Gaussian_Mom',
-            'FluxWeighted',
-            'LeastAsymmetry'
+            'gaussian_fit',
+            'gaussian_mom',
+            'fluxweighted',
+            'least_asym'
         ]
         if centering not in centering_options:
             raise KeyError(
-                "`centering` must be either 'Gaussian_Fit', 'Gaussian_Mom', "
-                "'FluxWeighted', or 'LeastAsymmetry'"
+                "`centering` must be either 'gaussian_fit', 'gaussian_mom', "
+                "'fluxweighted', or 'least_asym'"
             )
 
-        y_center_ = self.centering_df[centering + '_Y_Centers']
-        x_center_ = self.centering_df[centering + '_X_Centers']
-        centering_Use = np.transpose([y_center_, x_center_])
+        ycenter_ = self.centering_df[centering + '_ycenters']
+        xcenter_ = self.centering_df[centering + '_xcenters']
+        centering_Use = np.transpose([ycenter_, xcenter_])
 
         background_Use = self.background_df[background]
 
@@ -2273,31 +2277,31 @@ class Wanderer(object):
         )
 
         if varRad is None or varRad == 0.0:
-            aperRads = [staticRad] * self.nFrames
+            aper_rads = [staticRad] * self.n_frames
         else:
             med_quad_rad_dist = np.nanmedian(self.quadrature_widths)
             quad_rad_dist = self.quadrature_widths.copy() - med_quad_rad_dist
-            quad_rad_dist = clipOutlier(quad_rad_dist, n_sig=5)
-            aperRads = staticRad + varRad*quad_rad_dist
+            quad_rad_dist = clip_outlier(quad_rad_dist, n_sig=5)
+            aper_rads = staticRad + varRad*quad_rad_dist
 
-        if flux_key_now not in self.flux_TSO_df.keys() or useTheForce:
-            # for kf in self.tqdm(range(self.nFrames), desc='Flux', leave = False, total=self.nFrames):
+        if flux_key_now not in self.flux_tso_df.keys() or useTheForce:
+            # for kf in self.tqdm(range(self.n_frames), desc='flux', leave = False, total=self.n_frames):
 
             # pool = Pool(self.num_cores)
 
             # func = partial(compute_flux_one_frame)
 
-            fluxNow = pool_run_func(compute_flux_one_frame,
-                                    zip(self.imageCube, centering_Use, background_Use, aperRads))
+            flux_now = pool_run_func(compute_flux_one_frame,
+                                     zip(self.image_cube, centering_Use, background_Use, aper_rads))
 
             # pool.close()
             # pool.join()
 
-            # fluxNow[~np.isfinite(fluxNow)] = np.nanmedian(fluxNow[np.isfinite(fluxNow)])
-            # fluxNow[fluxNow < 0] = np.nanmedian(fluxNow[fluxNow > 0])
+            # flux_now[~np.isfinite(flux_now)] = np.nanmedian(flux_now[np.isfinite(flux_now)])
+            # flux_now[flux_now < 0] = np.nanmedian(flux_now[flux_now > 0])
 
-            self.flux_TSO_df[flux_key_now] = fluxNow
-            self.noise_TSO_df[flux_key_now] = np.sqrt(fluxNow)
+            self.flux_tso_df[flux_key_now] = flux_now
+            self.noise_tso_df[flux_key_now] = np.sqrt(flux_now)
 
         else:
             print(
@@ -2305,8 +2309,8 @@ class Wanderer(object):
                 'if you want to overwrite, then you `useTheForce=True`'
             )
 
-    def mp_compute_flux_over_time_betaRad(
-            self, centering='Gaussian_Fit', background='AnnularMask',
+    def mp_compute_flux_over_time_beta_rad(
+            self, centering='gaussian_fit', background='AnnularMask',
             useQuad=False, useTheForce=False):
         """Class methods are similar to regular functions.
 
@@ -2330,17 +2334,17 @@ class Wanderer(object):
             )
 
         centering_options = [
-            'Gaussian_Fit', 'Gaussian_Mom', 'FluxWeighted', 'LeastAsymmetry'
+            'gaussian_fit', 'gaussian_mom', 'fluxweighted', 'least_asym'
         ]
         if centering not in centering_options:
             raise ValueError(
-                "`centering` must be either 'Gaussian_Fit', 'Gaussian_Mom', "
-                "'FluxWeighted', or 'LeastAsymmetry'"
+                "`centering` must be either 'gaussian_fit', 'gaussian_mom', "
+                "'fluxweighted', or 'least_asym'"
             )
 
-        y_center_ = self.centering_df[centering + '_Y_Centers']
-        x_center_ = self.centering_df[centering + '_X_Centers']
-        centering_Use = np.transpose([y_center_, x_center_])
+        ycenter_ = self.centering_df[centering + '_ycenters']
+        xcenter_ = self.centering_df[centering + '_xcenters']
+        centering_Use = np.transpose([ycenter_, xcenter_])
 
         background_Use = self.background_df[background]
 
@@ -2349,32 +2353,32 @@ class Wanderer(object):
         flux_key_now = flux_key_now + \
             '_quadRad_0.0_0.0' if useQuad else flux_key_now + '_betaRad_0.0_0.0'
 
-        if flux_key_now not in self.flux_TSO_df.keys() or useTheForce:
-            # for kf in self.tqdm(range(self.nFrames), desc='Flux', leave = False, total=self.nFrames):
+        if flux_key_now not in self.flux_tso_df.keys() or useTheForce:
+            # for kf in self.tqdm(range(self.n_frames), desc='flux', leave = False, total=self.n_frames):
             sig2FW = 2*np.sqrt(2*np.log(2))
 
-            aperRads = np.sqrt(self.effective_widths)
+            aper_rads = np.sqrt(self.effective_widths)
 
             if useQuad:
-                aperRads = sig2FW * self.quadrature_widths
+                aper_rads = sig2FW * self.quadrature_widths
 
             # pool = Pool(self.num_cores)
 
             # func = partial(compute_flux_one_frame)
 
-            fluxNow = pool_run_func(
+            flux_now = pool_run_func(
                 compute_flux_one_frame,
-                zip(self.imageCube, centering_Use, background_Use, aperRads)
+                zip(self.image_cube, centering_Use, background_Use, aper_rads)
             )
 
             # pool.close()
             # pool.join()
 
-            # fluxNow[~np.isfinite(fluxNow)] = np.nanmedian(fluxNow[np.isfinite(fluxNow)])
-            # fluxNow[fluxNow < 0] = np.nanmedian(fluxNow[fluxNow > 0])
+            # flux_now[~np.isfinite(flux_now)] = np.nanmedian(flux_now[np.isfinite(flux_now)])
+            # flux_now[flux_now < 0] = np.nanmedian(flux_now[flux_now > 0])
 
-            self.flux_TSO_df[flux_key_now] = fluxNow
-            self.noise_TSO_df[flux_key_now] = np.sqrt(fluxNow)
+            self.flux_tso_df[flux_key_now] = flux_now
+            self.noise_tso_df[flux_key_now] = np.sqrt(flux_now)
 
         else:
             print(
@@ -2382,7 +2386,7 @@ class Wanderer(object):
                 'if you want to overwrite, then you `useTheForce=True`'
             )
 
-    def extract_PLD_components(
+    def extract_pld_components(
             self, ycenter=None, xcenter=None, nCols=3, nRows=3, order=1):
         """Class methods are similar to regular functions.
 
@@ -2398,12 +2402,12 @@ class Wanderer(object):
 
         """
 
-        nPLDComp = nCols*nRows
+        n_pld_comp = nCols*nRows
 
         # nCols = nCols // 2 # User input assumes matrix structure, which starts at y- and x-center
         # nRows = nRows // 2 #   and moves +\- nRows/2 and nCols/2, respectively
 
-        img_shape = self.imageCube.shape[1:]
+        img_shape = self.image_cube.shape[1:]
         # nominally 15
         ycenter = int(ycenter) if ycenter is not None else img_shape[0]//2-1
         """
@@ -2426,24 +2430,24 @@ class Wanderer(object):
         xlower = xcenter - nCols // 2     # nominally 14
         xupper = xcenter + nCols // 2 + 1  # nominally 17 (to include 16)
 
-        imageSubCube = self.imageCube[:, ylower:yupper, xlower:xupper]
-        new_shape = self.imageCube.shape[0], nPLDComp
-        PLD_comps_local = imageSubCube.reshape(new_shape).T
+        image_sub_cube = self.image_cube[:, ylower:yupper, xlower:xupper]
+        new_shape = self.image_cube.shape[0], n_pld_comp
+        pld_comps_local = image_sub_cube.reshape(new_shape).T
 
-        PLD_norm = np.sum(PLD_comps_local, axis=0)
-        PLD_comps_local = PLD_comps_local / PLD_norm
+        pld_norm = np.sum(pld_comps_local, axis=0)
+        pld_comps_local = pld_comps_local / pld_norm
 
-        self.PLD_components = PLD_comps_local
-        self.PLD_norm = PLD_norm
+        self.pld_components = pld_comps_local
+        self.pld_norm = pld_norm
 
         if order > 1:
             for ord_ in range(2, order+1):
-                self.PLD_components = np.vstack(
-                    [self.PLD_components, PLD_comps_local**ord_]
+                self.pld_components = np.vstack(
+                    [self.pld_components, pld_comps_local**ord_]
                 )
 
-    def DBScan_Flux_All(
-            self, centering='gaussian', dbsClean=0, useTheForce=False):
+    def dbscan_flux_all(
+            self, centering='gaussian', dbs_clean=0, useTheForce=False):
         """Class methods are similar to regular functions.
 
         Note:
@@ -2473,23 +2477,23 @@ class Wanderer(object):
         ycenters = self.centering_GaussianFit.T[y]
         xcenters = self.centering_GaussianFit.T[x]
 
-        if not hasattr(self, 'inliers_Phots'):
-            self.inliers_Phots = {}
+        if not hasattr(self, 'inliers_phots'):
+            self.inliers_phots = {}
 
-        for flux_key_now in self.flux_TSO_df.keys():
+        for flux_key_now in self.flux_tso_df.keys():
 
-            phots = self.flux_TSO_df[flux_key_now]
+            phots = self.flux_tso_df[flux_key_now]
 
-            if flux_key_now not in self.inliers_Phots.keys() or useTheForce:
-                self.inliers_Phots[flux_key_now] = DBScan_Segmented_Flux(
-                    phots, ycenters, xcenters, dbsClean=dbsClean)
+            if flux_key_now not in self.inliers_phots.keys() or useTheForce:
+                self.inliers_phots[flux_key_now] = dbscan_segmented_flux(
+                    phots, ycenters, xcenters, dbs_clean=dbs_clean)
             else:
                 print(
                     f'{flux_key_now} exists: '
                     'if you want to overwrite, then you `useTheForce=True`'
                 )
 
-    def mp_DBScan_Flux_All(self, centering='gaussian', dbsClean=0):
+    def mp_dbscan_flux_all(self, centering='gaussian', dbs_clean=0):
         """Class methods are similar to regular functions.
 
         Note:
@@ -2518,31 +2522,31 @@ class Wanderer(object):
         ycenters = self.centering_GaussianFit.T[self.y]
         xcenters = self.centering_GaussianFit.T[self.x]
 
-        if not hasattr(self, 'inliers_Phots'):
-            self.inliers_Phots = {}
+        if not hasattr(self, 'inliers_phots'):
+            self.inliers_phots = {}
 
         # This starts the multiprocessing call to arms
         # pool = Pool(self.num_cores)
 
         func = partial(
-            DBScan_Flux,
+            dbscan_flux,
             ycenters=ycenters,
             xcenters=xcenters,
-            dbsClean=dbsClean
+            dbs_clean=dbs_clean
         )
 
         # the order is very important
-        inliersMP = pool_run_func(func, zip(self.flux_TSO_df.values.T))
+        inliers_mp = pool_run_func(func, zip(self.flux_tso_df.values.T))
 
         # pool.close()
         # pool.join()
 
-        for k_mp, flux_key_now in enumerate(self.flux_TSO_df.keys()):
-            self.inliers_Phots[flux_key_now] = inliersMP[k_mp]
+        for k_mp, flux_key_now in enumerate(self.flux_tso_df.keys()):
+            self.inliers_phots[flux_key_now] = inliers_mp[k_mp]
 
-    def mp_DBScan_PLD_All(self, dbsClean=0):
+    def mp_dbscan_pld_all(self, dbs_clean=0):
         raise NotImplementedError(
-            'This Function is Not Working; please use lame_`DBScan_PLD_all`'
+            'This Function is Not Working; please use lame_`dbscan_pld_all`'
         )
         """Class methods are similar to regular functions.
 
@@ -2558,24 +2562,24 @@ class Wanderer(object):
 
         """
 
-        if not hasattr(self, "inliers_PLD"):
-            self.inliers_PLD = np.ones(self.PLD_components.shape, dtype=bool)
+        if not hasattr(self, "inliers_pld"):
+            self.inliers_pld = np.ones(self.pld_components.shape, dtype=bool)
 
         # This starts the multiprocessing call to arms
         # pool = Pool(self.num_cores)
 
-        func = partial(DBScan_Segmented_Flux, dbsClean=dbsClean)
+        func = partial(dbscan_segmented_flux, dbs_clean=dbs_clean)
 
         # the order is very important
-        inliersMP = pool_run_func(func, zip(self.PLD_components.T))
+        inliers_mp = pool_run_func(func, zip(self.pld_components.T))
 
         # pool.close()
         # pool.join()
 
-        for k_mp, inlier in enumerate(inliersMP):
-            self.inliers_PLD[k_mp] = inlier
+        for k_mp, inlier in enumerate(inliers_mp):
+            self.inliers_pld[k_mp] = inlier
 
-    def mp_DBScan_PLD_All(self, dbsClean=0):
+    def mp_dbscan_pld_all(self, dbs_clean=0):
         """Class methods are similar to regular functions.
 
         Note:
@@ -2590,8 +2594,8 @@ class Wanderer(object):
 
         """
 
-        if not hasattr(self, "inliers_PLD"):
-            self.inliers_PLD = np.ones(self.PLD_components.shape, dtype=bool)
+        if not hasattr(self, "inliers_pld"):
+            self.inliers_pld = np.ones(self.pld_components.shape, dtype=bool)
 
-        for kPLD, PLDnow in enumerate(self.PLD_components):
-            self.inliers_PLD[kPLD] = DBScan_PLD(PLDnow, dbsClean=dbsClean)
+        for kpld, pldnow in enumerate(self.pld_components):
+            self.inliers_pld[kpld] = dbscan_pld(pldnow, dbs_clean=dbs_clean)
