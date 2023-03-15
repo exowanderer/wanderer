@@ -1,5 +1,12 @@
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
+
+from plotly import graph_objs as go
+from time import time
+
+# from statsmodels.robust import scale
+
+import os
 import scipy as sp
 
 from argparse import ArgumentParser
@@ -26,7 +33,7 @@ from statsmodels.nonparametric import kde
 y, x = 0, 1
 
 '''
-Start: From least_asymmetry.asym by N.Lust 
+Start: From least_asymmetry.asym by N.Lust
 (github.com/natelust/least_asymmetry) and modified (reversed XY -> YX)
 '''
 
@@ -37,7 +44,7 @@ class WandererCLI:
     channel: str = None
     aor_dir: str = None
     planets_dir: str = './'
-    save_sub_dir: str = 'ExtracedData'
+    save_sub_dir: str = 'ExtractedData'
     data_sub_dir: str = '/data/raw/'
     data_tail_dir: str = ''
     fits_format: str = 'bcd'
@@ -61,7 +68,7 @@ def command_line_inputs(check_defaults=True):
                     help='AOR director (i.e. r11235813).')
     ap.add_argument('-pd', '--planets_dir', type=str, default='./',
                     help='Location of planet directory name from $HOME.')
-    ap.add_argument('-sd', '--save_sub_dir', type=str, default='ExtracedData',
+    ap.add_argument('-sd', '--save_sub_dir', type=str, default='ExtractedData',
                     help='Subdirectory inside Planet_Directory to '
                     'store extracted outputs.'
                     )
@@ -135,6 +142,472 @@ def convert_args_to_dataclass(args, check_defaults=True):
             'Please call command line with `-ad` or `--aor_dir`'
 
     return clargs
+
+
+def plotly_scattergl_flux_over_time(
+        wanderer, normalise=True, n_sig=3, data_config=None, y_range=None,
+        width=1800, height=1000, margins=None):
+
+    if margins is None:
+        margins = {'l': 20, 'r': 20, 't': 50, 'b': 20}
+
+    times = wanderer.time_cube
+    fluxs = wanderer.flux_tso_df
+
+    if normalise:
+        for colname in fluxs.columns:
+            fluxs[colname] = fluxs[colname] / np.median(fluxs[colname])
+
+    title = ''
+    if data_config is not None:
+        title = f'{data_config.planet_name} {data_config.aor_dir}'
+        title = f'{title} Flux over Time'
+
+    if y_range is None and normalise:
+        med_flux = fluxs.median()
+        std_flux = fluxs.std()
+        y_range = [
+            ((med_flux[colname] - n_sig * std_flux[colname]).min(),
+             (med_flux[colname] + n_sig * std_flux[colname]).max())
+            for colname in med_flux.index
+        ]
+
+        y_range = np.median(y_range, axis=0)
+
+        # y_range = (
+        #     (med_flux - n_sig * std_flux).min(),
+        #     (med_flux + n_sig * std_flux).max()
+        # )
+
+    if normalise:
+        fluxs = fluxs / med_flux
+        fluxs_inliers = fluxs[np.abs(fluxs - med_flux) < n_sig * std_flux]
+    else:
+        fluxs_inliers = fluxs.copy()
+
+    plots = [
+        go.Scattergl(
+            x=times,
+            y=fluxs[colname] / fluxs[colname].median(),
+            mode='markers',
+            # name=colname.replace('gaussian_fit_annular_mask_rad_', '')
+            marker={'color': fluxs_inliers[colname]-1, 'colorscale':'plasma'},
+        )
+        for colname in wanderer.flux_tso_df.columns
+    ]
+
+    fig = go.Figure(data=plots)
+    fig.update_layout(
+        title=title,
+        yaxis={'range': y_range},
+        width=width,
+        height=height,
+        margin=margins,
+        plot_bgcolor='rgba(255, 255, 255, 1)',
+        paper_bgcolor='rgba(255, 255, 255, 1)'
+    )
+    fig.show()
+
+
+def compute_x_range_dict(ycenters, xcenters, n_sig):
+    med_ycenter = ycenters.median()
+    std_ycenter = ycenters.std()
+
+    med_xcenter = xcenters.median()
+    std_xcenter = xcenters.std()
+
+    y_x_range = (
+        (med_ycenter - n_sig * std_ycenter),
+        (med_ycenter + n_sig * std_ycenter)
+    )
+    x_x_range = (
+        (med_xcenter - n_sig * std_xcenter),
+        (med_xcenter + n_sig * std_xcenter)
+    )
+
+    return {'y': y_x_range, 'x': x_x_range}
+
+
+def plotly_scattergl_flux_vs_centers1D(
+        wanderer, centering='fluxweighted', normalise=True, n_sig=3, fmt='-',
+        y_range=None, x_range=None, data_config=None, colorscale='plasma',
+        width=1600, height=1000, margins=None):
+
+    if margins is None:
+        margins = {'l': 20, 'r': 20, 't': 50, 'b': 20}
+
+    if (not isinstance(x_range, dict)
+            or 'y' not in x_range
+            or 'x' not in x_range):
+        x_range = None
+
+    title = ''
+    if data_config is not None:
+        title = f'{data_config.planet_name} {data_config.aor_dir}'
+        title = f'{title} Flux vs Centers in 1D'
+
+    ycenters = wanderer.centering_df[f'{centering}_ycenters'].copy()
+    xcenters = wanderer.centering_df[f'{centering}_xcenters'].copy()
+    fluxs = wanderer.flux_tso_df.copy()
+
+    med_flux = fluxs.median()
+    if normalise:
+        fluxs = fluxs / med_flux
+
+    if y_range is None and normalise:
+        med_flux = fluxs.median()
+        std_flux = fluxs.std()
+        y_range = (
+            (med_flux - n_sig * std_flux).median(),
+            (med_flux + n_sig * std_flux).median()
+        )
+
+    if x_range is None and normalise:
+        x_range = compute_x_range_dict(ycenters, xcenters, n_sig)
+
+    if normalise:
+        fluxs = fluxs / med_flux
+        fluxs_inliers = fluxs[np.abs(fluxs - med_flux) < n_sig * std_flux]
+    else:
+        fluxs_inliers = fluxs.copy()
+
+    # plasma_generator = gen_base(plasma)
+    plots = [
+        go.Scattergl(
+            x=ycenters,
+            y=fluxs_inliers[colname],
+            mode='markers',
+            name=colname.replace('gaussian_fit_annular_mask_rad_', ''),
+            # marker=dict(color=next(plasma_generator)),
+            marker={'color': fluxs_inliers[colname]-1, 'colorscale':'plasma'},
+            # xaxis="x",
+            # yaxis="y",
+        )
+        for colname in wanderer.flux_tso_df.columns
+    ]
+    """
+    data = [
+        go.Scattergl(
+            y=fluxs_inliers[colname]-1,
+            name=colname.replace('gaussian_fit_annular_mask_rad_',''),
+            mode='markers',
+            marker={'color':fluxs_inliers[colname]-1, 'colorscale':'plasma'}
+        )
+        for colname in wanderer.flux_tso_df.columns
+    ]
+    """
+    # plasma_generator = gen_base(plasma)
+    plots.extend([
+        go.Scattergl(
+            x=xcenters,
+            y=fluxs_inliers[colname],
+            mode='markers',
+            name=colname.replace('gaussian_fit_annular_mask_rad_', ''),
+            # marker=dict(color=next(plasma_generator)),
+            marker={'color': fluxs_inliers[colname] - \
+                    1, 'colorscale':colorscale},
+            xaxis="x2",
+            yaxis="y2",
+        )
+        for colname in wanderer.flux_tso_df.columns
+    ])
+
+    layout = go.Layout(
+        title=title,
+        xaxis={'range': x_range['y'], 'showgrid': False, 'title': 'y'},
+        xaxis2={'range': x_range['x'], 'showgrid': False, 'title': 'x'},
+        yaxis={
+            'domain': [0, 0.48],
+            'range': y_range,
+            'showgrid': False
+        },
+        yaxis2={
+            'domain': [0.51, 0.98],
+            'anchor': 'x2',
+            'range': y_range,
+            'showgrid': False
+        },
+        width=width,
+        height=height,
+        margin=margins,
+        plot_bgcolor='rgba(255, 255, 255, 1)',
+        paper_bgcolor='rgba(255, 255, 255, 1)'
+    )
+
+    fig = go.Figure(data=plots, layout=layout)
+    fig.show()
+
+
+def plotly_scattergl_flux_vs_centers2D(
+        wanderer, centering='fluxweighted', normalise=True, n_sig=3, fmt='-',
+        y_range=None, x_range=None, data_config=None, columns=None,
+        colorscale='plasma', width=1600, height=1000, margins=None):
+
+    if margins is None:
+        margins = {'l': 20, 'r': 20, 't': 50, 'b': 20}
+
+    if columns is None:
+        columns = wanderer.flux_tso_df.columns
+
+    if (not isinstance(x_range, dict)
+            or 'y' not in x_range
+            or 'x' not in x_range):
+        x_range = None
+
+    title = ''
+    if data_config is not None:
+        title = f'{data_config.planet_name} {data_config.aor_dir}'
+        title = f'{title} Flux vs Centers in 2D'
+
+    ycenters = wanderer.centering_df[f'{centering}_ycenters'].copy()
+    xcenters = wanderer.centering_df[f'{centering}_xcenters'].copy()
+    fluxs = wanderer.flux_tso_df.copy()
+
+    med_flux = fluxs.median()
+    if normalise:
+        fluxs = fluxs / med_flux
+
+    if y_range is None and normalise:
+        med_flux = fluxs.median()
+        std_flux = fluxs.std()
+        y_range = (
+            (med_flux - n_sig * std_flux).median(),
+            (med_flux + n_sig * std_flux).median()
+        )
+
+    if x_range is None and normalise:
+        x_range = compute_x_range_dict(ycenters, xcenters, n_sig)
+
+    if normalise:
+        fluxs = fluxs / med_flux
+        fluxs_inliers = fluxs[np.abs(fluxs - med_flux) < n_sig * std_flux]
+    else:
+        fluxs_inliers = fluxs.copy()
+
+    # plasma_generator = gen_base(plasma)
+    plots = [
+        # Plot the centring positions with flux coloring
+        go.Scattergl(
+            x=xcenters,
+            y=ycenters,
+            mode='markers',
+            name=colname.replace('gaussian_fit_annular_mask_rad_', ''),
+            # marker=dict(color=next(plasma_generator)),
+            marker={
+                'color': fluxs_inliers[colname] - 1,
+                'colorscale':colorscale
+            },
+            xaxis="x",
+            yaxis="y",
+        )
+        for colname in columns
+    ]
+    """
+    data = [
+        go.Scattergl(
+            y=fluxs_inliers[colname]-1,
+            name=colname.replace('gaussian_fit_annular_mask_rad_',''),
+            mode='markers',
+            marker={'color':fluxs_inliers[colname]-1, 'colorscale':'plasma'}
+        )
+        for colname in wanderer.flux_tso_df.columns
+    ]
+    """
+    plots.append(
+        # KDE Plot for Y-centers on Right Subplot
+        go.Violin(
+            y=ycenters,
+            line={
+                'color': 'rgb(70, 3, 159, 1.0)',
+                'width': 2
+            },
+            name='Y-Centers',
+            xaxis="x2",
+            yaxis="y",
+            side='positive'
+        )
+    )
+    plots.append(
+        # KDE Plot for X-centers on Upper Subplot
+        go.Violin(
+            x=xcenters,
+            line={
+                'color': 'rgb(70, 3, 159, 1.0)',
+                'width': 2
+            },
+            name='X-Centers',
+            xaxis="x",
+            yaxis="y3",
+            side='positive'
+        )
+    )
+
+    layout = go.Layout(
+        title=title,
+        xaxis={'domain': [0, 0.88], 'showgrid': False, 'range': x_range['x']},
+        xaxis2={'domain':  [0.9, 1], 'showgrid': False},
+        # , 'range': x_range['x']},
+        xaxis3={'domain': [0, 0.88], 'showgrid': False},
+        # , 'range': x_range['x']},
+        yaxis={'domain': [0, 0.88], 'showgrid': False, 'range': x_range['y']},
+        yaxis2={'domain': [0, 0.88], 'showgrid': False},
+        # , 'range': x_range['y']},
+        yaxis3={'domain': [0.9, 1], 'showgrid': False},
+        # , 'range': x_range['y']},
+
+        width=width,
+        height=height,
+        margin=margins,
+
+        plot_bgcolor='rgba(255, 255, 255, 1)',
+        paper_bgcolor='rgba(255, 255, 255, 1)'
+    )
+
+    fig = go.Figure(data=plots, layout=layout)
+    fig.show()
+
+
+def plotly_surface3D_plot_centers_vs_flux(
+        wanderer, normalise=True, n_sig=3, fmt='-', y_range=None, x_range=None,
+        columns=None, centering='fluxweighted', colorscale='plasma',
+        width=1600, height=1000, margins=None):
+
+    if margins is None:
+        margins = {'l': 20, 'r': 20, 't': 50, 'b': 20}
+
+    if columns is None:
+        column = wanderer.flux_tso_df.columns[0]
+
+    if (not isinstance(x_range, dict)
+            or 'y' not in x_range
+            or 'x' not in x_range):
+        x_range = None
+
+    ycenters = wanderer.centering_df[f'{centering}_ycenters'].copy()
+    xcenters = wanderer.centering_df[f'{centering}_xcenters'].copy()
+    fluxs = wanderer.flux_tso_df.copy()
+
+    med_flux = fluxs.median()
+    if normalise:
+        fluxs = fluxs / med_flux
+
+    if y_range is None and normalise:
+        med_flux = fluxs.median()
+        std_flux = fluxs.std()
+        y_range = (
+            (med_flux - n_sig * std_flux).median(),
+            (med_flux + n_sig * std_flux).median()
+        )
+
+    if x_range is None and normalise:
+        x_range = compute_x_range_dict(ycenters, xcenters, n_sig)
+
+    if normalise:
+        fluxs = fluxs / med_flux
+        fluxs_inliers = fluxs[np.abs(fluxs - med_flux) < n_sig * std_flux]
+    else:
+        fluxs_inliers = fluxs.copy()
+
+    fig = go.Figure(
+        data=[
+            go.Surface(
+                x=xcenters,
+                y=ycenters,
+                z=fluxs_inliers[column]
+            )
+        ]
+    )
+
+    fig.update_traces(
+        contours_z=dict(
+            show=True,
+            usecolormap=True,
+            highlightcolor="limegreen",
+            project_z=True
+        )
+    )
+
+    fig.update_layout(
+        title=column,
+        autosize=False,
+        scene_camera_eye=dict(x=1.87, y=0.88, z=-0.64),
+        width=height,
+        height=height,
+        margin=dict(l=65, r=50, b=65, t=90)
+    )
+
+    fig.show()
+
+
+def grab_dir_and_filenames(data_config, fits_format='bcd', unc_format='bunc'):
+    """
+    loadfiledir_parts = [
+        data_config.planets_dir,
+        data_config.save_sub_dir,
+        data_config.channel,
+        data_config.aor_dir
+    ]
+
+    print('Accessing stored file directory')
+    loadfiledir = ''
+    for sfpart in loadfiledir_parts:
+        loadfiledir = os.path.join(loadfiledir, sfpart)
+        assert (os.path.exists(loadfiledir))
+    """
+
+    print(
+        '\n\n**Initializing Master Class for '
+        'Exoplanet Time Series Observation Photometry**\n\n'
+    )
+
+    data_dir = data_config.data_dir
+    if data_dir is None:
+        data_dir = os.path.join(
+            data_config.planets_dir,
+            data_config.data_sub_dir,
+            data_config.channel,
+            data_config.data_tail_dir
+        )
+
+    print(f'Current Data Dir: {data_dir}')
+
+    fileExt = f'*{fits_format}.fits'
+    uncsExt = f'*{unc_format}.fits'
+
+    fits_file_dir = os.path.join(
+        data_dir,
+        data_config.aor_dir,
+        data_config.channel,
+        data_config.fits_format,
+        ''  # need ending in /
+    )
+
+    print(f'Directory to load fits files from: {fits_file_dir}')
+
+    fitsFilenames = glob(fits_file_dir + fileExt)
+    uncsFilenames = glob(fits_file_dir + uncsExt)
+
+    n_fitsfiles = len(fitsFilenames)
+    n_uncfiles = len(uncsFilenames)
+    print(f'Found {n_fitsfiles} {fits_format}.fits files')
+    print(f'Found {n_uncfiles} unc.fits files')
+
+    if len(fitsFilenames) == 0:
+        raise ValueError(
+            f'There are NO `{fits_format}.fits` files '
+            f'in the directory {fits_file_dir}'
+        )
+    if len(uncsFilenames) == 0:
+        raise ValueError(
+            f'There are NO `{unc_format}.fits` files '
+            f'in the directory {fits_file_dir}'
+        )
+
+    # do_db_scan = False  # len(fitsFilenames*64) < 6e4
+    # if not do_db_scan:
+    #     print('There are too many images for a DB-Scan; i.e. >1e5 images')
+
+    return fits_file_dir, fitsFilenames, uncsFilenames
 
 
 def pool_run_func(func, zipper, num_cores=cpu_count()-1):
@@ -449,7 +922,7 @@ def get_julian_date_from_header(header):
     return start_date, end_date
 
 
-def clipOutlier(vector, n_sig=8):
+def clip_outlier(vector, n_sig=8):
     """Class methods are similar to regular functions.
 
     Note:
@@ -472,7 +945,7 @@ def clipOutlier(vector, n_sig=8):
     return vector
 
 
-def clipOutlier2D(arr2d, n_sig=10):
+def clip_outlier2D(arr2d, n_sig=10):
     arr2d = arr2d.copy()
     medArr2D = np.nanmedian(arr2d, axis=0)
     sclArr2D = np.sqrt(((scale.mad(arr2d)**2.).sum()))
@@ -831,7 +1304,7 @@ def fit_one_center(
     if method == 'gaussian':
         # , xinds, yinds, np.copy(cmom)) # H, Xc, Yc, Xs, Ys, Th, O
         return fitgaussian(sub_frame_now)
-    if method == 'flux_weighted':
+    if method == 'fluxweighted':
         return flux_weighted_centroid(
             image,
             image.shape[y]//2,
@@ -1299,7 +1772,7 @@ def dbscan_segmented_pld(
     return dbs_pld_pred == dbs_clean
 
 
-def cross_correlation_HST_diff_NDR():
+def cross_correlation_hst_diff_ndr():
     # Cross correlated the differential non-destructive reads
     #   from HST Scanning mode with WFC3 and G141
     fitsfiles = glob("*ima*fits")

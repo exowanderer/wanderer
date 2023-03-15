@@ -286,7 +286,7 @@ print(
     'Image Cubes and the Storage Dictionary'
 )
 
-save_name_header = f'{planet_name}_{aor_dir}_Median'
+save_name_header = f'{planet_name}_{aor_dir}_median'
 save_file_type = '.joblib.save'
 
 path_to_files = os.path.join(

@@ -1,7 +1,6 @@
 # Wanderer for Exoplanet Time Series Observation Photometry
 
-Planetai (πλανῆται) is Greek for "Wanderers".  Moreover, Spitzer wobble makes the PSF "wandere" across the detector, which we have to tack precisely here.
-
+Planetai (πλανῆται) is Greek for "Wanderers". Moreover, Spitzer wobble makes the PSF "wandere" across the detector, which we have to tack precisely here.
 
 ```python
 from wanderer import wanderer
@@ -54,19 +53,21 @@ loadfitsdir = dataDir + AORNow + '/' + channel + '/' + dataSub
 print(loadfitsdir) # just to make sure this [directory] means what you think it means
 ```
 
-
 Set to max for multiprocessing: use cpu_count() - 1 if you want to use your computer at the same time.
+
 ```python
 nCores = cpu_count()
 ```
 
 Check that the files exist in the directory by printing out the number of each file (unc = uncertainty)
+
 ```python
 fitsFilenames = glob(loadfitsdir + fileExt);print(len(fitsFilenames))
 uncsFilenames = glob(loadfitsdir + uncsExt);print(len(uncsFilenames))
 ```
 
 Check the first header in the list of files to make sure it's the data you were expecting
+
 ```python
 header_test = fits.getheader(fitsFilenames[0])
 print('AORLABEL:\t{}\nNum Fits Files:\t{}\nNum Unc Files:\t{}'.format\
@@ -75,8 +76,8 @@ print('AORLABEL:\t{}\nNum Fits Files:\t{}\nNum Unc Files:\t{}'.format\
 
 # Load Wanderer Class
 
-Necessary Constants Spitzer (subarray with 32x32 pixels; center = 15,15)
----
+## Necessary Constants Spitzer (subarray with 32x32 pixels; center = 15,15)
+
 ```python
 ppm             = 1e6
 y,x             = 0,1
@@ -85,20 +86,19 @@ yguess, xguess  = 15., 15.   # Specific to Spitzer circa 2010 and beyond
 filetype        = 'bcd.fits' # Specific to Spitzer Basic Calibrated Data
 ```
 
-Start a New Instance with Median for the Metric
----
+## Start a New Instance with Median for the Metric
+
 ```python
 method = 'median'
 
 print('Initialize an instance of `wanderer` as `example_wanderer_median`\n')
-example_wanderer_median = wanderer(fitsFileDir=loadfitsdir, filetype=filetype, telescope='Spitzer', 
+example_wanderer_median = wanderer(fitsFileDir=loadfitsdir, filetype=filetype, telescope='Spitzer',
                                             yguess=yguess, xguess=xguess, method=method, nCores=nCores)
 
 example_wanderer_median.AOR        = AORNow
 example_wanderer_median.planetName = planetName
 example_wanderer_median.channel    = channel
 ```
-
 
 ```python
 print('Load Data From Fits Files in ' + loadfitsdir + '\n')
@@ -107,14 +107,12 @@ example_wanderer_median.spitzer_load_fits_file(outputUnits='electrons')#(outputU
 
 **Double check for NaNs**
 
-
 ```python
 example_wanderer_median.imageCube[np.where(isnan(example_wanderer_median.imageCube))] = \
                                                     np.nanmedian(example_wanderer_median.imageCube)
 ```
 
 **Identifier Strong Outliers**
-
 
 ```python
 print('Find, flag, and NaN the "Bad Pixels" Outliers' + '\n')
@@ -137,6 +135,7 @@ print('Operation took {} seconds with {} cores'.format(time()-start, example_wan
 ```
 
 Compute the sigma-clipping outliers for plotting purpose
+
 ```python
 nSig       = 10.1
 medY       = median(example_wanderer_median.centering_GaussianFit.T[y])
@@ -151,6 +150,7 @@ outliers   = (((example_wanderer_median.centering_GaussianFit.T[y] - medY)/(ySig
 ```
 
 Plot the inliers (blue) vs outliers (not blue)
+
 ```python
 ax = figure().add_subplot(111)
 cx, cy = example_wanderer_median.centering_GaussianFit.T[x],example_wanderer_median.centering_GaussianFit.T[y]
@@ -162,18 +162,19 @@ ax.set_ylim(medY-nSig*stdY,medY+nSig*stdY)
 ```
 
 Use advanced clustering algorithms (DBSCAN) to determine the inliers vs outliers
+
 ```python
 dbs     = DBSCAN(n_jobs=-1, eps=0.2, leaf_size=10)
 dbsPred = dbs.fit_predict(example_wanderer_median.centering_GaussianFit)
 ```
 
-Check over the clusteres to see the population of each 
+Check over the clusteres to see the population of each
+
 ```python
 dbs_options = [k for k in range(-1,100) if (dbsPred==k).sum()]
 ```
 
 Plot the full extent of the data to show that DBSCAN was able to identify the inliers correctly
-
 
 ```python
 fig = figure(figsize=(6,6))
@@ -196,7 +197,6 @@ for dbsOpt in dbs_options:
 
 Make sure that there are only a handful (<< 1%) of outliers
 
-
 ```python
 npix = 3
 
@@ -206,12 +206,10 @@ print(len(stillOutliers))
 
 Select the "class" dbsClean == 0 for the `inliers`
 
-
 ```python
 dbsClean  = 0
 dbsKeep   = (dbsPred == dbsClean)
 ```
-
 
 ```python
 nCores = example_wanderer_median.nCores
@@ -221,7 +219,6 @@ print('AnnularBG took {} seconds with {} cores'.format(time() - start, nCores))
 ```
 
 Plot the background to make sure that the (to be subtracted) flux is stable overtime
-
 
 ```python
 fig = figure(figsize=(20,10))
@@ -236,19 +233,16 @@ ax.set_ylim(-25,100)
 
 Compute the `effective widths` of each image to use later as the "beta pixels" and "optimal apertures"
 
-
 ```python
 example_wanderer_median.measure_effective_width()
 print(example_wanderer_median.effective_widths.mean(), sqrt(example_wanderer_median.effective_widths).mean())
 ```
-
 
 ```python
 print('Pipeline took {} seconds thus far'.format(time() - startFull))
 ```
 
 Compute the time series with static aperture radii only
-
 
 ```python
 print('Iterating over Background Techniques, Centering Techniques, Aperture Radii' + '\n')
@@ -262,11 +256,9 @@ for staticRad in tqdm_notebook(staticRads, total=len(staticRads), desc='Static')
 
 Create Beta Variable Radius
 
-
 ```python
 example_wanderer_median.mp_compute_flux_over_time_betaRad()
 ```
-
 
 ```python
 print('Entire Pipeline took {} seconds'.format(time() - startFull))
@@ -274,18 +266,15 @@ print('Entire Pipeline took {} seconds'.format(time() - startFull))
 
 Use Advanced clustering algorithms `DBSCAN` to compute the outliers of the flux distribution. This is sensitive the structure in the data (i.e. transit vs outlier), which is not always true with sigma-clipping.
 
-
 ```python
 example_wanderer_median.mp_DBScan_Flux_All()
 ```
 
 Check that the majority of data is an `inlier`
 
-
 ```python
 inlier_master = array(list(example_wanderer_median.inliers_Phots.values())).mean(axis=0) == 1.0
 ```
-
 
 ```python
 ((~inlier_master).sum() / inlier_master.size)*100
@@ -293,13 +282,11 @@ inlier_master = array(list(example_wanderer_median.inliers_Phots.values())).mean
 
 Compute the PLD components -- normalized and store the PLD vectors
 
-
 ```python
 example_wanderer_median.extract_PLD_components()
 ```
 
 Use Advanced clustering algorithms `DBSCAN` to compute the outliers of the PLD distributions.
-
 
 ```python
 example_wanderer_median.mp_DBScan_PLD_All()
@@ -307,16 +294,15 @@ example_wanderer_median.mp_DBScan_PLD_All()
 
 # Save all of your progress per AOR
 
-
 ```python
 print('Saving `example_wanderer_median` to a set of pickles for various Image Cubes and the Storage Dictionary')
 
-savefiledir         = environ['HOME']+'/Research/Planets/'+planetName+'/ExtracedData/' + channel 
+savefiledir         = environ['HOME']+'/Research/Planets/'+planetName+'/ExtractedData/' + channel
 saveFileNameHeader  = planetName+'_'+ AORNow +'_Median'
 saveFileType        = '.joblib.save'
 
-if not path.exists(environ['HOME']+'/Research/Planets/'+planetName+'/ExtracedData/'):
-    mkdir(environ['HOME']+'/Research/Planets/'+planetName+'/ExtracedData/')
+if not path.exists(environ['HOME']+'/Research/Planets/'+planetName+'/ExtractedData/'):
+    mkdir(environ['HOME']+'/Research/Planets/'+planetName+'/ExtractedData/')
 
 if not path.exists(savefiledir):
     print('Creating ' + savefiledir)
@@ -333,7 +319,6 @@ example_wanderer_median.save_data_to_save_files(savefiledir=savefiledir, \
 
 Compute the RMS in the raw data as a function of the apeture radius
 
-
 ```python
 color_cycle = rcParams['axes.prop_cycle'].by_key()['color']
 
@@ -346,7 +331,6 @@ ax.set_xlabel('Aperture Radius')
 ax.set_ylabel('MAD( Diff ( Flux ) )')
 ```
 
-
 ```python
 print('Entire Pipeline took {} seconds'.format(time() - startFull))
 ```
@@ -356,7 +340,6 @@ print('Entire Pipeline took {} seconds'.format(time() - startFull))
 # I made up this loop and did not test it
 
 Keys for `skywalker` input
-
 
 ```python
 flux_key = 'phots'
@@ -371,7 +354,6 @@ xwidth_key = 'xwidths'
 ```
 
 Things that **DON'T** change with respect to aperture radii
-
 
 ```python
 timeCube = example_wanderer_median.timeCube
@@ -405,23 +387,22 @@ pld_output_c = np.array(list([time_c]) + list(pld_comp_c))
 
 Things that **DO** change with respect to aperture radii
 
-
 ```python
 for phot_select, key_flux_now in tqdm(enumerate(example_wanderer_median.flux_TSO_df.keys())):
     if key_flux_now[-3:] == 0.0: # only do static radii
         flux_c = example_wanderer_median.flux_TSO_df[key_flux_now].values[inliersMaster]
         noise_c = example_wanderer_median.noise_TSO_df[key_flux_now].values[inliersMaster]
-        
-        output_dict = {time_key: time_c, 
-                       flux_key: flux_c, 
-                       flux_err_key: noise_c, 
-                       eff_width_key: npix_c, 
-                       xcenter_key: xpos_c, 
-                       ycenter_key: ypos_c, 
-                       xwidth_key: xwidth_c, 
-                       ywidth_key: ywidth_c, 
+
+        output_dict = {time_key: time_c,
+                       flux_key: flux_c,
+                       flux_err_key: noise_c,
+                       eff_width_key: npix_c,
+                       xcenter_key: xpos_c,
+                       ycenter_key: ypos_c,
+                       xwidth_key: xwidth_c,
+                       ywidth_key: ywidth_c,
                        pld_coeff_key: pld_comp_c}
-        
+
         # This creates 1 joblib output file for one static aperture radius -- need to be cycled from above: change `staticRad = '2.5'` to new radius
         joblib.dump(output_dict, '{}_full_output_for_skywalker_pipeline_{}_{}_{}.joblib.save'.format(planet_dir_name, channel, staticRad, varRad))
 ```
@@ -430,7 +411,6 @@ for phot_select, key_flux_now in tqdm(enumerate(example_wanderer_median.flux_TSO
 
 This is the code I used to make the for loop above  
 If the for loop does not work, try / check this
-
 
 ```python
 timeCube = example_wanderer_median.timeCube
@@ -448,7 +428,6 @@ except:
     inliers_PLD = np.ones(PLDFeatureLocal.shape)
 ```
 
-
 ```python
 # Gaussian_Fit_AnnularMask_rad_2.5_0.0
 
@@ -458,12 +437,10 @@ key_flux_now = 'Gaussian_Fit_AnnularMask_rad_'+staticRad+'_'+varRad
 phot_select = np.where(example_wanderer_median.flux_TSO_df.keys() == key_flux_now)[0][0]
 ```
 
-
 ```python
 inliersMaster = array(list(inliers_Phots)).all(axis=0) # Need to Switch `axis=0` for Qatar-2
 inliersMaster = inliersMaster * inliers_PLD.all(axis=1)
 ```
-
 
 ```python
 nSig = 6 # vary this as desired
@@ -473,17 +450,16 @@ if inliersMaster.all():
     print('Working on AOR {}'.format(AORNow))
     cy_now, cx_now        = example_wanderer_median.centering_GaussianFit.T
     phots_now             = phots_array[:,phot_select]
-    
+
     phots_clipped         = clipOutlier2D(phots_now, nSig=nSig)
     cy_clipped, cx_clipped= clipOutlier2D(transpose([cy_now, cx_now]),nSig=nSig).T
     arr2D_clipped         = transpose([phots_clipped, cy_clipped, cx_clipped])
-    
+
     # 3D inlier selection
     inliersMaster = (phots_clipped == phots_now)*(cy_clipped==cy_now)*(cx_clipped==cx_now)
 else:
     print("this box is just to double check -- keeping all inlier flags from above"
 ```
-
 
 ```python
 ypos, xpos = clipOutlier2D(transpose([example_wanderer_median.centering_GaussianFit.T[y][inliersMaster], \
@@ -491,7 +467,6 @@ ypos, xpos = clipOutlier2D(transpose([example_wanderer_median.centering_Gaussian
 
 npix = sqrt(example_wanderer_median.effective_widths[inliersMaster])
 ```
-
 
 ```python
 flux_c = phots_array[:, phot_select][inliersMaster]
@@ -504,7 +479,6 @@ time_c = timeCube[inliersMaster]
 ywidths_c, xwidths_c = example_wanderer_median.widths_GaussianFit[inliersMaster].T
 ```
 
-
 ```python
 # I am guessing that this will work.
 # I'm keeping the commented line because that's what I used before
@@ -513,7 +487,6 @@ ywidths_c, xwidths_c = example_wanderer_median.widths_GaussianFit[inliersMaster]
 pld_comp_c = example_wanderer_median.PLD_components.T # this is new to Carlos's notebook instance
 pld_output_c = np.array(list([time_c]) + list(pld_comp_c))
 ```
-
 
 ```python
 flux_key = 'phots'
@@ -526,23 +499,18 @@ xcenter_key = 'xcenters'
 ywidth_key = 'ywidths'
 xwidth_key = 'xwidths'
 
-output_dict = {time_key: time_c, 
-               flux_key: flux_c, 
-               flux_err_key: noise_c, 
-               eff_width_key: npix_c, 
-               xcenter_key: xpos_c, 
-               ycenter_key: ypos_c, 
-               xwidth_key: xwidth_c, 
-               ywidth_key: ywidth_c, 
+output_dict = {time_key: time_c,
+               flux_key: flux_c,
+               flux_err_key: noise_c,
+               eff_width_key: npix_c,
+               xcenter_key: xpos_c,
+               ycenter_key: ypos_c,
+               xwidth_key: xwidth_c,
+               ywidth_key: ywidth_c,
                pld_coeff_key: pld_comp_c}
 
 # This creates 1 joblib output file for one static aperture radius -- need to be cycled from above: change `staticRad = '2.5'` to new radius
 joblib.dump(output_dict, '{}_full_output_for_skywalker_pipeline_{}_{}_{}.joblib.save'.format(planet_dir_name, channel, staticRad, varRad))
 ```
 
-
-
-
     ['qatar2_full_output_for_pipeline_ch2_2.5_0.0.joblib.save']
-
-
