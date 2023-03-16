@@ -33,8 +33,8 @@ from tqdm import tqdm, tqdm_notebook
 
 # from skimage.filters import gaussian as gaussianFilter
 # import everything that `Wanderer` needs to operate
-# from .auxiliary import *
-from .auxiliary import (
+# from .utils import *
+from .utils import (
     # actr,
     clip_outlier,
     command_line_inputs,
@@ -2637,6 +2637,7 @@ def load_wanderer_instance_from_file(
     startFull = time()
     print(f'Found {num_cores} cores to process')
 
+    data_config.data_dir = data_config.data_dir or 'aordirs'
     fits_file_dir, fitsFilenames, uncsFilenames = grab_dir_and_filenames(
         data_config=data_config,
         fits_format=fits_format,

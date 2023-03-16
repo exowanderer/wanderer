@@ -12,7 +12,7 @@ from statsmodels.robust import scale
 
 # TODO: make this more direct
 from wanderer.wanderer import Wanderer
-from wanderer.auxiliary import command_line_inputs, clipOutlier2D
+from wanderer.utils import command_line_inputs, clipOutlier2D
 
 clargs = command_line_inputs(check_defaults=True)
 

@@ -10,7 +10,7 @@ from time import time
 
 # TODO: make this more direct
 from wanderer.wanderer import Wanderer
-from wanderer.auxiliary import command_line_inputs
+from wanderer.utils import command_line_inputs
 
 
 def plotly_scattergl_flux_over_time(wanderer, normalise=True):
