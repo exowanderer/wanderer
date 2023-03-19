@@ -56,7 +56,8 @@ from .utils import (
     measure_one_median_bg,
     measure_one_kde_bg,
     moments,
-    pool_run_func
+    pool_run_func,
+    WandererCLI
 )
 
 
@@ -393,8 +394,8 @@ class Wanderer(object):
             savefiledir = './'
 
         print('Loading from Master Files')
-        files_path_start = os.path.join(savefiledir, save_name_header)
-        file_path_template = files_path_start + '{0}' + save_file_type
+        file_path_base = os.path.join(savefiledir, save_name_header)
+        file_path_template = file_path_base + '{0}' + save_file_type
 
         print(f"Loading {file_path_template.format('_centering_dataframe')}")
         self.centering_df = joblib.load(
@@ -463,11 +464,17 @@ class Wanderer(object):
             '_noise_cube_array': self.noise_cube,
             '_time_cube_array': self.time_cube,
             '_image_bad_pix_cube_array': self.bad_pixel_masks,
-            '_save_dict': self.save_dict,
+            # '_save_dict': self.save_dict,
         }
 
         for filename_, df_ in dump_dict.items():
-            joblib.dump(df_, file_path_template.format(filename_))
+            # joblib.dump(df_, file_path_template.format(filename_))
+            df_.to_csv(file_path_template.format(filename_))
+
+        joblib.dump(
+            self.save_dict,
+            file_path_template.format(_save_dict)
+        )
 
     def save_data_to_save_files(
             self, savefiledir=None, save_name_header=None,
@@ -525,8 +532,8 @@ class Wanderer(object):
         if save_master:
             print('\nSaving to Master File -- Overwriting Previous Master')
 
-            files_path_start = os.path.join(savefiledir, save_name_header)
-            file_path_template = files_path_start + "{0}" + save_file_type
+            file_path_base = os.path.join(savefiledir, save_name_header)
+            file_path_template = file_path_base + '{0}' + save_file_type
 
             self.save_collection(file_path_template)
 
@@ -2609,39 +2616,46 @@ class Wanderer(object):
 
 
 def load_wanderer_instance_from_file(
-        planet_name=None, channel=None, aor_dir=None, check_defaults=False):
+        planet_name=None, channel=None, aor_dir=None, shell=True,
+        check_defaults=True):
 
-    data_config = command_line_inputs(check_defaults=check_defaults)
+    if shell:
+        data_config = command_line_inputs(check_defaults=check_defaults)
+    else:
+        data_config = WandererCLI()
+        # data_config = default_inputs(check_defaults=check_defaults)
 
     # data_config.planet_name = 'hatp26b'
     # data_config.channel = 'ch2'
     # data_config.aor_dir = 'r42621184'
+    # print(planet_name, channel, aor_dir)
 
-    planet_name = planet_name or data_config.planet_name
-    channel = channel or data_config.channel
-    aor_dir = aor_dir or data_config.aor_dir
-    planets_dir = data_config.planets_dir
-    load_sub_dir = data_config.save_sub_dir
+    data_config.planet_name = planet_name or data_config.planet_name
+    data_config.channel = channel or data_config.channel
+    data_config.aor_dir = aor_dir or data_config.aor_dir
+
+    # planets_dir = data_config.planets_dir
+    # load_sub_dir = data_config.save_sub_dir
     # data_sub_dir = data_config.data_sub_dir
     # data_tail_dir = data_config.data_tail_dir
-    fits_format = data_config.fits_format
-    unc_format = data_config.unc_format
-    load_file_type = data_config.save_file_type
-    method = data_config.method
-    telescope = data_config.telescope
-    # output_units = data_config.output_units
-    # data_dir = data_config.data_dir or 'aordirs'
-    num_cores = data_config.num_cores
-    verbose = data_config.verbose
+    # fits_format = data_config.fits_format
+    # unc_format = data_config.unc_format
+    # load_file_type = data_config.save_file_type
+    # method = data_config.method
+    # telescope = data_config.telescope
+    # # output_units = data_config.output_units
+    data_dir = data_config.data_dir or 'aordirs'
+    # num_cores = data_config.num_cores
+    # verbose = data_config.verbose
 
     startFull = time()
-    print(f'Found {num_cores} cores to process')
+    print(f'Found {data_config.num_cores} cores to process')
 
     data_config.data_dir = data_config.data_dir or 'aordirs'
     fits_file_dir, fitsFilenames, uncsFilenames = grab_dir_and_filenames(
         data_config=data_config,
-        fits_format=fits_format,
-        unc_format=unc_format
+        fits_format=data_config.fits_format,
+        unc_format=data_config.unc_format
     )
 
     loadfiledir = os.path.join(
@@ -2659,9 +2673,9 @@ def load_wanderer_instance_from_file(
         f'Num Unc Files:\t{len(uncsFilenames)}\n\n'
     )
 
-    if verbose:
+    if data_config.verbose:
         print(fitsFilenames)
-    if verbose:
+    if data_config.verbose:
         print(uncsFilenames)
 
     # Necessary Constants Spitzer
@@ -2670,34 +2684,34 @@ def load_wanderer_instance_from_file(
 
     yguess, xguess = 15., 15.   # Specific to Spitzer circa 2010 and beyond
     # Specific to Spitzer Basic Calibrated Data
-    filetype = f'{fits_format}.fits'
+    filetype = f'{data_config.fits_format}.fits'
 
     print('Initialize an instance of `Wanderer`\n')
     wanderer = Wanderer(
         fits_file_dir=fits_file_dir,
         filetype=filetype,
-        telescope=telescope,
+        telescope=data_config.telescope,
         yguess=yguess,
         xguess=xguess,
-        method=method,
-        num_cores=num_cores
+        method=data_config.method,
+        num_cores=data_config.num_cores
     )
 
-    wanderer.AOR = aor_dir
-    wanderer.planet_name = planet_name
-    wanderer.channel = channel
+    wanderer.AOR = data_config.aor_dir
+    wanderer.planet_name = data_config.planet_name
+    wanderer.channel = data_config.channel
 
     print(
         'Loading `wanderer` to a set of pickles for various '
         'Image Cubes and the Storage Dictionary'
     )
 
-    load_name_header = f'{planet_name}_{aor_dir}_median'
+    load_name_header = f'{data_config.planet_name}_{data_config.aor_dir}_median'
 
     path_to_files = os.path.join(
-        planets_dir,
-        # planet_name,
-        load_sub_dir
+        data_config.planets_dir,
+        # data_config.planet_name,
+        data_config.save_sub_dir
     )
     if not os.path.exists(path_to_files):
         raise ValueError()
@@ -2708,7 +2722,7 @@ def load_wanderer_instance_from_file(
 
     load_path = os.path.join(
         loadfiledir,
-        f'{load_name_header}_STRUCTURE{load_file_type}'
+        f'{load_name_header}_STRUCTURE{data_config.save_file_type}'
     )
 
     print()
@@ -2718,7 +2732,7 @@ def load_wanderer_instance_from_file(
     wanderer.load_data_from_save_files(
         savefiledir=loadfiledir,
         save_name_header=load_name_header,
-        save_file_type=load_file_type
+        save_file_type=data_config.save_file_type
     )
 
     print(f'Entire Pipeline took {time() - startFull} seconds')

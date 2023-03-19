@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 # Licensed under a 3-clause BSD style license - see LICENSE.rst
-import pathlib
 try:
     from astropy_helpers.version_helpers import generate_version_py
     from astropy_helpers.git_helpers import get_git_devstr
@@ -10,7 +9,8 @@ try:
 except Exception as e:
     # print(f'{e}')
     raise ImportError(
-        'User must install astropy-helper before running setup. Suggest: conda install astropy-helpers'
+        f'User must install astropy-helper before running setup. '
+        f'Suggest: conda install astropy-helpers'
     ) from e
 
 import builtins
@@ -38,9 +38,8 @@ __minimum_python_version__ = metadata.get("minimum_python_version", "3.5")
 # Enforce Python version check - this is the same check as in __init__.py but
 # this one has to happen before importing ah_bootstrap.
 if sys.version_info < tuple((int(val) for val in __minimum_python_version__.split('.'))):
-    sys.stderr.write(
-        f"ERROR: Wanderer requires Python {__minimum_python_version__} or later\n"
-    )
+    sys.stderr.write("ERROR: Wanderer requires Python {} or later\n".format(
+        __minimum_python_version__))
     sys.exit(1)
 
 # Import ah_bootstrap after the python version validation
@@ -56,13 +55,18 @@ builtins._ASTROPY_SETUP_ = True
 #   (3) load README.rst,
 #   (4) package docstring
 readme_glob = 'README*'
-if _cfg_long_description := metadata.get('long_description', ''):
+_cfg_long_description = metadata.get('long_description', '')
+if _cfg_long_description:
     LONG_DESCRIPTION = _cfg_long_description
 
 elif os.path.exists('LONG_DESCRIPTION.rst'):
-    LONG_DESCRIPTION = pathlib.Path('LONG_DESCRIPTION.rst').read_text()
+    with open('LONG_DESCRIPTION.rst') as f:
+        LONG_DESCRIPTION = f.read()
+
 elif len(glob.glob(readme_glob)) > 0:
-    LONG_DESCRIPTION = pathlib.Path(glob.glob(readme_glob)[0]).read_text()
+    with open(glob.glob(readme_glob)[0]) as f:
+        LONG_DESCRIPTION = f.read()
+
 else:
     # Get the long description from the package's docstring
     __import__(PACKAGENAME)
@@ -119,35 +123,33 @@ if conf.has_section('entry_points'):
 # directory name.
 c_files = []
 for root, dirs, files in os.walk(PACKAGENAME):
-    c_files.extend(
-        os.path.join(os.path.relpath(root, PACKAGENAME), filename)
-        for filename in files
-        if filename.endswith('.c')
-    )
+    for filename in files:
+        if filename.endswith('.c'):
+            c_files.append(
+                os.path.join(
+                    os.path.relpath(root, PACKAGENAME), filename))
 package_info['package_data'][PACKAGENAME].extend(c_files)
 
 # Note that requires and provides should not be included in the call to
 # ``setup``, since these are now deprecated. See this link for more details:
 # https://groups.google.com/forum/#!topic/astropy-dev/urYO8ckB2uM
 
-setup(
-    name=PACKAGENAME,
-    version=VERSION,
-    description=DESCRIPTION,
-    scripts=scripts,
-    install_requires=[
-        s.strip()
-        for s in metadata.get('install_requires', 'astropy').split(',')
-    ],
-    author=AUTHOR,
-    author_email=AUTHOR_EMAIL,
-    license=LICENSE,
-    url=URL,
-    long_description=LONG_DESCRIPTION,
-    cmdclass=cmdclassd,
-    zip_safe=False,
-    use_2to3=False,
-    entry_points=entry_points,
-    python_requires=f'>={__minimum_python_version__}',
-    **package_info,
-)
+setup(name=PACKAGENAME,
+      version=VERSION,
+      description=DESCRIPTION,
+      scripts=scripts,
+      install_requires=[s.strip() for s in metadata.get(
+          'install_requires', 'astropy').split(',')],
+      author=AUTHOR,
+      author_email=AUTHOR_EMAIL,
+      license=LICENSE,
+      url=URL,
+      long_description=LONG_DESCRIPTION,
+      cmdclass=cmdclassd,
+      zip_safe=False,
+      use_2to3=False,
+      # install_requires = ['numpy', 'scipy', 'corner', 'lmfit-py', 'emcee'],
+      entry_points=entry_points,
+      python_requires='>={}'.format(__minimum_python_version__),
+      **package_info
+      )

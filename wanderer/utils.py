@@ -53,7 +53,7 @@ class WandererCLI:
     method: str = 'median'
     telescope: str = 'Spitzer'
     output_units: str = 'electrons'
-    data_dir: str = ''
+    data_dir: str = None
     num_cores: int = 1
     verbose: bool = False
 
@@ -108,27 +108,26 @@ def command_line_inputs(check_defaults=True):
 
 
 def convert_args_to_dataclass(args, check_defaults=True):
-    clargs = WandererCLI()
-    clargs.args_obj = WandererCLI()
-    clargs.planet_name = args['planet_name']
-    clargs.channel = args['channel']
-    clargs.aor_dir = args['aor_dir']
-    clargs.planets_dir = args['planets_dir']
-    clargs.save_sub_dir = args['save_sub_dir']
-    clargs.data_sub_dir = args['data_sub_dir']
-    clargs.data_tail_dir = args['data_tail_dir']
-    clargs.fits_format = args['fits_format']
-    clargs.unc_format = args['unc_format']
-    clargs.method = args['method']
-    clargs.telescope = args['telescope']
-    clargs.output_units = args['output_units']
-    clargs.data_dir = args['data_dir']
-    clargs.num_cores = args['num_cores']
-    clargs.verbose = args['verbose']
+    data_config = WandererCLI()
+    data_config.planet_name = args['planet_name']
+    data_config.channel = args['channel']
+    data_config.aor_dir = args['aor_dir']
+    data_config.planets_dir = args['planets_dir']
+    data_config.save_sub_dir = args['save_sub_dir']
+    data_config.data_sub_dir = args['data_sub_dir']
+    data_config.data_tail_dir = args['data_tail_dir']
+    data_config.fits_format = args['fits_format']
+    data_config.unc_format = args['unc_format']
+    data_config.method = args['method']
+    data_config.telescope = args['telescope']
+    data_config.output_units = args['output_units']
+    data_config.data_dir = args['data_dir']
+    data_config.num_cores = args['num_cores']
+    data_config.verbose = args['verbose']
 
     if check_defaults:
         # Check important defaults directly
-        if clargs.planet_name == 'planetname':
+        if data_config.planet_name == 'planetname':
             print(
                 UserWarning(
                     '\n[WARNING] User is using default planet_name="planetname"'
@@ -136,17 +135,17 @@ def convert_args_to_dataclass(args, check_defaults=True):
                 )
             )
 
-        assert (clargs.channel is not None), \
+        assert (data_config.channel is not None), \
             'Please call command line with `-c` or `--channel`'
-        assert (clargs.aor_dir is not None), \
+        assert (data_config.aor_dir is not None), \
             'Please call command line with `-ad` or `--aor_dir`'
 
-    return clargs
+    return data_config
 
 
 def plotly_scattergl_flux_over_time(
         wanderer, normalise=True, n_sig=3, data_config=None, y_range=None,
-        width=1800, height=1000, margins=None):
+        title='', width=1800, height=800, margins=None):
 
     if margins is None:
         margins = {'l': 20, 'r': 20, 't': 50, 'b': 20}
@@ -158,9 +157,8 @@ def plotly_scattergl_flux_over_time(
         for colname in fluxs.columns:
             fluxs[colname] = fluxs[colname] / np.median(fluxs[colname])
 
-    title = ''
     if data_config is not None:
-        title = f'{data_config.planet_name} {data_config.aor_dir}'
+        title = f'{title} - {data_config.planet_name} - {data_config.aor_dir}'
         title = f'{title} Flux over Time'
 
     if y_range is None and normalise:
@@ -231,7 +229,7 @@ def compute_x_range_dict(ycenters, xcenters, n_sig):
 def plotly_scattergl_flux_vs_centers1D(
         wanderer, centering='fluxweighted', normalise=True, n_sig=3, fmt='-',
         y_range=None, x_range=None, data_config=None, colorscale='plasma',
-        width=1600, height=1000, margins=None):
+        width=1600, height=800, margins=None):
 
     if margins is None:
         margins = {'l': 20, 'r': 20, 't': 50, 'b': 20}
@@ -341,7 +339,7 @@ def plotly_scattergl_flux_vs_centers1D(
 def plotly_scattergl_flux_vs_centers2D(
         wanderer, centering='fluxweighted', normalise=True, n_sig=3, fmt='-',
         y_range=None, x_range=None, data_config=None, columns=None,
-        colorscale='plasma', width=1600, height=1000, margins=None):
+        colorscale='plasma', width=1600, height=800, margins=None):
 
     if margins is None:
         margins = {'l': 20, 'r': 20, 't': 50, 'b': 20}
@@ -470,7 +468,7 @@ def plotly_scattergl_flux_vs_centers2D(
 def plotly_surface3D_plot_centers_vs_flux(
         wanderer, normalise=True, n_sig=3, fmt='-', y_range=None, x_range=None,
         columns=None, centering='fluxweighted', colorscale='plasma',
-        width=1600, height=1000, margins=None):
+        width=1600, height=800, margins=None):
 
     if margins is None:
         margins = {'l': 20, 'r': 20, 't': 50, 'b': 20}
@@ -560,7 +558,8 @@ def grab_dir_and_filenames(data_config, fits_format='bcd', unc_format='bunc'):
         'Exoplanet Time Series Observation Photometry**\n\n'
     )
 
-    data_dir = data_config.data_dir
+    data_dir = data_config.data_dir or 'aordirs'
+
     if data_dir is None:
         data_dir = os.path.join(
             data_config.planets_dir,
