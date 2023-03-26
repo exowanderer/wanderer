@@ -413,11 +413,11 @@ class Wanderer(object):
         )
 
         noise_file_path = file_path_template.format('_noise_tso_dataframe')
-
         if os.path.exists(noise_file_path):
             print(f"Loading {noise_file_path}")
             self.noise_tso_df = joblib.load(noise_file_path)
         else:
+            print(f"Does Not Exist: {noise_file_path}")
             self.noise_tso_df = None
 
         print(f"Loading {file_path_template.format('_image_cube_array')}")
@@ -464,6 +464,7 @@ class Wanderer(object):
             '_noise_cube_array': self.noise_cube,
             '_time_cube_array': self.time_cube,
             '_image_bad_pix_cube_array': self.bad_pixel_masks,
+            '_noise_tso_dataframe': self.noise_tso_df,
             # '_save_dict': self.save_dict,
         }
 
@@ -1537,13 +1538,13 @@ class Wanderer(object):
             image_sq_sum = (self.image_cube**2).sum(axis=(1, 2))
             self.effective_widths = image_sum_sq / image_sq_sum
 
-        self.centering_df['Effective_widths'] = self.effective_widths
+        self.centering_df['effective_widths'] = self.effective_widths
 
         x_widths = self.centering_df['gaussian_fit_x_widths']
         y_widths = self.centering_df['gaussian_fit_y_widths']
 
         self.quadrature_widths = np.sqrt(x_widths**2 + y_widths**2)
-        self.centering_df['Quadrature_widths'] = self.quadrature_widths
+        self.centering_df['quadrature_widths'] = self.quadrature_widths
 
     def measure_background_circle_masked(
             self, aper_rad=10, centering='fluxweight'):
